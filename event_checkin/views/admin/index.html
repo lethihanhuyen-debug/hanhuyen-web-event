@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block title %}Quản Trị | Event Check-in{% endblock %}
+
+{% block content %}
+<section class="admin-panel">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Bảng điều khiển</p>
+      <h1>Quản trị check-in</h1>
+    </div>
+    <div class="panel-actions">
+      <a class="btn btn--ghost" href="{{ url_for('admin.export_csv') }}">Xuất CSV</a>
+      <button id="openResetModal" class="btn btn--danger" type="button">Xóa dữ liệu</button>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <article class="stat-card">
+      <span>Tổng đăng ký</span>
+      <strong>{{ stats.total_registrations }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Check-in hôm nay</span>
+      <strong>{{ stats.total_checkins_today }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Chưa check-in</span>
+      <strong>{{ stats.pending }}</strong>
+    </article>
+  </div>
+
+  <div class="table-card">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>STT</th>
+            <th>Mã CB/SV</th>
+            <th>Họ tên</th>
+            <th>Đơn vị</th>
+            <th>Email</th>
+            <th>Giờ đăng ký</th>
+            <th>Trạng thái check-in</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.stt }}</td>
+            <td>{{ row.ma_cbsv }}</td>
+            <td>{{ row.ho_ten }}</td>
+            <td>{{ row.don_vi }}</td>
+            <td>{{ row.email }}</td>
+            <td>{{ row.thoi_gian_dang_ky }}</td>
+            <td>
+              <span class="badge {% if row.trang_thai == 'Đã check-in' %}badge--success{% else %}badge--warning{% endif %}">
+                {{ row.trang_thai }}{% if row.checkin_time %} lúc {{ row.checkin_time }}{% endif %}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div id="resetModal" class="modal" aria-hidden="true">
+  <div class="modal__backdrop"></div>
+  <div class="modal__dialog">
+    <h2>Xác nhận xóa dữ liệu</h2>
+    <p>Hành động này sẽ xóa toàn bộ registrations và checkins. Bạn có chắc chắn không?</p>
+    <div class="modal__actions">
+      <button id="cancelReset" class="btn btn--ghost" type="button">Hủy</button>
+      <button id="confirmReset" class="btn btn--danger" type="button">Xóa ngay</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const modal = document.getElementById('resetModal');
+  const openButton = document.getElementById('openResetModal');
+  const cancelButton = document.getElementById('cancelReset');
+  const confirmButton = document.getElementById('confirmReset');
+
+  function openModal() {
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeModal() {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  openButton.addEventListener('click', openModal);
+  cancelButton.addEventListener('click', closeModal);
+  modal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal__backdrop')) {
+      closeModal();
+    }
+  });
+
+  confirmButton.addEventListener('click', async () => {
+    try {
+      const response = await fetch('/admin/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        window.location.reload();
+      } else {
+        alert(data.message || 'Không thể xóa dữ liệu.');
+      }
+    } catch (error) {
+      alert('Không thể kết nối máy chủ.');
+    }
+  });
+})();
+</script>
+{% endblock %}

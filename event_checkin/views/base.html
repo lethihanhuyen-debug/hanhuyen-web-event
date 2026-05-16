@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Event Check-in{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <a class="brand" href="{{ url_for('register.index') }}">Event Check-in</a>
+      <nav class="nav">
+        <a class="nav__link {% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng Ký</a>
+        <a class="nav__link {% if request.path.startswith('/checkin') %}is-active{% endif %}" href="{{ url_for('checkin.index') }}">Check-in</a>
+        <a class="nav__link {% if request.path.startswith('/admin') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản Trị</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <div class="container">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

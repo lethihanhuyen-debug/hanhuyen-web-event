@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Check-in | Event Check-in{% endblock %}
+
+{% block content %}
+<section class="checkin-stage">
+  <div class="checkin-card">
+    <p class="eyebrow">Check-in sự kiện</p>
+    <h1>Quét hoặc nhập mã CB/SV</h1>
+    <p class="muted">Hệ thống sẽ phản hồi ngay phía dưới và tự động sẵn sàng cho lần quét tiếp theo.</p>
+
+    <div class="checkin-form">
+      <input id="checkinInput" type="text" placeholder="Nhập hoặc quét Mã CB/SV" autocomplete="off" autofocus>
+      <button id="checkinBtn" class="btn btn--primary" type="button">Check-in</button>
+    </div>
+
+    <div id="checkinResult" class="checkin-result" aria-live="polite"></div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const input = document.getElementById('checkinInput');
+  const button = document.getElementById('checkinBtn');
+  const result = document.getElementById('checkinResult');
+
+  function paint(kind, text) {
+    result.className = 'checkin-result checkin-result--' + kind;
+    result.textContent = text;
+  }
+
+  async function submitCheckin() {
+    const ma_cbsv = input.value.trim();
+    if (!ma_cbsv) {
+      paint('error', 'Vui lòng nhập mã CB/SV.');
+      input.focus();
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ma_cbsv }),
+      });
+      const data = await response.json();
+
+      if (response.status === 404) {
+        paint('error', '❌ Mã ' + ma_cbsv + ' chưa đăng ký tham gia chương trình');
+      } else if (data.checked_in) {
+        paint('warning', '⚠️ ' + data.message);
+      } else if (data.success) {
+        paint('success', '✅ Cảm ơn ' + data.ho_ten + ' đã check-in lúc ' + data.thoi_gian);
+      } else {
+        paint('error', data.message || 'Đã xảy ra lỗi.');
+      }
+    } catch (error) {
+      paint('error', 'Không thể kết nối máy chủ.');
+    } finally {
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  button.addEventListener('click', submitCheckin);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitCheckin();
+    }
+  });
+})();
+</script>
+{% endblock %}

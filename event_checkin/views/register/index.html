@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}Đăng Ký | Event Check-in{% endblock %}
+
+{% block content %}
+<section class="hero-card">
+  <div>
+    <p class="eyebrow">Đăng ký tham gia</p>
+    <h1>Quản lý đăng ký sự kiện sinh viên</h1>
+    <p class="muted">Nhập mã CB/SV để tự động điền thông tin, sau đó gửi đăng ký bằng AJAX mà không cần tải lại trang.</p>
+  </div>
+
+  <div class="form-card">
+    <div id="registerMessage" class="message" hidden></div>
+    <form id="registerForm" class="form-grid">
+      <label>
+        <span>Mã CB/SV</span>
+        <input type="text" name="ma_cbsv" id="ma_cbsv" placeholder="Nhập mã CB/SV" required>
+      </label>
+      <label>
+        <span>Họ tên</span>
+        <input type="text" name="ho_ten" id="ho_ten" placeholder="Họ và tên" required>
+      </label>
+      <label>
+        <span>Đơn vị</span>
+        <input type="text" name="don_vi" id="don_vi" placeholder="Đơn vị / Khoa">
+      </label>
+      <label>
+        <span>Chức vụ</span>
+        <input type="text" name="chuc_vu" id="chuc_vu" placeholder="Chức vụ">
+      </label>
+      <label>
+        <span>SĐT</span>
+        <input type="text" name="so_dien_thoai" id="so_dien_thoai" placeholder="Số điện thoại">
+      </label>
+      <label>
+        <span>Email</span>
+        <input type="email" name="email" id="email" placeholder="Email">
+      </label>
+      <button class="btn btn--primary btn--full" type="submit">Gửi đăng ký</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const form = document.getElementById('registerForm');
+  const message = document.getElementById('registerMessage');
+  const maInput = document.getElementById('ma_cbsv');
+  const hoTenInput = document.getElementById('ho_ten');
+  const donViInput = document.getElementById('don_vi');
+  const chucVuInput = document.getElementById('chuc_vu');
+  const sdtInput = document.getElementById('so_dien_thoai');
+  const emailInput = document.getElementById('email');
+
+  function showMessage(text, type) {
+    message.hidden = false;
+    message.className = 'message message--' + type;
+    message.textContent = text;
+  }
+
+  maInput.addEventListener('blur', async () => {
+    const value = maInput.value.trim();
+    if (!value) return;
+    try {
+      const response = await fetch('/api/lookup/' + encodeURIComponent(value));
+      const result = await response.json();
+      if (!result.success) {
+        showMessage(result.message || 'Không tìm thấy thông tin.', 'error');
+        return;
+      }
+      const data = result.data;
+      hoTenInput.value = data.ho_ten || '';
+      donViInput.value = data.don_vi || '';
+      chucVuInput.value = data.chuc_vu || '';
+      sdtInput.value = data.so_dien_thoai || '';
+      emailInput.value = data.email || '';
+      showMessage('Đã tự động điền thông tin từ danh sách CB/SV.', 'success');
+    } catch (error) {
+      showMessage('Không thể tra cứu dữ liệu.', 'error');
+    }
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const payload = {
+      ma_cbsv: maInput.value.trim(),
+      ho_ten: hoTenInput.value.trim(),
+      don_vi: donViInput.value.trim(),
+      chuc_vu: chucVuInput.value.trim(),
+      so_dien_thoai: sdtInput.value.trim(),
+      email: emailInput.value.trim(),
+    };
+
+    try {
+      const response = await fetch('/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        showMessage(result.message || 'Đăng ký thất bại.', 'error');
+        return;
+      }
+      showMessage(result.message, 'success');
+      form.reset();
+      maInput.focus();
+    } catch (error) {
+      showMessage('Lỗi khi gửi đăng ký.', 'error');
+    }
+  });
+})();
+</script>
+{% endblock %}
