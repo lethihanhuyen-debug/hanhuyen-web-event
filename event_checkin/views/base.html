@@ -16,9 +16,10 @@
     <div class="container topbar__inner">
       <a class="brand" href="{{ url_for('register.index') }}">Event Check-in</a>
       <nav class="nav">
-        <a class="nav__link {% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng Ký</a>
+        <a class="nav__link {% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Dang ky</a>
         <a class="nav__link {% if request.path.startswith('/checkin') %}is-active{% endif %}" href="{{ url_for('checkin.index') }}">Check-in</a>
-        <a class="nav__link {% if request.path.startswith('/admin') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản Trị</a>
+        <a class="nav__link {% if request.path.startswith('/admin') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quan tri</a>
+        <a class="nav__link {% if request.path.startswith('/verify') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Chung nhan</a>
       </nav>
     </div>
   </header>

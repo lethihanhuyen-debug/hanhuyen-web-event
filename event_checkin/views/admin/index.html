@@ -1,31 +1,35 @@
 {% extends 'base.html' %}
-{% block title %}Quản Trị | Event Check-in{% endblock %}
+{% block title %}Quan tri | Event Check-in{% endblock %}
 
 {% block content %}
 <section class="admin-panel">
   <div class="panel-head">
     <div>
-      <p class="eyebrow">Bảng điều khiển</p>
-      <h1>Quản trị check-in</h1>
+      <p class="eyebrow">Bang dieu khien</p>
+      <h1>Quan tri check-in</h1>
     </div>
     <div class="panel-actions">
-      <a class="btn btn--ghost" href="{{ url_for('admin.export_csv') }}">Xuất CSV</a>
-      <button id="openResetModal" class="btn btn--danger" type="button">Xóa dữ liệu</button>
+      <a class="btn btn--ghost" href="{{ url_for('admin.export_csv') }}">Xuat CSV</a>
+      <button id="openResetModal" class="btn btn--danger" type="button">Xoa du lieu</button>
     </div>
   </div>
 
   <div class="stat-grid">
     <article class="stat-card">
-      <span>Tổng đăng ký</span>
+      <span>Tong dang ky</span>
       <strong>{{ stats.total_registrations }}</strong>
     </article>
     <article class="stat-card">
-      <span>Check-in hôm nay</span>
+      <span>Check-in hom nay</span>
       <strong>{{ stats.total_checkins_today }}</strong>
     </article>
     <article class="stat-card">
-      <span>Chưa check-in</span>
+      <span>Chua check-in</span>
       <strong>{{ stats.pending }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Chung nhan da cap</span>
+      <strong>{{ stats.total_certificates }}</strong>
     </article>
   </div>
 
@@ -35,12 +39,13 @@
         <thead>
           <tr>
             <th>STT</th>
-            <th>Mã CB/SV</th>
-            <th>Họ tên</th>
-            <th>Đơn vị</th>
+            <th>Ma CB/SV</th>
+            <th>Ho ten</th>
+            <th>Don vi</th>
             <th>Email</th>
-            <th>Giờ đăng ký</th>
-            <th>Trạng thái check-in</th>
+            <th>Gio dang ky</th>
+            <th>Trang thai check-in</th>
+            <th>Chung nhan</th>
           </tr>
         </thead>
         <tbody>
@@ -53,9 +58,18 @@
             <td>{{ row.email }}</td>
             <td>{{ row.thoi_gian_dang_ky }}</td>
             <td>
-              <span class="badge {% if row.trang_thai == 'Đã check-in' %}badge--success{% else %}badge--warning{% endif %}">
-                {{ row.trang_thai }}{% if row.checkin_time %} lúc {{ row.checkin_time }}{% endif %}
+              <span class="badge {% if row.trang_thai == 'Da check-in' %}badge--success{% else %}badge--warning{% endif %}">
+                {{ row.trang_thai }}{% if row.checkin_time %} luc {{ row.checkin_time }}{% endif %}
               </span>
+            </td>
+            <td>
+              {% if row.certificate_code %}
+                <a class="btn btn--ghost btn--sm" href="{{ row.certificate_url }}">{{ row.certificate_code }}</a>
+              {% elif row.can_generate_certificate %}
+                <button class="btn btn--primary btn--sm js-generate-certificate" type="button" data-ma-cbsv="{{ row.ma_cbsv }}">Tao chung nhan</button>
+              {% else %}
+                <span class="badge badge--warning">Chua du dieu kien</span>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -68,11 +82,11 @@
 <div id="resetModal" class="modal" aria-hidden="true">
   <div class="modal__backdrop"></div>
   <div class="modal__dialog">
-    <h2>Xác nhận xóa dữ liệu</h2>
-    <p>Hành động này sẽ xóa toàn bộ registrations và checkins. Bạn có chắc chắn không?</p>
+    <h2>Xac nhan xoa du lieu</h2>
+    <p>Hanh dong nay se xoa toan bo registrations, checkins va chung nhan. Ban co chac chan khong?</p>
     <div class="modal__actions">
-      <button id="cancelReset" class="btn btn--ghost" type="button">Hủy</button>
-      <button id="confirmReset" class="btn btn--danger" type="button">Xóa ngay</button>
+      <button id="cancelReset" class="btn btn--ghost" type="button">Huy</button>
+      <button id="confirmReset" class="btn btn--danger" type="button">Xoa ngay</button>
     </div>
   </div>
 </div>
@@ -115,11 +129,38 @@
       if (data.success) {
         window.location.reload();
       } else {
-        alert(data.message || 'Không thể xóa dữ liệu.');
+        alert(data.message || 'Khong the xoa du lieu.');
       }
     } catch (error) {
-      alert('Không thể kết nối máy chủ.');
+      alert('Khong the ket noi may chu.');
     }
+  });
+
+  document.querySelectorAll('.js-generate-certificate').forEach((button) => {
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = 'Dang tao...';
+      try {
+        const response = await fetch('/api/certificates/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ma_cbsv: button.dataset.maCbsv, event_id: 1, file_type: 'png' }),
+        });
+        const data = await response.json();
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.message || 'Khong the tao chung nhan.');
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      } catch (error) {
+        alert('Khong the ket noi may chu.');
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    });
   });
 })();
 </script>
