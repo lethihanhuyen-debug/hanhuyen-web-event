@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+{% block title %}{{ event.ten_su_kien }} | Quản trị sự kiện{% endblock %}
+
+{% block content %}
+<section class="admin-panel">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Sự kiện</p>
+      <h1>{{ event.ten_su_kien }}</h1>
+      <p class="muted">
+        {{ event.dia_diem or 'Chưa có địa điểm' }} -
+        {{ event.ngay_bat_dau_display or '' }}{% if event.ngay_ket_thuc_display %} - {{ event.ngay_ket_thuc_display }}{% endif %}
+      </p>
+    </div>
+    <div class="panel-actions">
+      {% if event.certificate_template_url %}
+        <button id="openTemplatePreview" class="btn btn--ghost" type="button">Xem mẫu chứng chỉ</button>
+      {% endif %}
+      <button id="openEventCheckinForm" class="btn btn--primary" type="button">Check-in</button>
+      <a class="btn btn--ghost" href="{{ url_for('admin.index') }}">Quay lại</a>
+    </div>
+  </div>
+
+  {% if event.hinh_url %}
+    <img class="event-detail-image" src="{{ event.hinh_url }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
+  {% endif %}
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <span>Đã đăng ký</span>
+      <strong>{{ totals.registrations }}</strong>
+    </div>
+    <div class="stat-card">
+      <span>Đã check-in</span>
+      <strong>{{ totals.checkins }}</strong>
+    </div>
+    <div class="stat-card">
+      <span>Chưa check-in</span>
+      <strong>{{ totals.pending }}</strong>
+    </div>
+  </div>
+
+  <div id="eventCheckinMessage" class="message" hidden></div>
+
+  <div id="eventCheckinFormCard" class="form-card" hidden>
+    <form id="eventCheckinForm" class="checkin-form">
+      <input id="eventCheckinCode" name="ma_cbsv" placeholder="Nhập mã CB/SV" autocomplete="off" required>
+      <button class="btn btn--primary" type="submit">Check-in</button>
+    </form>
+  </div>
+
+  <div class="table-card">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>STT</th>
+            <th>Mã CB/SV</th>
+            <th>Họ tên</th>
+            <th>Đơn vị</th>
+            <th>Email</th>
+            <th>Giờ đăng ký</th>
+            <th>Trạng thái</th>
+            <th>Chứng nhận</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.stt }}</td>
+            <td>{{ row.ma_cbsv }}</td>
+            <td>{{ row.ho_ten }}</td>
+            <td>{{ row.don_vi }}</td>
+            <td>{{ row.email }}</td>
+            <td>{{ row.thoi_gian_dang_ky }}</td>
+            <td>
+              {% if row.checked_in %}
+                <span class="badge badge--success">Đã check-in</span>
+                <div class="muted">{{ row.checkin_time }}</div>
+              {% else %}
+                <span class="badge badge--warning">Chưa check-in</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.certificate_url %}
+                <button class="btn btn--ghost btn--sm js-open-certificate" type="button" data-certificate-code="{{ row.certificate_code }}">Xem</button>
+              {% else %}
+                <span class="muted">Chưa có</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.checked_in %}
+                <button
+                  class="btn btn--danger btn--sm js-delete-checkin"
+                  type="button"
+                  data-event-id="{{ row.event_id }}"
+                  data-ma-cbsv="{{ row.ma_cbsv }}"
+                  data-name="{{ row.ho_ten }}"
+                >Xóa check-in</button>
+              {% else %}
+                <button
+                  class="btn btn--primary btn--sm js-event-checkin"
+                  type="button"
+                  data-event-id="{{ row.event_id }}"
+                  data-ma-cbsv="{{ row.ma_cbsv }}"
+                >Check-in</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9">Chưa có ai đăng ký sự kiện này.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if event.certificate_template_url %}
+  <div id="templatePreviewModal" class="designer-modal" hidden>
+    <div class="designer-modal__backdrop" data-close-template-preview></div>
+    <div class="designer-modal__dialog template-preview-dialog">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Chứng chỉ</p>
+          <h2>Mẫu chứng chỉ</h2>
+        </div>
+        <button id="closeTemplatePreview" class="btn btn--ghost" type="button">Đóng</button>
+      </div>
+      <div class="template-preview-wrap">
+        <img src="{{ event.certificate_template_url }}" alt="Mẫu chứng chỉ">
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div id="certificatePreviewModal" class="designer-modal" hidden>
+    <div class="designer-modal__backdrop" data-close-certificate-preview></div>
+    <div class="designer-modal__dialog template-preview-dialog">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Chứng chỉ</p>
+          <h2>Xem chứng nhận</h2>
+        </div>
+        <div>
+          <a id="certificateDownload" class="btn btn--primary" href="#" target="_blank">Tải xuống</a>
+          <button id="closeCertificatePreview" class="btn btn--ghost" type="button">Đóng</button>
+        </div>
+      </div>
+      <div id="certificatePreviewWrap" class="template-preview-wrap">
+        <div id="certificatePreviewContent" style="width:100%;height:80vh;display:grid;place-items:center"></div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const message = document.getElementById('eventCheckinMessage');
+  const formCard = document.getElementById('eventCheckinFormCard');
+  const openFormButton = document.getElementById('openEventCheckinForm');
+  const checkinForm = document.getElementById('eventCheckinForm');
+  const checkinCode = document.getElementById('eventCheckinCode');
+  const currentEventId = {{ event.id }};
+  const openTemplatePreview = document.getElementById('openTemplatePreview');
+  const templatePreviewModal = document.getElementById('templatePreviewModal');
+  const closeTemplatePreview = document.getElementById('closeTemplatePreview');
+
+  function showMessage(type, text) {
+    message.className = `message message--${type}`;
+    message.textContent = text;
+    message.hidden = false;
+  }
+
+  async function submitCheckin(maCbsv, eventId, button) {
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Đang check-in...';
+    }
+    message.hidden = true;
+
+    try {
+      const response = await fetch('/api/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ma_cbsv: maCbsv, event_id: eventId }),
+      });
+      const data = await response.json();
+      if (data.success || data.checked_in) {
+        showMessage('success', data.message || 'Đã check-in.');
+        window.setTimeout(() => window.location.reload(), 700);
+        return;
+      }
+      showMessage('error', data.message || 'Không thể check-in.');
+    } catch (error) {
+      showMessage('error', 'Không thể kết nối máy chủ.');
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Check-in';
+      }
+    }
+  }
+
+  openFormButton.addEventListener('click', () => {
+    formCard.hidden = !formCard.hidden;
+    if (!formCard.hidden) {
+      checkinCode.focus();
+    }
+  });
+
+  checkinForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const maCbsv = checkinCode.value.trim();
+    if (!maCbsv) return;
+    await submitCheckin(maCbsv, currentEventId, checkinForm.querySelector('button'));
+  });
+
+  if (openTemplatePreview && templatePreviewModal) {
+    openTemplatePreview.addEventListener('click', () => {
+      templatePreviewModal.hidden = false;
+    });
+  }
+
+  if (closeTemplatePreview && templatePreviewModal) {
+    closeTemplatePreview.addEventListener('click', () => {
+      templatePreviewModal.hidden = true;
+    });
+  }
+
+  document.querySelectorAll('[data-close-template-preview]').forEach((element) => {
+    element.addEventListener('click', () => {
+      templatePreviewModal.hidden = true;
+    });
+  });
+
+  document.querySelectorAll('.js-event-checkin').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const maCbsv = button.dataset.maCbsv;
+      const eventId = Number(button.dataset.eventId);
+      await submitCheckin(maCbsv, eventId, button);
+    });
+  });
+
+  document.querySelectorAll('.js-delete-checkin').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const maCbsv = button.dataset.maCbsv;
+      const eventId = Number(button.dataset.eventId);
+      const name = button.dataset.name || maCbsv;
+      if (!confirm(`Xóa check-in của ${name}?`)) return;
+
+      button.disabled = true;
+      button.textContent = 'Đang xóa...';
+      message.hidden = true;
+
+      try {
+        const response = await fetch(`/api/admin/events/${eventId}/checkins/${encodeURIComponent(maCbsv)}`, {
+          method: 'DELETE',
+        });
+        const data = await response.json();
+        if (data.success) {
+          showMessage('success', data.message || 'Đã xóa check-in.');
+          window.setTimeout(() => window.location.reload(), 700);
+          return;
+        }
+        showMessage('error', data.message || 'Không thể xóa check-in.');
+      } catch (error) {
+        showMessage('error', 'Không thể kết nối máy chủ.');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Xóa check-in';
+      }
+    });
+  });
+
+  // Certificate preview
+  const certificatePreviewModal = document.getElementById('certificatePreviewModal');
+  const certificatePreviewContent = document.getElementById('certificatePreviewContent');
+  const certificateDownload = document.getElementById('certificateDownload');
+  const closeCertificatePreview = document.getElementById('closeCertificatePreview');
+
+  async function openCertificatePreview(code) {
+    if (!code) return;
+    certificatePreviewModal.hidden = false;
+    certificatePreviewContent.innerHTML = 'Đang tải...';
+    certificateDownload.href = `/api/certificates/${encodeURIComponent(code)}`;
+
+    try {
+      const head = await fetch(`/api/certificates/${encodeURIComponent(code)}/view`, { method: 'HEAD' });
+      const contentType = head.headers.get('Content-Type') || '';
+      certificatePreviewContent.innerHTML = '';
+        if (contentType.includes('pdf')) {
+          const iframe = document.createElement('iframe');
+          iframe.src = `/api/certificates/${encodeURIComponent(code)}/view`;
+          iframe.style.width = '100%';
+          iframe.style.height = 'calc(100vh - 230px)';
+          iframe.style.border = '0';
+          certificatePreviewContent.appendChild(iframe);
+        } else {
+          const img = document.createElement('img');
+          img.src = `/api/certificates/${encodeURIComponent(code)}/view`;
+          img.style.maxWidth = '100%';
+          img.style.maxHeight = 'calc(100vh - 230px)';
+          img.style.width = 'auto';
+          img.style.height = 'auto';
+          certificatePreviewContent.appendChild(img);
+        }
+    } catch (err) {
+      certificatePreviewContent.innerHTML = 'Không thể tải chứng nhận.';
+    }
+  }
+
+  document.querySelectorAll('.js-open-certificate').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const code = btn.dataset.certificateCode;
+      openCertificatePreview(code);
+    });
+  });
+
+  if (closeCertificatePreview) closeCertificatePreview.addEventListener('click', () => { certificatePreviewModal.hidden = true; });
+  document.querySelectorAll('[data-close-certificate-preview]').forEach((el) => el.addEventListener('click', () => { certificatePreviewModal.hidden = true; }));
+})();
+</script>
+{% endblock %}

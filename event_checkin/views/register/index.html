@@ -1,52 +1,108 @@
-{% extends 'base.html' %}
-{% block title %}Đăng Ký | Event Check-in{% endblock %}
+﻿{% extends 'base.html' %}
+{% block title %}Đăng ký | Event Check-in{% endblock %}
 
 {% block content %}
-<section class="hero-card">
-  <div>
-    <p class="eyebrow">Đăng ký tham gia</p>
-    <h1>Quản lý đăng ký sự kiện sinh viên</h1>
-    <p class="muted">Nhập mã CB/SV để tự động điền thông tin, sau đó gửi đăng ký bằng AJAX mà không cần tải lại trang.</p>
+<section class="admin-panel">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Đăng ký tham gia</p>
+      {% if selected_event %}
+        <h1>{{ selected_event.ten_su_kien }}</h1>
+        <p class="muted">
+          {{ selected_event.dia_diem or 'Chưa có địa điểm' }} - {{ selected_event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if selected_event.ngay_bat_dau else '' }}
+          {% if selected_event.ngay_ket_thuc %} - {{ selected_event.ngay_ket_thuc.strftime('%H:%M %d/%m/%Y') }}{% endif %}
+        </p>
+      {% else %}
+        <h1>Chọn sự kiện để đăng ký</h1>
+        <p class="muted">Bấm vào sự kiện bạn muốn tham gia, sau đó điền thông tin CB/SV để gửi đăng ký.</p>
+      {% endif %}
+    </div>
+    {% if selected_event %}
+      <a class="btn btn--ghost" href="{{ url_for('register.index') }}">Chọn sự kiện khác</a>
+    {% endif %}
   </div>
 
-  <div class="form-card">
-    <div id="registerMessage" class="message" hidden></div>
-    <form id="registerForm" class="form-grid">
-      <label>
-        <span>Mã CB/SV</span>
-        <input type="text" name="ma_cbsv" id="ma_cbsv" placeholder="Nhập mã CB/SV" required>
-      </label>
-      <label>
-        <span>Họ tên</span>
-        <input type="text" name="ho_ten" id="ho_ten" placeholder="Họ và tên" required>
-      </label>
-      <label>
-        <span>Đơn vị</span>
-        <input type="text" name="don_vi" id="don_vi" placeholder="Đơn vị / Khoa">
-      </label>
-      <label>
-        <span>Chức vụ</span>
-        <input type="text" name="chuc_vu" id="chuc_vu" placeholder="Chức vụ">
-      </label>
-      <label>
-        <span>SĐT</span>
-        <input type="text" name="so_dien_thoai" id="so_dien_thoai" placeholder="Số điện thoại">
-      </label>
-      <label>
-        <span>Email</span>
-        <input type="email" name="email" id="email" placeholder="Email">
-      </label>
-      <button class="btn btn--primary btn--full" type="submit">Gửi đăng ký</button>
-    </form>
-  </div>
+  {% if not selected_event %}
+    <div class="event-list">
+      {% for event in events %}
+        <a class="event-card" href="{{ url_for('register.event_register', event_id=event.id) }}">
+          <div class="event-card__image">
+            {% if event.hinh %}
+              <img src="{{ url_for('static', filename=event.hinh) }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
+            {% else %}
+              <span>Chưa có hình</span>
+            {% endif %}
+          </div>
+          <div>
+            <span class="badge badge--success">
+              {% if event.trang_thai == 'upcoming' %}Sắp diễn ra{% elif event.trang_thai == 'ongoing' %}Đang diễn ra{% elif event.trang_thai == 'closed' %}Đã đóng{% else %}{{ event.trang_thai }}{% endif %}
+            </span>
+            <h2>{{ event.ten_su_kien }}</h2>
+            <p class="muted">{{ event.mo_ta or 'Chưa có mô tả.' }}</p>
+          </div>
+          <div class="event-meta">
+            <strong>{{ event.dia_diem or 'Chưa có địa điểm' }}</strong>
+            <span>{{ event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if event.ngay_bat_dau else '' }}</span>
+            <span>Đăng ký đến {{ event.thoi_gian_dong_dang_ky.strftime('%H:%M %d/%m/%Y') if event.thoi_gian_dong_dang_ky else '' }}</span>
+          </div>
+        </a>
+      {% else %}
+        <div class="form-card">
+          <p class="muted">Chưa có sự kiện nào để đăng ký.</p>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    {% if selected_event.hinh %}
+      <img class="event-detail-image" src="{{ url_for('static', filename=selected_event.hinh) }}" alt="Hình sự kiện {{ selected_event.ten_su_kien }}">
+    {% endif %}
+    <div class="form-card">
+      <div id="registerMessage" class="message" hidden></div>
+      <form id="registerForm" class="form-grid">
+        <input type="hidden" name="event_id" id="event_id" value="{{ selected_event.id }}">
+        <label>
+          <span>Mã CB/SV</span>
+          <input type="text" name="ma_cbsv" id="ma_cbsv" placeholder="Nhập mã CB/SV" required>
+        </label>
+        <label>
+          <span>Họ tên</span>
+          <input type="text" name="ho_ten" id="ho_ten" placeholder="Họ và tên" required>
+        </label>
+        <label>
+          <span>Đơn vị</span>
+          <select name="don_vi" id="don_vi">
+            <option value="">Chọn đơn vị</option>
+            {% for item in don_vi_items %}
+              <option value="{{ item.id }}">{{ item.ten_don_vi }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>Chức vụ</span>
+          <input type="text" name="chuc_vu" id="chuc_vu" placeholder="Chức vụ">
+        </label>
+        <label>
+          <span>SĐT</span>
+          <input type="text" name="so_dien_thoai" id="so_dien_thoai" placeholder="Số điện thoại">
+        </label>
+        <label>
+          <span>Email</span>
+          <input type="email" name="email" id="email" placeholder="Email" required>
+        </label>
+        <button class="btn btn--primary btn--full" type="submit">Gửi đăng ký</button>
+      </form>
+    </div>
+  {% endif %}
 </section>
 {% endblock %}
 
 {% block scripts %}
+{% if selected_event %}
 <script>
 (function () {
   const form = document.getElementById('registerForm');
   const message = document.getElementById('registerMessage');
+  const eventInput = document.getElementById('event_id');
   const maInput = document.getElementById('ma_cbsv');
   const hoTenInput = document.getElementById('ho_ten');
   const donViInput = document.getElementById('don_vi');
@@ -72,7 +128,11 @@
       }
       const data = result.data;
       hoTenInput.value = data.ho_ten || '';
-      donViInput.value = data.don_vi || '';
+      const donViId = data.don_vi_id ? String(data.don_vi_id) : '';
+      if (donViId && !Array.from(donViInput.options).some((option) => option.value === donViId)) {
+        donViInput.add(new Option(data.don_vi || 'Đơn vị đã lưu', donViId));
+      }
+      donViInput.value = donViId;
       chucVuInput.value = data.chuc_vu || '';
       sdtInput.value = data.so_dien_thoai || '';
       emailInput.value = data.email || '';
@@ -85,9 +145,10 @@
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const payload = {
+      event_id: Number(eventInput.value),
       ma_cbsv: maInput.value.trim(),
       ho_ten: hoTenInput.value.trim(),
-      don_vi: donViInput.value.trim(),
+      don_vi_id: Number(donViInput.value || 0) || null,
       chuc_vu: chucVuInput.value.trim(),
       so_dien_thoai: sdtInput.value.trim(),
       email: emailInput.value.trim(),
@@ -106,6 +167,7 @@
       }
       showMessage(result.message, 'success');
       form.reset();
+      eventInput.value = payload.event_id;
       maInput.focus();
     } catch (error) {
       showMessage('Lỗi khi gửi đăng ký.', 'error');
@@ -113,4 +175,6 @@
   });
 })();
 </script>
+{% endif %}
 {% endblock %}
+

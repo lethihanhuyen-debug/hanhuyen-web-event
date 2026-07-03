@@ -1,7 +1,8 @@
-from datetime import datetime
+﻿from datetime import datetime
 from html import escape
 from pathlib import Path
 
+from flask import current_app
 
 CERTIFICATE_WIDTH = 2048
 CERTIFICATE_HEIGHT = 1433
@@ -9,6 +10,47 @@ BLUE = "#0646c8"
 RED = "#d71920"
 LIGHT_BLUE = "#66c8ef"
 PALE_BLUE = "#e6f8ff"
+
+
+def resolve_font(size, bold=False, font_path=None, static_folder=None):
+    try:
+        from PIL import ImageFont
+    except ImportError as error:
+        raise RuntimeError("Pillow chưa được cài đặt, không thể tải font.") from error
+
+    if static_folder is None:
+        static_folder = current_app.static_folder
+
+    candidates = []
+    if font_path:
+        font_path_obj = Path(font_path)
+        if not font_path_obj.is_absolute():
+            font_path_obj = Path(static_folder) / font_path_obj
+        if font_path_obj.exists():
+            candidates.append(font_path_obj)
+
+    font_dir = Path(static_folder) / "fonts"
+    candidates.append(font_dir / ("Roboto-Bold.ttf" if bold else "Roboto-Regular.ttf"))
+
+    candidates.extend([
+        "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/Arial.ttf",
+        "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
+    ])
+
+    tried = []
+    for candidate in candidates:
+        try:
+            tried.append(str(candidate))
+            return ImageFont.truetype(str(candidate), size)
+        except OSError:
+            continue
+
+    raise RuntimeError(
+        "Không tìm thấy font Unicode hợp lệ, chữ tiếng Việt có thể hiển thị sai. "
+        "Hãy thêm static/fonts/Roboto-Regular.ttf và static/fonts/Roboto-Bold.ttf, hoặc cung cấp font_file hợp lệ. "
+        f"Đã thử: {', '.join(tried)}"
+    )
 
 
 def render_certificate_svg(student_name, ma_cbsv, don_vi, certificate_code, issued_at=None):
@@ -49,7 +91,7 @@ def save_svg_certificate(output_path, student_name, ma_cbsv, don_vi, certificate
     return output_path
 
 
-def save_png_certificate(output_path, student_name, ma_cbsv, don_vi, certificate_code, issued_at=None):
+def save_png_certificate(output_path, student_name, ma_cbsv, don_vi, certificate_code, issued_at=None, template_path=None, layout=None):
     try:
         from PIL import Image, ImageDraw, ImageFont
     except ImportError:
@@ -57,194 +99,138 @@ def save_png_certificate(output_path, student_name, ma_cbsv, don_vi, certificate
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    image = Image.new("RGB", (CERTIFICATE_WIDTH, CERTIFICATE_HEIGHT), "#ffffff")
+    if not template_path or not Path(template_path).exists():
+        # Không tự tạo nền trắng hoặc đồ họa mẫu nếu không có ảnh nền do người dùng tải lên.
+        return None
+
+    image = Image.open(template_path).convert("RGBA")
     draw = ImageDraw.Draw(image)
 
-    def font(size, bold=False, serif=False, condensed=False):
-        if serif:
-            candidates = [
-                "C:/Windows/Fonts/georgiab.ttf" if bold else "C:/Windows/Fonts/georgia.ttf",
-                "C:/Windows/Fonts/timesbd.ttf" if bold else "C:/Windows/Fonts/times.ttf",
-            ]
-        elif condensed:
-            candidates = [
-                "C:/Windows/Fonts/impact.ttf",
-                "C:/Windows/Fonts/arialbd.ttf",
-                "C:/Windows/Fonts/Arial.ttf",
-            ]
-        else:
-            candidates = [
-                "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
-                "C:/Windows/Fonts/Arial.ttf",
-                "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
-            ]
-        for candidate in candidates:
-            try:
-                return ImageFont.truetype(candidate, size)
-            except OSError:
-                continue
-        return ImageFont.load_default()
+    def font(size, bold=False, serif=False, condensed=False, font_path=None):
+        return resolve_font(size, bold=bold, font_path=font_path, static_folder=current_app.static_folder)
 
     def text_bbox(text, selected_font):
         return draw.textbbox((0, 0), text, font=selected_font)
 
-    def fit_font(text, size, max_width, bold=False, serif=False, condensed=False):
+    def fit_font(text, size, max_width, bold=False, serif=False, condensed=False, font_path=None):
         selected_size = size
         while selected_size > 20:
-            selected_font = font(selected_size, bold=bold, serif=serif, condensed=condensed)
+            selected_font = font(selected_size, bold=bold, serif=serif, condensed=condensed, font_path=font_path)
             bbox = text_bbox(text, selected_font)
             if bbox[2] - bbox[0] <= max_width:
                 return selected_font
             selected_size -= 2
-        return font(selected_size, bold=bold, serif=serif, condensed=condensed)
+        return font(selected_size, bold=bold, serif=serif, condensed=condensed, font_path=font_path)
 
-    def centered(text, y, size, fill, bold=False, serif=False, condensed=False, max_width=None):
-        selected_font = fit_font(text, size, max_width, bold, serif, condensed) if max_width else font(size, bold, serif, condensed)
-        bbox = draw.textbbox((0, 0), text, font=selected_font)
-        x = (CERTIFICATE_WIDTH - (bbox[2] - bbox[0])) / 2
-        draw.text((x, y), text, fill=fill, font=selected_font)
+    def draw_template_fields(values, layout_config, image_width, image_height):
+        layout_meta = layout_config.get("_meta") if isinstance(layout_config, dict) else None
+        base_width = int(layout_meta.get("width")) if isinstance(layout_config, dict) and layout_meta.get("width") else CERTIFICATE_WIDTH
+        base_height = int(layout_meta.get("height")) if isinstance(layout_config, dict) and layout_meta.get("height") else CERTIFICATE_HEIGHT
+        scale_x = image_width / max(base_width, 1)
+        scale_y = image_height / max(base_height, 1)
 
-    def centered_at(text, center_x, y, size, fill, bold=False, serif=False, condensed=False, max_width=None):
-        selected_font = fit_font(text, size, max_width, bold, serif, condensed) if max_width else font(size, bold, serif, condensed)
-        bbox = draw.textbbox((0, 0), text, font=selected_font)
-        draw.text((center_x - (bbox[2] - bbox[0]) / 2, y), text, fill=fill, font=selected_font)
+        default_style = {"size": 48, "color": BLUE, "bold": True, "align": "left"}
+        anchor_map = {"left": "lt", "center": "mt", "right": "rt"}
 
-    def left_text(text, x, y, size, fill, bold=False, serif=False, condensed=False, max_width=None):
-        selected_font = fit_font(text, size, max_width, bold, serif, condensed) if max_width else font(size, bold, serif, condensed)
-        draw.text((x, y), text, fill=fill, font=selected_font)
+        for field, text_value in values.items():
+            saved_config = layout_config.get(field)
+            if not isinstance(saved_config, dict):
+                continue
+            if saved_config.get("x") is None or saved_config.get("y") is None:
+                continue
 
-    def draw_halftone(origin_x, origin_y, cols, rows, direction):
-        for row in range(rows):
-            for col in range(cols):
-                if direction == "tl":
-                    strength = max(0, 1 - (row + col) / (cols + rows - 6))
-                elif direction == "br":
-                    strength = max(0, 1 - ((rows - row) + (cols - col)) / (cols + rows - 6))
-                else:
-                    strength = 0.4
-                if strength <= 0:
-                    continue
-                radius = max(1, int(7 * strength))
-                x = origin_x + col * 18
-                y = origin_y + row * 18
-                color = (0, 135, 210)
-                draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
+            field_config = {**default_style, **saved_config}
+            align = str(field_config.get("align", "left")).lower()
+            if align not in anchor_map:
+                align = "left"
 
-    def draw_waves():
-        waves = Image.new("RGBA", image.size, (255, 255, 255, 0))
-        wave_draw = ImageDraw.Draw(waves)
-        wave_draw.pieslice((-260, 915, 1130, 1785), 178, 342, fill=(61, 183, 226, 210))
-        wave_draw.pieslice((-170, 960, 1045, 1740), 183, 348, fill=(126, 220, 240, 165))
-        wave_draw.pieslice((-60, 1000, 950, 1680), 188, 350, fill=(209, 248, 245, 180))
-        wave_draw.polygon([(0, 1433), (0, 1190), (260, 1270), (500, 1355), (720, 1433)], fill=(66, 196, 232, 185))
-        image.alpha_composite(waves) if image.mode == "RGBA" else image.paste(Image.alpha_composite(Image.new("RGBA", image.size, (255, 255, 255, 0)), waves).convert("RGB"), mask=waves.split()[3])
+            x = 900
+            y = 680
+            size = max(20, int(round(field_config.get("size", default_style["size"]) * min(scale_x, scale_y))))
+            fill = field_config.get("color", default_style["color"])
+            bold_flag = bool(field_config.get("bold", default_style["bold"]))
+            font_path = field_config.get("font_path") or field_config.get("font_file")
 
-    def draw_ussh_logo(cx, cy):
-        draw.ellipse((cx - 72, cy - 55, cx + 72, cy + 55), fill="#1446a0", outline="#1446a0", width=2)
-        draw.ellipse((cx - 62, cy - 45, cx + 62, cy + 45), fill="#d71920", outline="#ffd84d", width=2)
-        for offset in (-35, -15, 5, 25):
-            draw.arc((cx - 58, cy - 42 + offset, cx + 58, cy + 42 - offset), 0, 360, fill="#ffb347", width=1)
-        for offset in (-40, -15, 15, 40):
-            draw.line((cx + offset, cy - 42, cx - offset, cy + 42), fill="#ffb347", width=1)
-        centered_font = font(24, bold=True)
-        small_font = font(8, bold=True)
-        draw.text((cx - 29, cy - 7), "USSH", fill="#fff04a", font=centered_font)
-        draw.text((cx - 37, cy + 21), "VNU HCM", fill="#fff04a", font=small_font)
-
-    def draw_cilm_logo(cx, cy):
-        draw.ellipse((cx - 58, cy - 58, cx + 58, cy + 58), fill="#ffffff", outline="#0f5d91", width=2)
-        draw.polygon([(cx - 43, cy + 8), (cx - 8, cy - 4), (cx - 8, cy + 14), (cx - 43, cy + 22)], fill="#1b75bb")
-        draw.polygon([(cx + 43, cy + 8), (cx + 8, cy - 4), (cx + 8, cy + 14), (cx + 43, cy + 22)], fill="#1b75bb")
-        draw.polygon([(cx - 28, cy - 20), (cx, cy - 5), (cx + 28, cy - 20), (cx + 6, cy + 26), (cx - 6, cy + 26)], fill="#2a9fd6")
-        logo_font = font(22, bold=True, serif=True)
-        draw.text((cx - 31, cy + 31), "CILM", fill="#1b4f72", font=logo_font)
-        draw.line((cx - 45, cy + 57, cx + 45, cy + 57), fill="#1b4f72", width=2)
-
-    def draw_signature(cx, cy):
-        sig = Image.new("RGBA", image.size, (255, 255, 255, 0))
-        sig_draw = ImageDraw.Draw(sig)
-        blue = (26, 126, 194, 230)
-        sig_draw.arc((cx - 110, cy - 55, cx - 25, cy + 35), 230, 65, fill=blue, width=4)
-        sig_draw.line((cx - 60, cy - 20, cx - 20, cy + 65, cx + 10, cy - 30, cx + 38, cy + 50), fill=blue, width=4)
-        sig_draw.arc((cx + 35, cy - 40, cx + 120, cy + 50), 120, 305, fill=blue, width=4)
-        sig_draw.line((cx - 120, cy + 72, cx + 170, cy + 72), fill=blue, width=4)
-        image.paste(sig.convert("RGB"), mask=sig.split()[3])
+            selected_font = resolve_font(size, bold=bold_flag, font_path=font_path, static_folder=current_app.static_folder)
+            anchor = anchor_map[align]
+            draw.text((x, y), text_value, fill=fill, font=selected_font, anchor=anchor)
 
     issued_at = issued_at or datetime.utcnow()
-    image = image.convert("RGBA")
-    draw = ImageDraw.Draw(image)
+    values = {
+        "student_name": student_name or "",
+        "ma_cbsv": str(ma_cbsv or ""),
+        "don_vi": don_vi or "",
+        "issue_date": f"TP. Hồ Chí Minh, ngày {issued_at.day} tháng {issued_at.month} năm {issued_at.year}",
+        "certificate_code": f"Mã chứng nhận: {certificate_code}",
+    }
+    try:
+        draw_template_fields(values, layout or {}, image.width, image.height)
+    except RuntimeError as exc:
+        current_app.logger.error('Không thể render chứng chỉ với template font: %s', exc, exc_info=True)
+        return None
 
-    draw_halftone(0, 0, 23, 24, "tl")
-    draw_halftone(1810, 1130, 16, 17, "br")
-    draw_waves()
-    draw_ussh_logo(965, 115)
-    draw_cilm_logo(1138, 112)
-
-    centered("TRƯỜNG ĐẠI HỌC KHOA HỌC XÃ HỘI VÀ NHÂN VĂN, ĐHQG-HCM", 205, 58, BLUE, True, condensed=True, max_width=1220)
-    centered("TRUNG TÂM THÔNG TIN, THƯ VIỆN VÀ BẢO TÀNG", 285, 58, BLUE, True, condensed=True, max_width=1000)
-    centered("GIẤY CHỨNG NHẬN", 405, 120, RED, True, condensed=True, max_width=760)
-
-    label_x = 455
-    value_x = 930
-    left_text("Sinh viên:", label_x, 560, 78, BLUE, True, condensed=True)
-    left_text(student_name or "", value_x, 560, 78, BLUE, True, condensed=True, max_width=575)
-    left_text("Mã số sinh viên:", label_x, 670, 78, BLUE, True, condensed=True)
-    left_text(str(ma_cbsv or ""), 1065, 670, 78, BLUE, True, condensed=True, max_width=420)
-    left_text("Khoa:", label_x, 780, 78, BLUE, True, condensed=True)
-    left_text(don_vi or "Công tác xã hội - Nhân học - Xã hội học", 680, 780, 78, BLUE, True, condensed=True, max_width=1180)
-
-    centered('Đã tham dự Lễ Khai mạc triển lãm “Mảnh ghép” và', 910, 62, RED, True, serif=True, max_width=1170)
-    centered('Talkshow: “Ký ức từ những mảnh ghép di sản”', 1000, 62, RED, True, serif=True, max_width=1170)
-    date_line = f"TP. Hồ Chí Minh, ngày {issued_at.day} tháng {issued_at.month} năm {issued_at.year}"
-    centered_at(date_line, 1510, 1115, 50, BLUE, True, condensed=True, max_width=760)
-    centered_at("GIÁM ĐỐC", 1510, 1205, 50, BLUE, True, condensed=True, max_width=360)
-    draw_signature(1510, 1270)
-    centered_at("TS.Bùi Thu Hằng", 1510, 1355, 52, BLUE, True, condensed=True, max_width=520)
-    centered(f"Mã chứng nhận: {certificate_code}", 1405, 18, "#7c97b8", False, max_width=540)
-
-    image = image.convert("RGB")
-    image.save(output_path)
+    image.convert("RGB").save(output_path)
     return output_path
 
 
-def save_pdf_certificate(output_path, student_name, ma_cbsv, don_vi, certificate_code, issued_at=None):
+def save_pdf_certificate(output_path, student_name, ma_cbsv, don_vi, certificate_code, issued_at=None, template_path=None, layout=None):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     issued_at = issued_at or datetime.utcnow()
-    lines = [
-        "GIAY CHUNG NHAN",
-        f"Ho ten: {student_name}",
-        f"Ma CB/SV: {ma_cbsv}",
-        f"Don vi: {don_vi or ''}",
-        "Da tham gia va check-in thanh cong.",
-        f"Ngay cap: {issued_at.strftime('%d/%m/%Y')}",
-        f"Ma chung nhan: {certificate_code}",
-    ]
-    stream = ["BT", "/F1 28 Tf", "72 760 Td"]
-    for index, line in enumerate(lines):
-        size = 28 if index == 0 else 16
-        stream.append(f"/F1 {size} Tf")
-        stream.append(f"({line.replace('(', '[').replace(')', ']')}) Tj")
-        stream.append("0 -42 Td")
-    stream.append("ET")
-    content = "\n".join(stream).encode("latin-1", errors="replace")
 
-    objects = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        b"<< /Length " + str(len(content)).encode("ascii") + b" >>\nstream\n" + content + b"\nendstream",
-    ]
-    pdf = [b"%PDF-1.4\n"]
-    offsets = []
-    for number, obj in enumerate(objects, start=1):
-        offsets.append(sum(len(part) for part in pdf))
-        pdf.append(f"{number} 0 obj\n".encode("ascii") + obj + b"\nendobj\n")
-    xref_at = sum(len(part) for part in pdf)
-    pdf.append(f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode("ascii"))
-    for offset in offsets:
-        pdf.append(f"{offset:010d} 00000 n \n".encode("ascii"))
-    pdf.append(f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n".encode("ascii"))
-    output_path.write_bytes(b"".join(pdf))
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:
+        return None
+
+    if not template_path or not Path(template_path).exists():
+        return None
+
+    image = Image.open(template_path).convert("RGB")
+    draw = ImageDraw.Draw(image)
+    layout_meta = layout.get("_meta") if isinstance(layout, dict) else None
+    base_width = int(layout_meta.get("width")) if isinstance(layout_meta, dict) and layout_meta.get("width") else CERTIFICATE_WIDTH
+    base_height = int(layout_meta.get("height")) if isinstance(layout_meta, dict) and layout_meta.get("height") else CERTIFICATE_HEIGHT
+    scale_x = image.width / max(base_width, 1)
+    scale_y = image.height / max(base_height, 1)
+    scale_font = min(scale_x, scale_y)
+
+    fallback_layout = {
+        "student_name": {"x": 930, "y": 560, "size": 78, "color": BLUE, "bold": True, "align": "left"},
+        "ma_cbsv": {"x": 1065, "y": 670, "size": 78, "color": BLUE, "bold": True, "align": "left"},
+        "don_vi": {"x": 680, "y": 780, "size": 78, "color": BLUE, "bold": True, "align": "left"},
+        "issue_date": {"x": 1120, "y": 1115, "size": 50, "color": BLUE, "bold": True, "align": "left"},
+        "certificate_code": {"x": 760, "y": 1405, "size": 18, "color": "#7c97b8", "bold": False, "align": "left"},
+    }
+    anchor_map = {"left": "lt", "center": "mt", "right": "rt"}
+
+    values = {
+        "student_name": student_name or "",
+        "ma_cbsv": str(ma_cbsv or ""),
+        "don_vi": don_vi or "",
+        "issue_date": f"TP. Hồ Chí Minh, ngày {issued_at.day} tháng {issued_at.month} năm {issued_at.year}",
+        "certificate_code": f"Mã chứng nhận: {certificate_code}",
+    }
+
+    for field, text_value in values.items():
+        config = fallback_layout[field].copy()
+        if isinstance(layout, dict) and isinstance(layout.get(field), dict):
+            config.update(layout.get(field))
+        align = str(config.get("align", "left")).lower()
+        if align not in anchor_map:
+            align = "left"
+        x = int(config.get("x", fallback_layout[field]["x"]) * scale_x)
+        y = int(config.get("y", fallback_layout[field]["y"]) * scale_y)
+        size = max(10, int(round(config.get("size", fallback_layout[field]["size"]) * scale_font)))
+        fill = config.get("color", fallback_layout[field]["color"])
+        bold_flag = bool(config.get("bold", fallback_layout[field]["bold"]))
+        font_path = config.get("font_path") or config.get("font_file")
+        try:
+            selected_font = resolve_font(size, bold=bold_flag, font_path=font_path, static_folder=current_app.static_folder)
+        except RuntimeError:
+            return None
+        anchor = anchor_map[align]
+        draw.text((x, y), text_value, fill=fill, font=selected_font, anchor=anchor)
+
+    image.save(output_path, "PDF", resolution=72.0, quality=95, optimize=True)
     return output_path

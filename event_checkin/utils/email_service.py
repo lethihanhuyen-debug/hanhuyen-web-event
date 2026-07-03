@@ -30,15 +30,18 @@ def send_checkin_email(
     certificate_path=None,
     certificate_code=None,
     verify_url=None,
+    return_error=False,
 ):
     if not email:
-        logger.warning("Bo qua gui email vi nguoi dung khong co dia chi email.")
-        return False
+        error = "Người dùng không có địa chỉ email."
+        logger.warning(f"Bỏ qua gửi email vì {error}")
+        return (False, error) if return_error else False
 
     config = current_app.config
     if not config.get("MAIL_USERNAME") or not config.get("MAIL_PASSWORD"):
-        logger.warning("Thieu cau hinh SMTP nen khong the gui email.")
-        return False
+        error = "Thiếu cấu hình SMTP."
+        logger.warning(f"{error} Không thể gửi email.")
+        return (False, error) if return_error else False
 
     sender = config.get("MAIL_SENDER") or config.get("MAIL_USERNAME")
     formatted_time = thoi_gian.strftime("%H:%M ngay %d/%m/%Y")
@@ -47,33 +50,33 @@ def send_checkin_email(
     certificate_html = ""
     if certificate_code:
         certificate_text = (
-            f"\nMa chung nhan: {certificate_code}"
-            + (f"\nXac minh: {verify_url}" if verify_url else "")
-            + "\nHinh chung nhan duoc dinh kem trong email nay.\n"
+            f"\nMã chứng nhận: {certificate_code}"
+            + (f"\nXác minh: {verify_url}" if verify_url else "")
+            + "\nFile chứng nhận được đính kèm trong email này.\n"
         )
         certificate_html = (
-            f"<p><b>Ma chung nhan:</b> {certificate_code}</p>"
-            + (f'<p><a href="{verify_url}">Xac minh chung nhan</a></p>' if verify_url else "")
-            + "<p>Hinh chung nhan duoc dinh kem trong email nay.</p>"
+            f"<p><b>Mã chứng nhận:</b> {certificate_code}</p>"
+            + (f'<p><a href="{verify_url}">Xác minh chứng nhận</a></p>' if verify_url else "")
+            + "<p>File chứng nhận được đính kèm trong email này.</p>"
         )
 
     text_body = (
-        f"Cam on {ho_ten} da tham gia su kien hom nay vao luc {formatted_time}.\n"
-        "Ban duoc cong 2 diem ren luyen.\n"
+        f"Cảm ơn {ho_ten} đã tham gia sự kiện hôm nay vào lúc {formatted_time}.\n"
+        "Bạn được cộng 2 điểm rèn luyện.\n"
         f"{certificate_text}\n"
-        "Tran trong."
+        "Trân trọng."
     )
     html_body = (
-        f"<p>Cam on <b>{ho_ten}</b> da tham gia su kien hom nay vao luc <b>{formatted_time}</b>.</p>"
-        "<p>Ban duoc cong <b>2 diem ren luyen</b>.</p>"
+        f"<p>Cảm ơn <b>{ho_ten}</b> đã tham gia sự kiện hôm nay vào lúc <b>{formatted_time}</b>.</p>"
+        "<p>Bạn được cộng <b>2 điểm rèn luyện</b>.</p>"
         f"{certificate_html}"
-        "<p>Tran trong.</p>"
+        "<p>Trân trọng.</p>"
     )
 
     try:
-        logger.info(f"Gui email: {sender} -> {email}")
+        logger.info(f"Gửi email: {sender} -> {email}")
         message = Message(
-            subject="Xac nhan tham gia su kien",
+            subject="Xác nhận tham gia sự kiện",
             sender=sender,
             recipients=[email],
             body=text_body,
@@ -84,10 +87,10 @@ def send_checkin_email(
             if path.exists():
                 message.attach(path.name, _mime_type_for(path), path.read_bytes())
             else:
-                logger.warning(f"Khong tim thay file chung nhan de dinh kem: {path}")
+                logger.warning(f"Không tìm thấy file chứng nhận để đính kèm: {path}")
         mail.send(message)
-        logger.info(f"Email gui thanh cong toi {email}")
-        return True
+        logger.info(f"Email gửi thành công tới {email}")
+        return (True, None) if return_error else True
     except Exception as error:
-        logger.error(f"Gui email that bai toi {email}: {error}")
-        return False
+        logger.error(f"Gửi email thất bại tới {email}: {error}")
+        return (False, str(error)) if return_error else False

@@ -1,35 +1,35 @@
 {% extends 'base.html' %}
-{% block title %}Xac minh chung nhan | Event Check-in{% endblock %}
+{% block title %}Xác minh chứng nhận | Event Check-in{% endblock %}
 
 {% block content %}
 <section class="verify-panel">
   <div class="panel-head">
     <div>
-      <p class="eyebrow">Xac minh</p>
-      <h1>Chung nhan hop le</h1>
+      <p class="eyebrow">Xác minh</p>
+      <h1>Chứng nhận hợp lệ</h1>
     </div>
-    <a class="btn btn--primary" href="{{ url_for('certificates.download', certificate_code=certificate.certificate_code) }}">Tai chung nhan</a>
+    <a class="btn btn--primary" href="{{ url_for('certificates.download', certificate_code=certificate.certificate_code) }}">Tải chứng nhận</a>
   </div>
 
   <div class="certificate-summary">
     <div>
-      <span>Ho ten</span>
+      <span>Họ tên</span>
       <strong>{{ certificate.user.ho_ten if certificate.user else certificate.ma_cbsv }}</strong>
     </div>
     <div>
-      <span>Ma CB/SV</span>
+      <span>Mã CB/SV</span>
       <strong>{{ certificate.ma_cbsv }}</strong>
     </div>
     <div>
-      <span>Ma chung nhan</span>
+      <span>Mã chứng nhận</span>
       <strong>{{ certificate.certificate_code }}</strong>
     </div>
     <div>
-      <span>Trang thai</span>
+      <span>Trạng thái</span>
       <strong>{{ certificate.status }}</strong>
     </div>
     <div>
-      <span>Ngay cap</span>
+      <span>Ngày cấp</span>
       <strong>{{ certificate.issued_at.strftime('%d/%m/%Y') }}</strong>
     </div>
   </div>

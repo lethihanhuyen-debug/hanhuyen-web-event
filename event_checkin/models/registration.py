@@ -5,20 +5,25 @@ from event_checkin.models import db
 
 class Registration(db.Model):
     __tablename__ = "registrations"
+    __table_args__ = (
+        db.UniqueConstraint("ma_cbsv", "event_id", name="uq_registrations_user_event"),
+    )
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     ma_cbsv = db.Column(db.String(50), db.ForeignKey("users.ma_cbsv"), nullable=False, index=True)
-    ho_ten = db.Column(db.String(255), nullable=False)
-    don_vi = db.Column(db.String(255))
-    email = db.Column(db.String(255))
+    event_id = db.Column(db.Integer, db.ForeignKey("events.id"), nullable=False, index=True)
     thoi_gian_dang_ky = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    user = db.relationship("User", lazy="joined")
+    event = db.relationship("Event", lazy="joined")
 
     def to_dict(self):
         return {
             "id": self.id,
             "ma_cbsv": self.ma_cbsv,
-            "ho_ten": self.ho_ten,
-            "don_vi": self.don_vi,
-            "email": self.email,
+            "event_id": self.event_id,
+            "ho_ten": self.user.ho_ten if self.user else "",
+            "don_vi": self.user.ten_don_vi if self.user else "",
+            "email": self.user.email if self.user else "",
             "thoi_gian_dang_ky": self.thoi_gian_dang_ky.isoformat() if self.thoi_gian_dang_ky else None,
         }

@@ -11,15 +11,27 @@
   <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
   {% block head %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <header class="topbar">
     <div class="container topbar__inner">
       <a class="brand" href="{{ url_for('register.index') }}">Event Check-in</a>
       <nav class="nav">
-        <a class="nav__link {% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Dang ky</a>
-        <a class="nav__link {% if request.path.startswith('/checkin') %}is-active{% endif %}" href="{{ url_for('checkin.index') }}">Check-in</a>
-        <a class="nav__link {% if request.path.startswith('/admin') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quan tri</a>
-        <a class="nav__link {% if request.path.startswith('/verify') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Chung nhan</a>
+        <a class="nav__link {% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng ký</a>
+        <a class="nav__link {% if request.path.startswith('/admin') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản trị</a>
+        {% if request.path.startswith('/admin') %}
+          <button class="nav__link nav__button" type="button" data-admin-logout>Đăng xuất</button>
+          <div class="admin-settings">
+            <button class="admin-settings__button" type="button" aria-label="Cài đặt admin" title="Cài đặt admin" aria-expanded="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"></path>
+                <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05A1.7 1.7 0 0 0 15 19.36a1.7 1.7 0 0 0-1 .94l-.03.08a2 2 0 0 1-3.84 0l-.03-.08a1.7 1.7 0 0 0-1-.94 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 0 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.64 15a1.7 1.7 0 0 0-.94-1l-.08-.03a2 2 0 0 1 0-3.84l.08-.03a1.7 1.7 0 0 0 .94-1 1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 0 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.64a1.7 1.7 0 0 0 1-.94l.03-.08a2 2 0 0 1 3.84 0l.03.08a1.7 1.7 0 0 0 1 .94 1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.36 9c.11.42.45.76.94 1l.08.03a2 2 0 0 1 0 3.84l-.08.03a1.7 1.7 0 0 0-.94 1Z"></path>
+              </svg>
+            </button>
+            <div class="admin-settings__menu" hidden>
+              <button class="admin-settings__item" type="button" data-open-don-vi>Quản lý đơn vị</button>
+            </div>
+          </div>
+        {% endif %}
       </nav>
     </div>
   </header>
@@ -29,6 +41,38 @@
       {% block content %}{% endblock %}
     </div>
   </main>
+
+  {% if request.path.startswith('/admin') %}
+    <div id="donViModal" class="modal admin-data-modal" aria-hidden="true">
+      <div class="modal__backdrop" data-close-don-vi></div>
+      <div class="modal__dialog admin-data-modal__dialog">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Cài đặt</p>
+            <h2>Danh sách đơn vị</h2>
+          </div>
+          <button class="btn btn--ghost" type="button" data-close-don-vi>Đóng</button>
+        </div>
+        <div id="donViMessage" class="message" hidden></div>
+        <form id="donViForm" class="admin-data-form">
+          <input type="hidden" id="donViId">
+          <label>
+            <span>Tên đơn vị</span>
+            <input id="donViName" name="ten_don_vi" placeholder="Nhập đơn vị" required>
+          </label>
+          <label class="admin-data-form__toggle">
+            <input id="donViActive" type="checkbox" checked>
+            <span>Đang sử dụng</span>
+          </label>
+          <div class="btn-row">
+            <button class="btn btn--primary" type="submit">Lưu</button>
+            <button id="resetDonViForm" class="btn btn--ghost" type="button">Thêm mới</button>
+          </div>
+        </form>
+        <div id="donViList" class="admin-data-list"></div>
+      </div>
+    </div>
+  {% endif %}
 
   {% block scripts %}{% endblock %}
 </body>

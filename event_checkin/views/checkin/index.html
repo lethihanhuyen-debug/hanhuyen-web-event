@@ -51,7 +51,11 @@
       } else if (data.checked_in) {
         paint('warning', '⚠️ ' + data.message);
       } else if (data.success) {
-        paint('success', '✅ Cảm ơn ' + data.ho_ten + ' đã check-in lúc ' + data.thoi_gian);
+        if (data.email_sent) {
+          paint('success', '✅ Cảm ơn ' + data.ho_ten + ' đã check-in lúc ' + data.thoi_gian + '. Email xác nhận đã gửi tới ' + (data.email || 'địa chỉ đã đăng ký') + '.');
+        } else {
+          paint('warning', '⚠️ Cảm ơn ' + data.ho_ten + ' đã check-in lúc ' + data.thoi_gian + '. Nhưng gửi email xác nhận thất bại.');
+        }
       } else {
         paint('error', data.message || 'Đã xảy ra lỗi.');
       }

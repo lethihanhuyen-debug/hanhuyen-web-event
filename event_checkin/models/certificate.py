@@ -5,10 +5,13 @@ from event_checkin.models import db
 
 class Certificate(db.Model):
     __tablename__ = "certificates"
+    __table_args__ = (
+        db.UniqueConstraint("ma_cbsv", "event_id", name="uq_certificates_user_event"),
+    )
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     ma_cbsv = db.Column(db.String(50), db.ForeignKey("users.ma_cbsv"), nullable=False, index=True)
-    event_id = db.Column(db.Integer, nullable=False, default=1, index=True)
+    event_id = db.Column(db.Integer, db.ForeignKey("events.id"), nullable=False, default=1, index=True)
     certificate_code = db.Column(db.String(100), unique=True, nullable=False, index=True)
     file_url = db.Column(db.String(255))
     file_type = db.Column(db.String(20), nullable=False, default="svg")
@@ -16,7 +19,8 @@ class Certificate(db.Model):
     issued_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
-    user = db.relationship("User", primaryjoin="Certificate.ma_cbsv == User.ma_cbsv", lazy="joined")
+    user = db.relationship("User", lazy="joined")
+    event = db.relationship("Event", lazy="joined")
 
     def to_dict(self):
         return {

@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Đăng nhập | Event Check-in{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<section class="auth-stage">
+  <form class="auth-card" id="adminLoginForm">
+    <h1>Đăng nhập</h1>
+    <p class="auth-subtitle">Nhập thông tin tài khoản để truy cập hệ thống</p>
+    <div id="loginMessage" class="message" style="display:none"></div>
+    <div class="auth-form">
+      <label class="auth-field">
+        <span>Tài khoản</span>
+        <input name="username" type="text" autocomplete="username" placeholder="Tài khoản" required>
+      </label>
+      <label class="auth-field auth-password">
+        <span>Mật khẩu</span>
+        <input id="adminPassword" name="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" required>
+        <button class="auth-password__toggle" type="button" aria-label="Hiện mật khẩu" title="Hiện mật khẩu">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+      </label>
+      <div class="auth-options">
+        <label class="auth-remember">
+          <input name="remember" type="checkbox">
+          <span>Ghi nhớ đăng nhập</span>
+        </label>
+      </div>
+      <button class="btn btn--primary btn--full auth-submit" type="submit">Đăng nhập</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const nextUrl = {{ next_url|tojson }};
+const passwordInput = document.getElementById('adminPassword');
+const passwordToggle = document.querySelector('.auth-password__toggle');
+
+passwordToggle.addEventListener('click', () => {
+  const isPassword = passwordInput.type === 'password';
+  passwordInput.type = isPassword ? 'text' : 'password';
+  passwordToggle.setAttribute('aria-label', isPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+  passwordToggle.setAttribute('title', isPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+});
+
+document.getElementById('adminLoginForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const message = document.getElementById('loginMessage');
+  const payload = {
+    username: form.username.value,
+    password: form.password.value,
+    remember: form.remember.checked,
+  };
+  const response = await fetch('/api/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  message.style.display = 'block';
+  if (data.success) {
+    window.location.href = nextUrl || '/admin';
+    return;
+  }
+  message.className = 'message message--error';
+  message.textContent = data.message || 'Đăng nhập thất bại.';
+});
+</script>
+{% endblock %}

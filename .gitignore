@@ -7,3 +7,5 @@ instance/
 *.sqlite3
 *.db
 *.xlsx
+frontend/node_modules/
+frontend/dist/
