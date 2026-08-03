@@ -4,6 +4,8 @@ from pathlib import Path
 
 from flask import current_app
 
+from event_checkin.utils.timezone import utc_to_vn
+
 CERTIFICATE_WIDTH = 2048
 CERTIFICATE_HEIGHT = 1433
 BLUE = "#0646c8"
@@ -54,7 +56,10 @@ def resolve_font(size, bold=False, font_path=None, static_folder=None):
 
 
 def render_certificate_svg(student_name, ma_cbsv, don_vi, certificate_code, issued_at=None):
-    issued_at = issued_at or datetime.utcnow()
+    # issued_at comes in as UTC (datetime.utcnow()) -- convert before it's used for
+    # display anywhere below, otherwise the printed date/day can be off by up to a
+    # day for check-ins near the UTC/Vietnam day boundary.
+    issued_at = utc_to_vn(issued_at or datetime.utcnow())
     issue_date = issued_at.strftime("%d/%m/%Y")
     safe_name = escape(student_name or "")
     safe_code = escape(certificate_code)
@@ -155,7 +160,9 @@ def save_png_certificate(output_path, student_name, ma_cbsv, don_vi, certificate
             anchor = anchor_map[align]
             draw.text((x, y), text_value, fill=fill, font=selected_font, anchor=anchor)
 
-    issued_at = issued_at or datetime.utcnow()
+    # issued_at is UTC (datetime.utcnow()) -- convert to Vietnam time before it's
+    # formatted into the printed issue_date text below.
+    issued_at = utc_to_vn(issued_at or datetime.utcnow())
     values = {
         "student_name": student_name or "",
         "ma_cbsv": str(ma_cbsv or ""),
@@ -176,7 +183,9 @@ def save_png_certificate(output_path, student_name, ma_cbsv, don_vi, certificate
 def save_pdf_certificate(output_path, student_name, ma_cbsv, don_vi, certificate_code, issued_at=None, template_path=None, layout=None):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    issued_at = issued_at or datetime.utcnow()
+    # issued_at is UTC (datetime.utcnow()) -- convert to Vietnam time before it's
+    # formatted into the printed issue_date text below.
+    issued_at = utc_to_vn(issued_at or datetime.utcnow())
 
     try:
         from PIL import Image, ImageDraw

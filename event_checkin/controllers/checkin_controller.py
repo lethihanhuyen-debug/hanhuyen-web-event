@@ -13,13 +13,17 @@ from event_checkin.models.email_log import EmailLog
 from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
 from event_checkin.utils.email_service import send_checkin_email
+from event_checkin.utils.timezone import format_utc_as_vn
 
 
 checkin_bp = Blueprint("checkin", __name__)
 
 
 def _format_vn_datetime(dt):
-    return dt.strftime("%H:%M ngay %d/%m/%Y")
+    # thoi_gian_checkin is stored via datetime.utcnow() (see below), so it must be
+    # converted to Vietnam local time before display -- formatting it as-is showed
+    # the UTC hour (7 hours behind actual Vietnam wall-clock time).
+    return format_utc_as_vn(dt, "%H:%M ngay %d/%m/%Y")
 
 
 def _already_checked_in_response(user, existing_checkin):
@@ -93,6 +97,7 @@ def checkin():
         user.ho_ten,
         user.email,
         checkin_record.thoi_gian_checkin,
+        ten_su_kien=registration.event.ten_su_kien if registration.event else "",
         certificate_path=certificate_path,
         certificate_code=certificate.certificate_code if certificate else None,
         verify_url=verify_url,
