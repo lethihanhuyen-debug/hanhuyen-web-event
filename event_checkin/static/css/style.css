@@ -799,7 +799,10 @@ textarea:focus {
   min-height: 220px;
   background: #fff;
   border-radius: 16px;
-  overflow: hidden;
+  /* visible, not hidden: the delete badge/resize handle on a field dragged near an
+     edge sit outside the field's own box (top:-16px/right:-16px etc.) and would get
+     clipped and become unreachable if this container clipped its children. */
+  overflow: visible;
   user-select: none;
 }
 
@@ -807,6 +810,7 @@ textarea:focus {
   display: block;
   width: 100%;
   height: auto;
+  border-radius: 16px;
   pointer-events: none;
 }
 
@@ -916,11 +920,6 @@ textarea:focus {
 .field-toolbar__btn.active {
   border-color: #d71920;
   background: rgba(215, 25, 32, 0.08);
-}
-
-.field-toolbar__btn--danger {
-  color: #d71920;
-  border-color: #d71920;
 }
 
 .field-toolbar__font {

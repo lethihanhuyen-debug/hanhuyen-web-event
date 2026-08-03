@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError
 from event_checkin.certificates.service import (
     CertificateError,
@@ -20,6 +20,16 @@ checkin_bp = Blueprint("checkin", __name__)
 
 def _format_vn_datetime(dt):
     return dt.strftime("%H:%M ngay %d/%m/%Y")
+
+
+def _already_checked_in_response(user, existing_checkin):
+    return jsonify({
+        "success": False,
+        "checked_in": True,
+        "message": f"{user.ho_ten} đã check-in lúc {_format_vn_datetime(existing_checkin.thoi_gian_checkin)}.",
+        "ho_ten": user.ho_ten,
+        "thoi_gian": _format_vn_datetime(existing_checkin.thoi_gian_checkin),
+    }), 200
 
 
 @checkin_bp.get("/checkin")
@@ -47,13 +57,7 @@ def checkin():
     existing_checkin = CheckIn.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
 
     if existing_checkin:
-        return jsonify({
-            "success": False,
-            "checked_in": True,
-            "message": f"{user.ho_ten} đã check-in lúc {_format_vn_datetime(existing_checkin.thoi_gian_checkin)}.",
-            "ho_ten": user.ho_ten,
-            "thoi_gian": _format_vn_datetime(existing_checkin.thoi_gian_checkin),
-        }), 200
+        return _already_checked_in_response(user, existing_checkin)
 
     checkin_record = CheckIn(
         ma_cbsv=ma_cbsv,
@@ -70,13 +74,7 @@ def checkin():
         # already-checked-in response instead of a 500.
         db.session.rollback()
         existing_checkin = CheckIn.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
-        return jsonify({
-            "success": False,
-            "checked_in": True,
-            "message": f"{user.ho_ten} đã check-in lúc {_format_vn_datetime(existing_checkin.thoi_gian_checkin)}.",
-            "ho_ten": user.ho_ten,
-            "thoi_gian": _format_vn_datetime(existing_checkin.thoi_gian_checkin),
-        }), 200
+        return _already_checked_in_response(user, existing_checkin)
 
     certificate = None
     certificate_path = None

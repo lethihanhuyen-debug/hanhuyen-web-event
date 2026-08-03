@@ -158,7 +158,7 @@
               <button type="button" class="layout-field-button" data-field="issue_date">Ngày cấp</button>
               <button type="button" class="layout-field-button" data-field="certificate_code">Mã chứng nhận</button>
             </div>
-            <p class="hint">Bấm để thêm vào giữa khung, sau đó kéo để chỉnh vị trí. Bấm lại một trường đã thêm để chọn và chỉnh sửa.</p>
+            <p class="muted">Bấm để thêm vào giữa khung, sau đó kéo để chỉnh vị trí. Bấm lại một trường đã thêm để chọn và chỉnh sửa.</p>
           </div>
           <div class="btn-row">
             <button id="saveLayout" class="btn btn--primary" type="button">Lưu vị trí</button>
@@ -188,7 +188,6 @@
           </div>
         </div>
       </div>
-      <p id="fontStatus" class="muted" hidden></p>
     </div>
   </div>
 
@@ -427,6 +426,11 @@
   });
 
   const FIELD_ORDER = ['student_name', 'ma_cbsv', 'don_vi', 'issue_date', 'certificate_code'];
+  // Keep in sync with `.cert-field .field-delete { top: -16px }` in style.css — that's how
+  // far above the field's own box the delete badge sits, so the toolbar needs to clear at
+  // least that much (plus a little breathing room) to avoid covering it.
+  const FIELD_BADGE_PROTRUSION = 16;
+  const TOOLBAR_GAP = FIELD_BADGE_PROTRUSION + 6;
 
   function sampleText(field) {
     return {
@@ -446,6 +450,11 @@
     return Math.max(8, Math.min(300, Math.round(size)));
   }
 
+  // Fields currently mid-FontFace-load, so a rapid drag/resize (which re-enters this
+  // function on every renderFields() call) doesn't kick off overlapping loads of the
+  // same font URL before the first one resolves.
+  const loadingFontFields = new Set();
+
   async function loadFieldFont(field, config) {
     if (!config || !config.font_url || !config.font_family) return;
     const cached = loadedFonts.get(config.font_family);
@@ -453,6 +462,8 @@
       config.__loaded_family = cached.family;
       return;
     }
+    if (loadingFontFields.has(field)) return;
+    loadingFontFields.add(field);
     try {
       const uniqueFamily = `${config.font_family}__${Date.now()}`;
       const fontFace = new FontFace(uniqueFamily, `url(${config.font_url})`);
@@ -463,6 +474,8 @@
       renderFields();
     } catch (error) {
       console.warn('Không thể tải font xem trước', field, error);
+    } finally {
+      loadingFontFields.delete(field);
     }
   }
 
@@ -529,8 +542,13 @@
     const elRect = el.getBoundingClientRect();
     const toolbarRect = fieldToolbar.getBoundingClientRect();
     let left = elRect.left - wrapRect.left;
-    let top = elRect.top - wrapRect.top - toolbarRect.height - 10;
-    if (top < 0) top = elRect.bottom - wrapRect.top + 10;
+    // The delete badge sits FIELD_BADGE_PROTRUSION px above the field's own top edge
+    // (must match `.cert-field .field-delete { top: -16px }` in style.css) — the old
+    // fixed 10px gap put the toolbar's bottom edge inside that badge, covering it.
+    // Clearing the badge's full height, not just the field's box, keeps them apart
+    // whether the toolbar lands above the field or (near the canvas's top edge) below it.
+    let top = elRect.top - wrapRect.top - toolbarRect.height - TOOLBAR_GAP;
+    if (top < 0) top = elRect.bottom - wrapRect.top + TOOLBAR_GAP;
     left = Math.max(0, Math.min(left, wrap.clientWidth - toolbarRect.width));
     fieldToolbar.style.left = `${left}px`;
     fieldToolbar.style.top = `${top}px`;
@@ -573,6 +591,17 @@
     updateToolbar();
   }
 
+  // Lighter-weight path for high-frequency events (drag, resize, typing a size, dragging
+  // a color swatch) where only the selected field's own styling changed: restyle just that
+  // element instead of renderFields()'s full teardown/rebuild of every field + sidebar +
+  // listener rebinding, which would otherwise run on every mousemove/keystroke tick.
+  function updateFieldElement(field) {
+    const config = certificateLayout[field];
+    const el = stage.querySelector(`.cert-field[data-field="${field}"]`);
+    if (config && el) positionField(el, config);
+    updateToolbar();
+  }
+
   function addOrSelectField(field) {
     if (!designingTemplateUrl) return;
     if (!certificateLayout[field] || typeof certificateLayout[field].x !== 'number') {
@@ -611,6 +640,17 @@
     }
   });
 
+  // Shared drag lifecycle: wire up onMove/onUp for the duration of one mouse drag and
+  // clean up afterwards. Used by both field-move and resize-handle dragging below.
+  function trackDrag(onMove) {
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
   function onFieldMouseDown(event, field) {
     if (event.target.classList.contains('resize-handle') || event.target.classList.contains('field-delete')) return;
     event.preventDefault();
@@ -622,17 +662,11 @@
     const startX = config.x;
     const startY = config.y;
 
-    function onMove(moveEvent) {
+    trackDrag((moveEvent) => {
       config.x = Math.round(startX + toNatural(moveEvent.clientX - startClientX));
       config.y = Math.round(startY + toNatural(moveEvent.clientY - startClientY));
-      renderFields();
-    }
-    function onUp() {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+      updateFieldElement(field);
+    });
   }
 
   function onResizeMouseDown(event, field) {
@@ -642,16 +676,10 @@
     const startClientX = event.clientX;
     const startSize = config.size || 64;
 
-    function onMove(moveEvent) {
+    trackDrag((moveEvent) => {
       config.size = clampFontSize(startSize + toNatural(moveEvent.clientX - startClientX) * 0.8);
-      renderFields();
-    }
-    function onUp() {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+      updateFieldElement(field);
+    });
   }
 
   toolbarFontSize.addEventListener('input', () => {
@@ -666,7 +694,7 @@
     // matches what's in the box; out-of-range values are only normalized on blur below,
     // once the user has actually finished typing.
     certificateLayout[selectedField].size = parsed;
-    renderFields();
+    updateFieldElement(selectedField);
   });
 
   toolbarFontSize.addEventListener('blur', () => {
@@ -675,27 +703,27 @@
     const raw = toolbarFontSize.value.trim();
     const parsed = Number(raw);
     config.size = clampFontSize(raw === '' || Number.isNaN(parsed) ? (config.size || 64) : parsed);
-    renderFields();
+    updateFieldElement(selectedField);
   });
 
   toolbarColor.addEventListener('input', () => {
     if (!selectedField) return;
     certificateLayout[selectedField].color = toolbarColor.value;
-    renderFields();
+    updateFieldElement(selectedField);
   });
 
   toolbarBold.addEventListener('click', () => {
     if (!selectedField) return;
     const config = certificateLayout[selectedField];
     config.bold = config.bold === false;
-    renderFields();
+    updateFieldElement(selectedField);
   });
 
   fieldToolbar.querySelectorAll('[data-align]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!selectedField) return;
       certificateLayout[selectedField].align = button.dataset.align;
-      renderFields();
+      updateFieldElement(selectedField);
     });
   });
 
@@ -726,7 +754,7 @@
     certificateLayout[field] = { ...prev, ...returned, x: prev.x, y: prev.y, size: prev.size };
     if (editingEventId === designingEventId) editingEventData = data.data;
     await loadFieldFont(field, certificateLayout[field]);
-    renderFields();
+    updateFieldElement(field);
     setTemplateStatus('Font đã tải lên.', 2500);
   });
 
@@ -746,7 +774,7 @@
     delete prev.font_family;
     delete prev.__loaded_family;
     if (editingEventId === designingEventId) editingEventData = data.data;
-    renderFields();
+    updateFieldElement(field);
     setTemplateStatus('Đã xóa font riêng.', 2000);
   });
 
@@ -761,17 +789,33 @@
 
   async function applyTemplateUrl(url) {
     designingTemplateUrl = url;
-    templatePreview.src = url;
     templatePreview.hidden = false;
     try {
-      const img = await loadTemplateImage(url);
-      naturalWidth = img.naturalWidth;
-      naturalHeight = img.naturalHeight;
+      // Load through the visible <img> itself instead of a second `new Image()` probe —
+      // both would decode the same (often multi-megapixel) file, so this halves the work.
+      await new Promise((resolve, reject) => {
+        templatePreview.onload = resolve;
+        templatePreview.onerror = reject;
+        templatePreview.src = url;
+      });
+      naturalWidth = templatePreview.naturalWidth;
+      naturalHeight = templatePreview.naturalHeight;
       recalcScale();
     } catch (error) {
       console.error('Không thể tải ảnh mẫu', error);
     }
     renderFields();
+  }
+
+  // Shared by openDesigner/discardDesignerChanges/resetLayoutBtn below: all three need a
+  // deep clone of a saved layout (so edits don't mutate the object they'd revert to) with
+  // the same "missing or invalid -> empty layout" fallback.
+  function cloneLayout(source) {
+    try {
+      return source && source.certificate_layout ? JSON.parse(JSON.stringify(source.certificate_layout)) : {};
+    } catch (e) {
+      return {};
+    }
   }
 
   function openDesigner(event) {
@@ -782,11 +826,7 @@
     naturalHeight = 0;
     templatePreview.hidden = true;
     templatePreview.removeAttribute('src');
-    try {
-      certificateLayout = event && event.certificate_layout ? JSON.parse(JSON.stringify(event.certificate_layout)) : {};
-    } catch (e) {
-      certificateLayout = {};
-    }
+    certificateLayout = cloneLayout(event);
     designerTitle.textContent = `Thiết lập chứng chỉ - ${event.ten_su_kien}`;
     designer.hidden = false;
     if (event.certificate_template_url) {
@@ -805,11 +845,7 @@
   });
 
   function discardDesignerChanges() {
-    if (editingEventData && editingEventData.certificate_layout) {
-      certificateLayout = JSON.parse(JSON.stringify(editingEventData.certificate_layout));
-    } else {
-      certificateLayout = {};
-    }
+    certificateLayout = cloneLayout(editingEventData);
     selectedField = null;
     designer.hidden = true;
   }
@@ -847,11 +883,7 @@
 
   if (resetLayoutBtn) {
     resetLayoutBtn.addEventListener('click', () => {
-      if (editingEventData && editingEventData.certificate_layout) {
-        try { certificateLayout = JSON.parse(JSON.stringify(editingEventData.certificate_layout)); } catch (e) { certificateLayout = {}; }
-      } else {
-        certificateLayout = {};
-      }
+      certificateLayout = cloneLayout(editingEventData);
       selectedField = null;
       renderFields();
       setTemplateStatus('Đã khôi phục layout đã lưu.', 2000);
@@ -921,16 +953,20 @@
         return;
       }
       const file = templateInput.files[0];
-      const img = new Image();
-      img.onload = () => {
+      const objectUrl = URL.createObjectURL(file);
+      // Reuse the same image-load helper applyTemplateUrl() uses, just pointed at a
+      // local blob URL instead of a server one, rather than hand-rolling another
+      // new Image()/onload/onerror trio here.
+      loadTemplateImage(objectUrl).then((img) => {
         const ratio = img.naturalWidth / img.naturalHeight;
         if (Math.abs(ratio - TARGET_RATIO) <= RATIO_TOLERANCE) {
+          URL.revokeObjectURL(objectUrl);
           uploadTemplateFile(file);
           templateInput.value = '';
           return;
         }
-        cropObjectUrl = URL.createObjectURL(file);
-        cropImage.src = cropObjectUrl;
+        cropObjectUrl = objectUrl;
+        cropImage.src = objectUrl;
         cropModal.hidden = false;
         if (cropper) cropper.destroy();
         cropper = new Cropper(cropImage, {
@@ -939,9 +975,7 @@
           autoCropArea: 1,
           background: false,
         });
-      };
-      img.onerror = () => setTemplateStatus('Không thể đọc file ảnh.');
-      img.src = URL.createObjectURL(file);
+      }).catch(() => setTemplateStatus('Không thể đọc file ảnh.'));
     });
   })();
 })();
