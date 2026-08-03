@@ -1,7 +1,0 @@
-flask
-flask-sqlalchemy
-flask-wtf
-python-dotenv
-flask-mail
-Pillow
-PyMySQL
