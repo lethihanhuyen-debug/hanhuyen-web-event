@@ -5,6 +5,7 @@ from flask import current_app
 from flask_mail import Message
 
 from event_checkin.extensions import mail
+from event_checkin.utils.timezone import format_utc_as_vn
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ def send_checkin_email(
     ho_ten,
     email,
     thoi_gian,
+    ten_su_kien=None,
     certificate_path=None,
     certificate_code=None,
     verify_url=None,
@@ -44,7 +46,13 @@ def send_checkin_email(
         return (False, error) if return_error else False
 
     sender = config.get("MAIL_SENDER") or config.get("MAIL_USERNAME")
-    formatted_time = thoi_gian.strftime("%H:%M ngay %d/%m/%Y")
+    # thoi_gian is the check-in timestamp, stored via datetime.utcnow() -- convert to
+    # Vietnam local time before formatting, or the email shows the UTC hour instead.
+    formatted_time = format_utc_as_vn(thoi_gian, "%H:%M ngay %d/%m/%Y")
+    # Quoted event name for the opening line; falls back to no event name (rather than a
+    # dangling pair of quotes) if the caller couldn't resolve one.
+    su_kien_text = f' "{ten_su_kien}"' if ten_su_kien else ""
+    su_kien_html = f' "<b>{ten_su_kien}</b>"' if ten_su_kien else ""
 
     certificate_text = ""
     certificate_html = ""
@@ -61,13 +69,13 @@ def send_checkin_email(
         )
 
     text_body = (
-        f"Cảm ơn {ho_ten} đã tham gia sự kiện hôm nay vào lúc {formatted_time}.\n"
+        f"Cảm ơn {ho_ten} đã tham gia sự kiện{su_kien_text} vào lúc {formatted_time}.\n"
         "Bạn được cộng 2 điểm rèn luyện.\n"
         f"{certificate_text}\n"
         "Trân trọng."
     )
     html_body = (
-        f"<p>Cảm ơn <b>{ho_ten}</b> đã tham gia sự kiện hôm nay vào lúc <b>{formatted_time}</b>.</p>"
+        f"<p>Cảm ơn <b>{ho_ten}</b> đã tham gia sự kiện{su_kien_html} vào lúc <b>{formatted_time}</b>.</p>"
         "<p>Bạn được cộng <b>2 điểm rèn luyện</b>.</p>"
         f"{certificate_html}"
         "<p>Trân trọng.</p>"
