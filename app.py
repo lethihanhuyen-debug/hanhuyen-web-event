@@ -82,11 +82,10 @@ def create_app():
     mail.init_app(app)
 
     @app.after_request
-    def add_cors_headers(response):
-        response.headers["Access-Control-Allow-Origin"] = app.config.get("FRONTEND_ORIGIN", "http://localhost:5173")
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+    def add_no_cache_headers(response):
+        # Templates and APIs are served same-origin (no separate cross-origin
+        # frontend is deployed), so no CORS headers are needed here. Only
+        # keep admin pages from being cached by the browser/back button.
         if request.path.startswith("/admin"):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"

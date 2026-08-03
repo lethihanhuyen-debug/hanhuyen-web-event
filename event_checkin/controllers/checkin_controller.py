@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from flask import Blueprint, jsonify, redirect, request, url_for
+from flask import Blueprint, jsonify, render_template, request
+from sqlalchemy.exc import IntegrityError
 from event_checkin.certificates.service import (
     CertificateError,
     generate_certificate,
@@ -23,7 +24,7 @@ def _format_vn_datetime(dt):
 
 @checkin_bp.get("/checkin")
 def index():
-    return redirect(url_for("admin.index"))
+    return render_template("checkin/index.html")
 
 
 @checkin_bp.post("/api/checkin")
@@ -60,7 +61,22 @@ def checkin():
         thoi_gian_checkin=datetime.utcnow(),
     )
     db.session.add(checkin_record)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # Two requests for the same ma_cbsv landed at (almost) the same time
+        # (e.g. a double-tap on the check-in button). The unique constraint
+        # on (ma_cbsv, event_id) rejects the second insert; treat it as an
+        # already-checked-in response instead of a 500.
+        db.session.rollback()
+        existing_checkin = CheckIn.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
+        return jsonify({
+            "success": False,
+            "checked_in": True,
+            "message": f"{user.ho_ten} đã check-in lúc {_format_vn_datetime(existing_checkin.thoi_gian_checkin)}.",
+            "ho_ten": user.ho_ten,
+            "thoi_gian": _format_vn_datetime(existing_checkin.thoi_gian_checkin),
+        }), 200
 
     certificate = None
     certificate_path = None

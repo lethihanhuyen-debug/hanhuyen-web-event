@@ -588,6 +588,11 @@ textarea:focus {
   color: var(--warning);
 }
 
+.checkin-result--pending {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--ink-500, #5f6b82);
+}
+
 .checkin-form {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -746,18 +751,207 @@ textarea:focus {
 }
 
 .designer-canvas-wrap {
-  overflow: auto;
+  position: relative;
+  overflow: visible;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: #fff;
 }
 
-#certificateCanvas {
-  width: 100%;
-  min-width: 760px;
-  height: auto;
+.designer-modal__dialog--wide {
+  width: min(1320px, 100%);
+}
+
+.designer-sidebar__label {
   display: block;
-  cursor: crosshair;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.layout-field-button.placed::after {
+  content: ' \2713';
+  color: #2f855a;
+}
+
+.layout-field-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.file-upload-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.file-upload-button input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.certificate-stage {
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  user-select: none;
+}
+
+.certificate-stage img#templatePreview {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.certificate-stage img#templatePreview[hidden] {
+  display: none;
+}
+
+.empty-stage-hint {
+  padding: 60px 24px;
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.cert-field {
+  position: absolute;
+  white-space: nowrap;
+  cursor: move;
+  padding: 2px 4px;
+  line-height: 1.15;
+  user-select: none;
+}
+
+.cert-field.selected {
+  outline: 2px dashed #d71920;
+  outline-offset: 6px;
+}
+
+.cert-field .resize-handle {
+  position: absolute;
+  right: -9px;
+  bottom: -9px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border: 1px solid #333;
+  border-radius: 3px;
+  cursor: nwse-resize;
+}
+
+.cert-field .field-delete {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d71920;
+  color: #fff;
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+.field-toolbar {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  box-shadow: var(--shadow);
+}
+
+.field-toolbar[hidden] {
+  display: none;
+}
+
+.field-toolbar input[type="number"] {
+  width: 60px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.field-toolbar input[type="color"] {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.field-toolbar__group {
+  display: flex;
+  gap: 2px;
+}
+
+.field-toolbar__btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.field-toolbar__btn.active {
+  border-color: #d71920;
+  background: rgba(215, 25, 32, 0.08);
+}
+
+.field-toolbar__btn--danger {
+  color: #d71920;
+  border-color: #d71920;
+}
+
+.field-toolbar__font {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 110px;
+  font-size: 11px;
+}
+
+.field-toolbar__font span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-toolbar__font input {
+  max-width: 110px;
+  font-size: 11px;
+}
+
+.cropper-frame {
+  max-height: 60vh;
+  overflow: hidden;
+  background: #111;
+  border-radius: 12px;
+}
+
+.cropper-frame img {
+  display: block;
+  max-width: 100%;
 }
 
 .template-preview-dialog {

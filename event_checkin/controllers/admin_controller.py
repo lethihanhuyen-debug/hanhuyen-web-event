@@ -559,6 +559,10 @@ def save_certificate_layout(event_id):
 
     for field in allowed_fields:
         if field not in layout_payload:
+            # The designer always sends its full current layout, so a field missing from
+            # the payload means the admin deleted it client-side — drop it here too instead
+            # of silently keeping the stale copy already stored for this event.
+            layout.pop(field, None)
             continue
         valid, error_message = _validate_layout_field(field, layout_payload[field])
         if not valid:

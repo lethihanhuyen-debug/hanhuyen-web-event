@@ -24,6 +24,7 @@
   const input = document.getElementById('checkinInput');
   const button = document.getElementById('checkinBtn');
   const result = document.getElementById('checkinResult');
+  let submitting = false;
 
   function paint(kind, text) {
     result.className = 'checkin-result checkin-result--' + kind;
@@ -31,12 +32,17 @@
   }
 
   async function submitCheckin() {
+    if (submitting) return; // ignore double-tap / double-Enter while a request is in flight
     const ma_cbsv = input.value.trim();
     if (!ma_cbsv) {
       paint('error', 'Vui lòng nhập mã CB/SV.');
       input.focus();
       return;
     }
+
+    submitting = true;
+    button.disabled = true;
+    paint('pending', 'Đang xử lý...');
 
     try {
       const response = await fetch('/api/checkin', {
@@ -62,6 +68,8 @@
     } catch (error) {
       paint('error', 'Không thể kết nối máy chủ.');
     } finally {
+      submitting = false;
+      button.disabled = false;
       input.value = '';
       input.focus();
     }

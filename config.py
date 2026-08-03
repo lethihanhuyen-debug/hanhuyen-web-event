@@ -24,8 +24,6 @@ class Config:
         "pool_pre_ping": True,
         "pool_recycle": 280,
     }
-    FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
-
     MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
     MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")

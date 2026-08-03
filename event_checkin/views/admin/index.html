@@ -1,6 +1,10 @@
 {% extends 'base.html' %}
 {% block title %}Quản trị sự kiện | Event Check-in{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css" integrity="sha256-BVucHOVAB74kQI49AuWE6CxgqaUs0ceA5f8IMYodeH8=" crossorigin="anonymous">
+{% endblock %}
+
 {% block content %}
 <section class="admin-panel">
   <div class="panel-head">
@@ -126,7 +130,7 @@
 
   <div id="certificateDesigner" class="designer-modal" hidden>
     <div class="designer-modal__backdrop" data-close-designer></div>
-    <div class="designer-modal__dialog">
+    <div class="designer-modal__dialog designer-modal__dialog--wide">
       <div class="panel-head">
         <div>
           <p class="eyebrow">Chứng chỉ</p>
@@ -136,14 +140,17 @@
       </div>
 
       <form id="designerUploadForm" class="btn-row" enctype="multipart/form-data">
-        <input class="template-input" type="file" name="certificate_template" accept="image/png,image/jpeg,image/webp" required>
-        <p id="templateStatus" class="muted" style="margin-left:12px;align-self:center">&nbsp;</p>
+        <label class="file-upload-button btn btn--ghost btn--sm">
+          <span>Tải ảnh nền chứng chỉ</span>
+          <input class="template-input" type="file" name="certificate_template" accept="image/png,image/jpeg,image/webp">
+        </label>
+        <p id="templateStatus" class="muted" style="align-self:center">&nbsp;</p>
       </form>
 
       <div class="designer-grid">
-        <div class="designer-sidebar">
-          <label>
-            <span>Thông tin cần đặt</span>
+        <aside class="designer-sidebar">
+          <div>
+            <span class="designer-sidebar__label">Thêm thông tin vào chứng chỉ</span>
             <div id="layoutFieldList" class="layout-field-list">
               <button type="button" class="layout-field-button" data-field="student_name">Họ tên sinh viên</button>
               <button type="button" class="layout-field-button" data-field="ma_cbsv">Mã CB/SV</button>
@@ -151,51 +158,37 @@
               <button type="button" class="layout-field-button" data-field="issue_date">Ngày cấp</button>
               <button type="button" class="layout-field-button" data-field="certificate_code">Mã chứng nhận</button>
             </div>
-            <input id="layoutField" type="hidden" value="">
-          </label>
-          <label>
-            <span>Cỡ chữ</span>
-            <input id="layoutSize" type="number" value="64" min="12" max="160">
-          </label>
-          <label>
-            <span>Màu chữ</span>
-            <input id="layoutColor" type="color" value="#6f1d1b">
-          </label>
-          <label>
-            <span>Căn chỉnh</span>
-            <select id="layoutAlign">
-              <option value="left">Trái</option>
-              <option value="center" selected>Giữa</option>
-              <option value="right">Phải</option>
-            </select>
-          </label>
-          <form id="fontUploadForm" class="font-upload-form" enctype="multipart/form-data">
-            <label>
-              <span>Font chữ cho thông tin đang chọn</span>
-              <input id="layoutFont" class="template-input" type="file" name="certificate_font" accept=".ttf,.otf">
-            </label>
-            <button class="btn btn--ghost btn--sm" type="submit">Tải font lên</button>
-            <p id="fontStatus" class="muted">Chưa chọn font riêng.</p>
-          </form>
-          <label>
-            <span>X</span>
-            <input id="layoutX" type="number" readonly>
-          </label>
-          <label>
-            <span>Y</span>
-            <input id="layoutY" type="number" readonly>
-          </label>
-          <div style="display:flex;gap:8px;align-items:center;">
+            <p class="hint">Bấm để thêm vào giữa khung, sau đó kéo để chỉnh vị trí. Bấm lại một trường đã thêm để chọn và chỉnh sửa.</p>
+          </div>
+          <div class="btn-row">
             <button id="saveLayout" class="btn btn--primary" type="button">Lưu vị trí</button>
             <button id="resetLayout" class="btn btn--ghost" type="button">Hủy thay đổi</button>
           </div>
-          <p class="muted">Chọn trường, rồi bấm lên ảnh để đặt vị trí hiển thị thông tin. Nhấn Hủy để quay lại layout đã lưu.</p>
-        </div>
+        </aside>
+
         <div class="designer-canvas-wrap">
-          <img id="templatePreview" alt="Mẫu chứng chỉ" style="max-width:100%;display:none;border-radius:8px;" />
-          <canvas id="certificateCanvas" width="2048" height="1433"></canvas>
+          <div id="certificateStage" class="certificate-stage">
+            <img id="templatePreview" alt="Mẫu chứng chỉ" hidden>
+            <p id="emptyStageHint" class="empty-stage-hint">Tải ảnh chứng chỉ lên để bắt đầu</p>
+          </div>
+          <div id="fieldToolbar" class="field-toolbar" hidden>
+            <input id="toolbarFontSize" type="number" min="8" max="300" title="Cỡ chữ">
+            <input id="toolbarColor" type="color" title="Màu chữ">
+            <div class="field-toolbar__group">
+              <button type="button" class="field-toolbar__btn" data-align="left" title="Căn trái">◧</button>
+              <button type="button" class="field-toolbar__btn" data-align="center" title="Căn giữa">◫</button>
+              <button type="button" class="field-toolbar__btn" data-align="right" title="Căn phải">◨</button>
+            </div>
+            <button id="toolbarBold" type="button" class="field-toolbar__btn" title="Đậm"><strong>B</strong></button>
+            <label id="toolbarFontLabel" class="file-upload-button field-toolbar__font" title="Tải font riêng cho trường này">
+              <span>Font mặc định</span>
+              <input id="toolbarFontUpload" type="file" accept=".ttf,.otf">
+            </label>
+            <button id="toolbarFontRemove" type="button" class="field-toolbar__btn" title="Xóa font riêng" hidden>⟲</button>
+          </div>
         </div>
       </div>
+      <p id="fontStatus" class="muted" hidden></p>
     </div>
   </div>
 
@@ -206,20 +199,16 @@
       <div class="panel-head">
         <div>
           <p class="eyebrow">Chỉnh ảnh</p>
-          <h2>Crop ảnh về kích thước 2000x1414</h2>
+          <h2>Cắt ảnh về tỉ lệ 2000×1414</h2>
         </div>
         <button id="closeCrop" class="btn btn--ghost" type="button">Đóng</button>
       </div>
-      <div style="padding:12px;display:flex;flex-direction:column;gap:8px;align-items:stretch;">
-        <canvas id="cropCanvas" style="width:100%;border:1px solid #ddd;background:#333;max-height:600px;"></canvas>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <label style="display:flex;align-items:center;gap:8px;"><span>Kích thước vùng crop</span>
-            <input id="cropScale" type="range" min="0.2" max="1" step="0.01" value="0.9">
-          </label>
-          <button id="cropConfirm" class="btn btn--primary">Crop &amp; Upload</button>
-          <button id="cropCancel" class="btn btn--ghost">Hủy</button>
-        </div>
-        <p class="muted">Ảnh sẽ được crop xuống chuẩn 2000×1414 trước khi tải lên.</p>
+      <div class="cropper-frame">
+        <img id="cropImage" alt="Ảnh cần cắt">
+      </div>
+      <div class="btn-row">
+        <button id="cropConfirm" class="btn btn--primary" type="button">Cắt &amp; Tải lên</button>
+        <button id="cropCancel" class="btn btn--ghost" type="button">Hủy</button>
       </div>
     </div>
   </div>
@@ -227,6 +216,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js" integrity="sha256-YVg1EQ0H2YQtHAqZXp/Hn7TfqNLBuHn/DWSFcHFO4cc=" crossorigin="anonymous"></script>
 <script>
 (function () {
   const formCard = document.getElementById('eventFormCard');
@@ -242,25 +232,31 @@
   const designerTitle = document.getElementById('designerTitle');
   const closeDesigner = document.getElementById('closeDesigner');
   const designerUploadForm = document.getElementById('designerUploadForm');
-  const fontUploadForm = document.getElementById('fontUploadForm');
-  const fontStatus = document.getElementById('fontStatus');
-  const canvas = document.getElementById('certificateCanvas');
-  const ctx = canvas.getContext('2d');
-  const layoutField = document.getElementById('layoutField');
+  const stage = document.getElementById('certificateStage');
+  const templatePreview = document.getElementById('templatePreview');
+  const emptyStageHint = document.getElementById('emptyStageHint');
   const layoutFieldList = document.getElementById('layoutFieldList');
-  const layoutSize = document.getElementById('layoutSize');
-  const layoutColor = document.getElementById('layoutColor');
-  const layoutAlign = document.getElementById('layoutAlign');
-  const layoutX = document.getElementById('layoutX');
-  const layoutY = document.getElementById('layoutY');
   const saveLayout = document.getElementById('saveLayout');
+  const resetLayoutBtn = document.getElementById('resetLayout');
+  const fieldToolbar = document.getElementById('fieldToolbar');
+  const toolbarFontSize = document.getElementById('toolbarFontSize');
+  const toolbarColor = document.getElementById('toolbarColor');
+  const toolbarBold = document.getElementById('toolbarBold');
+  const toolbarFontUpload = document.getElementById('toolbarFontUpload');
+  const toolbarFontLabel = document.getElementById('toolbarFontLabel');
+  const toolbarFontRemove = document.getElementById('toolbarFontRemove');
   let editingEventId = null;
   let editingEventData = null;
   let designingEventId = null;
   let designingTemplateUrl = null;
+  // natural (original) pixel size of the uploaded template, and the current on-screen scale factor
+  let naturalWidth = 0;
+  let naturalHeight = 0;
+  let scale = 1;
+  let selectedField = null;
   // session state for layout edits (kept in-memory until Save pressed)
   let certificateLayout = {};
-  // map original font_family -> { url, family } for the currently loaded FontFace
+  // map font_family -> loaded local FontFace family name, so we don't reload the same font twice
   const loadedFonts = new Map();
 
   function setTemplateStatus(text, timeout = 0) {
@@ -430,6 +426,8 @@
     });
   });
 
+  const FIELD_ORDER = ['student_name', 'ma_cbsv', 'don_vi', 'issue_date', 'certificate_code'];
+
   function sampleText(field) {
     return {
       student_name: 'Nguyễn Văn A',
@@ -440,322 +438,363 @@
     }[field] || field;
   }
 
-  async function loadFieldFont(field, config) {
-    if (!config || !config.font_url || !config.font_family) {
-      return Promise.resolve();
-    }
-    // if we've already loaded this family for the same URL, skip
-    const cached = loadedFonts.get(config.font_family);
-    if (cached && cached.url === config.font_url) return Promise.resolve();
-    // ensure layout entry exists
-    certificateLayout = certificateLayout || {};
-    certificateLayout[field] = certificateLayout[field] || {};
-    const cfg = certificateLayout[field];
-    const text = sampleText(field);
-    const fontSize = cfg.size || 64;
-    // measure current text height using current canvas font metrics
-    try {
-      // preserve current ctx.font and baseline
-      const prevFont = ctx.font;
-      const prevBaseline = ctx.textBaseline;
-      ctx.textBaseline = 'top';
-      // use current ctx (which may be fallback) to measure
-      const beforeMetrics = ctx.measureText(text);
-      const beforeHeight = (beforeMetrics.actualBoundingBoxAscent || fontSize * 0.8) + (beforeMetrics.actualBoundingBoxDescent || fontSize * 0.2);
+  function toNatural(px) {
+    return scale ? px / scale : px;
+  }
 
-      // load the font under a unique local family name so re-uploads take effect
+  function clampFontSize(size) {
+    return Math.max(8, Math.min(300, Math.round(size)));
+  }
+
+  async function loadFieldFont(field, config) {
+    if (!config || !config.font_url || !config.font_family) return;
+    const cached = loadedFonts.get(config.font_family);
+    if (cached && cached.url === config.font_url) {
+      config.__loaded_family = cached.family;
+      return;
+    }
+    try {
       const uniqueFamily = `${config.font_family}__${Date.now()}`;
       const fontFace = new FontFace(uniqueFamily, `url(${config.font_url})`);
       await fontFace.load();
       document.fonts.add(fontFace);
       loadedFonts.set(config.font_family, { url: config.font_url, family: uniqueFamily });
-      // record the loaded family on the certificateLayout entry so drawing uses it
-      certificateLayout = certificateLayout || {};
-      certificateLayout[field] = certificateLayout[field] || {};
-      certificateLayout[field].__loaded_family = uniqueFamily;
-
-      // measure with new font
-      ctx.font = `${cfg.bold === false ? '' : 'bold '}${fontSize}px "${uniqueFamily}"`;
-      const afterMetrics = ctx.measureText(text);
-      const afterHeight = (afterMetrics.actualBoundingBoxAscent || fontSize * 0.8) + (afterMetrics.actualBoundingBoxDescent || fontSize * 0.2);
-
-      // adjust Y to keep visual center stable
-      const delta = afterHeight - beforeHeight;
-      if (typeof cfg.y === 'number') {
-        cfg.y = Math.round(cfg.y - Math.round(delta / 2));
-      }
-
-      try { drawDesigner(); } catch (e) { /* ignore */ }
-      // restore previous font/baseline
-      ctx.font = prevFont;
-      ctx.textBaseline = prevBaseline;
-      return Promise.resolve();
+      config.__loaded_family = uniqueFamily;
+      renderFields();
     } catch (error) {
       console.warn('Không thể tải font xem trước', field, error);
-      return Promise.resolve();
     }
   }
 
-  function updateFontStatus() {
-    const config = certificateLayout[layoutField.value] || {};
-    fontStatus.textContent = config.font_name ? `Font: ${config.font_name}` : 'Chưa chọn font riêng.';
+  function recalcScale() {
+    if (naturalWidth) scale = stage.clientWidth / naturalWidth;
   }
 
-  function setActiveLayoutField(field) {
-    if (!layoutField) return;
-    layoutField.value = field || '';
-    if (layoutFieldList) {
-      layoutFieldList.querySelectorAll('.layout-field-button').forEach((button) => {
-        button.classList.toggle('active', button.dataset.field === field);
-      });
+  function positionField(el, config) {
+    const align = config.align || 'left';
+    el.style.left = `${config.x * scale}px`;
+    el.style.top = `${config.y * scale}px`;
+    if (align === 'center') {
+      el.style.transform = 'translateX(-50%)';
+      el.style.textAlign = 'center';
+    } else if (align === 'right') {
+      el.style.transform = 'translateX(-100%)';
+      el.style.textAlign = 'right';
+    } else {
+      el.style.transform = 'none';
+      el.style.textAlign = 'left';
     }
-    if (!field) {
-      layoutX.value = '';
-      layoutY.value = '';
-      if (layoutAlign) layoutAlign.value = 'center';
-      updateFontStatus();
-      drawDesigner();
-      return;
-    }
-    ensureFieldHasPosition(field);
-    const config = certificateLayout[field] || {};
-    if (layoutAlign) layoutAlign.value = (config.align || 'center');
-    layoutX.value = typeof config.x === 'number' ? config.x : '';
-    layoutY.value = typeof config.y === 'number' ? config.y : '';
-    if (layoutSize) layoutSize.value = config.size || 64;
-    if (layoutColor) layoutColor.value = config.color || '#6f1d1b';
-    updateFontStatus();
-    drawDesigner();
+    el.style.fontSize = `${(config.size || 64) * scale}px`;
+    el.style.color = config.color || '#6f1d1b';
+    el.style.fontWeight = config.bold === false ? '400' : '700';
+    el.style.fontFamily = `"${config.__loaded_family || config.font_family || 'Arial'}", Arial, sans-serif`;
   }
 
-  if (layoutFieldList) {
+  function updateSidebarState() {
     layoutFieldList.querySelectorAll('.layout-field-button').forEach((button) => {
-      button.addEventListener('click', () => {
-        setActiveLayoutField(button.dataset.field);
+      const field = button.dataset.field;
+      const placed = certificateLayout[field] && typeof certificateLayout[field].x === 'number';
+      button.classList.toggle('active', field === selectedField);
+      button.classList.toggle('placed', !!placed);
+      button.disabled = !designingTemplateUrl;
+    });
+  }
+
+  function updateToolbar() {
+    const config = selectedField && certificateLayout[selectedField];
+    const el = config && stage.querySelector(`.cert-field[data-field="${selectedField}"]`);
+    if (!config || !el) {
+      fieldToolbar.hidden = true;
+      return;
+    }
+    // Don't stomp on the input while the user is actively typing in it — renderFields()
+    // (and therefore updateToolbar()) runs on every keystroke, and unconditionally resetting
+    // .value here fought the user's own typing (couldn't type multi-digit numbers, couldn't
+    // clear the box). Only sync the displayed value when something else changed it (drag-resize,
+    // switching selected field, etc.).
+    if (document.activeElement !== toolbarFontSize) {
+      toolbarFontSize.value = config.size || 64;
+    }
+    toolbarColor.value = config.color || '#6f1d1b';
+    toolbarBold.classList.toggle('active', config.bold !== false);
+    fieldToolbar.querySelectorAll('[data-align]').forEach((btn) => {
+      btn.classList.toggle('active', (config.align || 'left') === btn.dataset.align);
+    });
+    toolbarFontLabel.querySelector('span').textContent = config.font_name || 'Font mặc định';
+    toolbarFontRemove.hidden = !config.font_file;
+
+    fieldToolbar.hidden = false;
+    const wrap = stage.parentElement;
+    const wrapRect = wrap.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const toolbarRect = fieldToolbar.getBoundingClientRect();
+    let left = elRect.left - wrapRect.left;
+    let top = elRect.top - wrapRect.top - toolbarRect.height - 10;
+    if (top < 0) top = elRect.bottom - wrapRect.top + 10;
+    left = Math.max(0, Math.min(left, wrap.clientWidth - toolbarRect.width));
+    fieldToolbar.style.left = `${left}px`;
+    fieldToolbar.style.top = `${top}px`;
+  }
+
+  function renderFields() {
+    stage.querySelectorAll('.cert-field').forEach((el) => el.remove());
+    emptyStageHint.hidden = !!designingTemplateUrl;
+
+    if (designingTemplateUrl) {
+      FIELD_ORDER.forEach((field) => {
+        const config = certificateLayout[field];
+        if (!config || typeof config.x !== 'number' || typeof config.y !== 'number') return;
+        const el = document.createElement('div');
+        el.className = 'cert-field';
+        el.dataset.field = field;
+        el.textContent = sampleText(field);
+        positionField(el, config);
+        if (field === selectedField) {
+          el.classList.add('selected');
+          const handle = document.createElement('span');
+          handle.className = 'resize-handle';
+          handle.addEventListener('mousedown', (e) => onResizeMouseDown(e, field));
+          el.appendChild(handle);
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'field-delete';
+          del.textContent = '×';
+          del.addEventListener('mousedown', (e) => e.stopPropagation());
+          del.addEventListener('click', (e) => { e.stopPropagation(); removeField(field); });
+          el.appendChild(del);
+        }
+        el.addEventListener('mousedown', (e) => onFieldMouseDown(e, field));
+        stage.appendChild(el);
+        if (config.font_url && !config.__loaded_family) loadFieldFont(field, config);
       });
-    });
+    }
+
+    updateSidebarState();
+    updateToolbar();
   }
 
-  if (layoutAlign) {
-    layoutAlign.addEventListener('change', () => {
-      const field = layoutField.value;
-      if (!field) return;
-      certificateLayout[field] = certificateLayout[field] || {};
-      certificateLayout[field].align = layoutAlign.value || 'center';
-      drawDesigner();
-    });
+  function addOrSelectField(field) {
+    if (!designingTemplateUrl) return;
+    if (!certificateLayout[field] || typeof certificateLayout[field].x !== 'number') {
+      const defaultSize = 64;
+      // y is stored as the TOP of the text (matches the top-anchored rendering used when
+      // the certificate is actually generated), so offset by half a line height to make a
+      // freshly-added field look vertically centered on the image, not just horizontally.
+      certificateLayout[field] = {
+        ...(certificateLayout[field] || {}),
+        x: Math.round(naturalWidth / 2),
+        y: Math.round(naturalHeight / 2 - defaultSize * 0.6),
+        size: defaultSize,
+        color: '#6f1d1b',
+        bold: true,
+        align: 'center',
+      };
+    }
+    selectedField = field;
+    renderFields();
   }
 
-  if (layoutSize) {
-    layoutSize.addEventListener('input', () => {
-      const field = layoutField.value;
-      if (!field) return;
-      certificateLayout[field] = certificateLayout[field] || {};
-      certificateLayout[field].size = Number(layoutSize.value) || 64;
-      drawDesigner();
-    });
+  function removeField(field) {
+    delete certificateLayout[field];
+    if (selectedField === field) selectedField = null;
+    renderFields();
   }
 
-  if (layoutColor) {
-    layoutColor.addEventListener('input', () => {
-      const field = layoutField.value;
-      if (!field) return;
-      certificateLayout[field] = certificateLayout[field] || {};
-      certificateLayout[field].color = layoutColor.value;
-      drawDesigner();
-    });
+  layoutFieldList.querySelectorAll('.layout-field-button').forEach((button) => {
+    button.addEventListener('click', () => addOrSelectField(button.dataset.field));
+  });
+
+  stage.addEventListener('mousedown', (event) => {
+    if ((event.target === stage || event.target === templatePreview) && selectedField) {
+      selectedField = null;
+      renderFields();
+    }
+  });
+
+  function onFieldMouseDown(event, field) {
+    if (event.target.classList.contains('resize-handle') || event.target.classList.contains('field-delete')) return;
+    event.preventDefault();
+    selectedField = field;
+    renderFields();
+    const config = certificateLayout[field];
+    const startClientX = event.clientX;
+    const startClientY = event.clientY;
+    const startX = config.x;
+    const startY = config.y;
+
+    function onMove(moveEvent) {
+      config.x = Math.round(startX + toNatural(moveEvent.clientX - startClientX));
+      config.y = Math.round(startY + toNatural(moveEvent.clientY - startClientY));
+      renderFields();
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   }
 
-  function drawDesigner() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    if (!designingTemplateUrl) {
-      const preview = document.getElementById('templatePreview');
-      if (preview) { preview.style.display = 'none'; preview.removeAttribute('src'); }
-      ctx.fillStyle = '#64748b';
-      ctx.font = '48px Arial';
-      ctx.textBaseline = 'top';
-      ctx.fillText('Tải ảnh chứng chỉ lên để bắt đầu', 120, 160);
+  function onResizeMouseDown(event, field) {
+    event.preventDefault();
+    event.stopPropagation();
+    const config = certificateLayout[field];
+    const startClientX = event.clientX;
+    const startSize = config.size || 64;
+
+    function onMove(moveEvent) {
+      config.size = clampFontSize(startSize + toNatural(moveEvent.clientX - startClientX) * 0.8);
+      renderFields();
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
+  toolbarFontSize.addEventListener('input', () => {
+    if (!selectedField) return;
+    const raw = toolbarFontSize.value.trim();
+    // Let the box sit empty while the user clears it to type a new number — committing
+    // a fallback value here is what caused the "jumps back while deleting" symptom.
+    if (raw === '') return;
+    const parsed = Number(raw);
+    if (Number.isNaN(parsed)) return;
+    // Apply the typed value as-is (no rounding/clamping) so what's on screen always
+    // matches what's in the box; out-of-range values are only normalized on blur below,
+    // once the user has actually finished typing.
+    certificateLayout[selectedField].size = parsed;
+    renderFields();
+  });
+
+  toolbarFontSize.addEventListener('blur', () => {
+    if (!selectedField) return;
+    const config = certificateLayout[selectedField];
+    const raw = toolbarFontSize.value.trim();
+    const parsed = Number(raw);
+    config.size = clampFontSize(raw === '' || Number.isNaN(parsed) ? (config.size || 64) : parsed);
+    renderFields();
+  });
+
+  toolbarColor.addEventListener('input', () => {
+    if (!selectedField) return;
+    certificateLayout[selectedField].color = toolbarColor.value;
+    renderFields();
+  });
+
+  toolbarBold.addEventListener('click', () => {
+    if (!selectedField) return;
+    const config = certificateLayout[selectedField];
+    config.bold = config.bold === false;
+    renderFields();
+  });
+
+  fieldToolbar.querySelectorAll('[data-align]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!selectedField) return;
+      certificateLayout[selectedField].align = button.dataset.align;
+      renderFields();
+    });
+  });
+
+  toolbarFontUpload.addEventListener('change', async () => {
+    if (!selectedField || !toolbarFontUpload.files.length) return;
+    if (!designingEventId) {
+      setTemplateStatus('Hãy lưu sự kiện trước khi tải font.');
+      toolbarFontUpload.value = '';
       return;
     }
-    // reset transient UI targets (delete button)
-    window._deleteBtn = null;
-    // reuse a cached Image to avoid reloading the template on every redraw
-    window._designerImage = window._designerImage || null;
-    window._designerImageUrl = window._designerImageUrl || null;
-    function drawWithImage(img) {
-      // set canvas size once (only when changed)
-      if (canvas.width !== img.naturalWidth || canvas.height !== img.naturalHeight) {
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-      }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      // update preview image element for immediate visual feedback
-        try {
-        const preview = document.getElementById('templatePreview');
-        if (preview) {
-          // set src to the uploaded URL but keep the preview hidden — canvas renders the template.
-          preview.src = designingTemplateUrl;
-          preview.style.display = 'none';
-          preview.style.pointerEvents = 'none';
-        }
-      } catch (e) {
-        if (window._debug) console.debug('preview update failed', e);
-      }
-      // store measured boxes for each field and render all placed fields
-      window._fieldBoxes = window._fieldBoxes || {};
-      const activeField = layoutField.value;
-      if (activeField) ensureFieldHasPosition(activeField);
-      for (const [field, config] of Object.entries(certificateLayout)) {
-        if (field === '_meta') continue;
-        if (typeof config.x !== 'number' || typeof config.y !== 'number') {
-          delete window._fieldBoxes[field];
-          continue;
-        }
-        const fontFamily = (config.__loaded_family || config.font_family) || 'Arial';
-        const fontSize = config.size || 64;
-        ctx.fillStyle = config.color || '#6f1d1b';
-        ctx.font = `${config.bold === false ? '' : 'bold '}${fontSize}px "${fontFamily}"`;
-        ctx.textBaseline = 'top';
-        const text = sampleText(field);
-        const align = (config.align || 'left');
-        ctx.textAlign = align === 'center' ? 'center' : (align === 'right' ? 'right' : 'left');
-        if (field === activeField) loadFieldFont(field, config);
-        ctx.fillText(text, config.x, config.y);
-        const metrics = ctx.measureText(text);
-        const textWidth = Math.ceil(metrics.width);
-        const textHeight = Math.ceil(fontSize * 1.1);
-        let boxLeft = config.x;
-        if (align === 'center') boxLeft = Math.round(config.x - textWidth / 2);
-        else if (align === 'right') boxLeft = Math.round(config.x - textWidth);
-        else boxLeft = Math.round(config.x);
-        window._fieldBoxes[field] = { x: boxLeft, y: config.y, w: textWidth, h: textHeight };
-      }
-      updateFontStatus();
-
-      const activeBox = activeField && window._fieldBoxes[activeField] ? window._fieldBoxes[activeField] : null;
-      if (activeBox) {
-        const box = activeBox;
-        ctx.save();
-        ctx.strokeStyle = '#d71920';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 4]);
-        ctx.strokeRect(box.x - 6, box.y - 6, box.w + 12, box.h + 12);
-        ctx.setLineDash([]);
-        // draw move-handle (four arrows) when hovering near edge
-        if (window._showHandle && window._handlePos) {
-          const cx = window._handlePos.x;
-          const cy = window._handlePos.y;
-          // draw circular background
-          ctx.beginPath();
-          ctx.fillStyle = '#8b1d1b';
-          ctx.arc(cx, cy, 12, 0, Math.PI * 2);
-          ctx.fill();
-          // draw four arrows
-          ctx.fillStyle = '#fff';
-          const drawArrow = (dx, dy) => {
-            ctx.beginPath();
-            ctx.moveTo(cx + dx * 6, cy + dy * 6 - 4);
-            ctx.lineTo(cx + dx * 10, cy + dy * 6);
-            ctx.lineTo(cx + dx * 6, cy + dy * 6 + 4);
-            ctx.closePath();
-            ctx.fill();
-          };
-          drawArrow(-1, 0);
-          drawArrow(1, 0);
-          drawArrow(0, -1);
-          drawArrow(0, 1);
-        }
-        // no zoom buttons (removed): clear any stale zoom targets
-        window._zoomBtn = null;
-        // draw corner resize handles (small squares)
-        const handleSize = 10;
-        const corners = {
-          tl: { x: box.x - 6, y: box.y - 6 },
-          tr: { x: box.x + box.w + 6, y: box.y - 6 },
-          bl: { x: box.x - 6, y: box.y + box.h + 6 },
-          br: { x: box.x + box.w + 6, y: box.y + box.h + 6 },
-        };
-        for (const [name, p] of Object.entries(corners)) {
-          ctx.beginPath();
-          ctx.fillStyle = window._resizeHandle === name ? '#2b6cb0' : '#ffffff';
-          ctx.strokeStyle = '#333';
-          ctx.lineWidth = 1;
-          ctx.rect(p.x - handleSize/2, p.y - handleSize/2, handleSize, handleSize);
-          ctx.fill();
-          ctx.stroke();
-        }
-        // draw delete button (larger red circle with ×) for active field
-        try {
-          const delSize = 28;
-          const delX = box.x + box.w - delSize + 6; // adjust to sit near top-right
-          const delY = box.y - 28;
-          const delCx = delX + delSize / 2;
-          const delCy = delY + delSize / 2;
-          ctx.beginPath();
-          ctx.fillStyle = '#d71920';
-          ctx.arc(delCx, delCy, delSize/2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 18px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('\u00D7', delCx, delCy);
-          // save delete button hit rect in canvas coords
-          window._deleteBtn = { x: Math.round(delX), y: Math.round(delY), w: Math.round(delSize), h: Math.round(delSize), field: activeField };
-        } catch (e) {
-          // ignore drawing errors
-        }
-        ctx.restore();
-      }
-    }
-
-    // if we already have the image cached and it's the same URL, draw immediately
-    if (window._designerImage && window._designerImageUrl === designingTemplateUrl && window._designerImage.complete) {
-      drawWithImage(window._designerImage);
+    const field = selectedField;
+    const formData = new FormData();
+    formData.append('field', field);
+    formData.append('certificate_font', toolbarFontUpload.files[0]);
+    toolbarFontUpload.value = '';
+    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-font`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await response.json();
+    if (!data.success) {
+      setTemplateStatus(data.message || 'Không thể tải font lên.');
       return;
     }
+    const returned = (data.data.certificate_layout && data.data.certificate_layout[field]) || {};
+    const prev = certificateLayout[field] || {};
+    loadedFonts.delete(prev.font_family);
+    certificateLayout[field] = { ...prev, ...returned, x: prev.x, y: prev.y, size: prev.size };
+    if (editingEventId === designingEventId) editingEventData = data.data;
+    await loadFieldFont(field, certificateLayout[field]);
+    renderFields();
+    setTemplateStatus('Font đã tải lên.', 2500);
+  });
 
-    // otherwise create/load image and cache it
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      window._designerImage = img;
-      window._designerImageUrl = designingTemplateUrl;
-      drawWithImage(img);
-      setTemplateStatus('Mẫu chứng chỉ đã sẵn sàng.', 3000);
-    };
-    img.onerror = (err) => {
-      console.error('Designer image load error', err, designingTemplateUrl);
-      setTemplateStatus('Không thể tải ảnh mẫu (lỗi hình).');
-    };
-    img.src = designingTemplateUrl;
+  toolbarFontRemove.addEventListener('click', async () => {
+    if (!selectedField || !designingEventId) return;
+    const field = selectedField;
+    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-font/${field}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!data.success) {
+      setTemplateStatus(data.message || 'Không thể xóa font.');
+      return;
+    }
+    const prev = certificateLayout[field] || {};
+    loadedFonts.delete(prev.font_family);
+    delete prev.font_file;
+    delete prev.font_name;
+    delete prev.font_family;
+    delete prev.__loaded_family;
+    if (editingEventId === designingEventId) editingEventData = data.data;
+    renderFields();
+    setTemplateStatus('Đã xóa font riêng.', 2000);
+  });
+
+  function loadTemplateImage(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  async function applyTemplateUrl(url) {
+    designingTemplateUrl = url;
+    templatePreview.src = url;
+    templatePreview.hidden = false;
+    try {
+      const img = await loadTemplateImage(url);
+      naturalWidth = img.naturalWidth;
+      naturalHeight = img.naturalHeight;
+      recalcScale();
+    } catch (error) {
+      console.error('Không thể tải ảnh mẫu', error);
+    }
+    renderFields();
   }
 
   function openDesigner(event) {
     designingEventId = event.id;
-    designingTemplateUrl = event.certificate_template_url;
-    // keep a session copy of the saved layout (do not mutate the original object)
     editingEventData = event;
+    selectedField = null;
+    naturalWidth = 0;
+    naturalHeight = 0;
+    templatePreview.hidden = true;
+    templatePreview.removeAttribute('src');
     try {
       certificateLayout = event && event.certificate_layout ? JSON.parse(JSON.stringify(event.certificate_layout)) : {};
-      // normalize missing align values to 'left' (server expectation), but keep existing values
-      for (const k of Object.keys(certificateLayout || {})) {
-        if (k === '_meta') continue;
-        const cfg = certificateLayout[k];
-        if (cfg && typeof cfg === 'object') {
-          cfg.align = (cfg.align || 'left');
-        }
-      }
     } catch (e) {
       certificateLayout = {};
     }
     designerTitle.textContent = `Thiết lập chứng chỉ - ${event.ten_su_kien}`;
     designer.hidden = false;
-    // ensure no field is selected by default when opening
-    if (layoutField) layoutField.value = '';
-    drawDesigner();
+    if (event.certificate_template_url) {
+      applyTemplateUrl(event.certificate_template_url);
+    } else {
+      designingTemplateUrl = null;
+      renderFields();
+    }
     designer.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -765,709 +804,66 @@
     });
   });
 
-  closeDesigner.addEventListener('click', () => {
-    // discard unsaved edits and restore saved layout
+  function discardDesignerChanges() {
     if (editingEventData && editingEventData.certificate_layout) {
       certificateLayout = JSON.parse(JSON.stringify(editingEventData.certificate_layout));
     } else {
       certificateLayout = {};
     }
-    window._fieldBoxes = {};
-    window._designerImage = null;
-    window._designerImageUrl = null;
-    layoutField.value = '';
-    layoutX.value = '';
-    layoutY.value = '';
+    selectedField = null;
     designer.hidden = true;
+  }
+
+  closeDesigner.addEventListener('click', discardDesignerChanges);
+  document.querySelectorAll('[data-close-designer]').forEach((element) => {
+    element.addEventListener('click', discardDesignerChanges);
   });
 
-  document.querySelectorAll('[data-close-designer]').forEach((element) => {
-    element.addEventListener('click', () => {
+  window.addEventListener('resize', () => {
+    if (!designer.hidden && naturalWidth) {
+      recalcScale();
+      renderFields();
+    }
+  });
+
+  saveLayout.addEventListener('click', async () => {
+    if (!designingEventId) return;
+    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-layout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        layout: certificateLayout,
+        base_width: naturalWidth,
+        base_height: naturalHeight,
+      }),
+    });
+    const data = await response.json();
+    if (data.success) {
+      window.location.reload();
+      return;
+    }
+    setTemplateStatus(data.message || 'Không thể lưu vị trí.');
+  });
+
+  if (resetLayoutBtn) {
+    resetLayoutBtn.addEventListener('click', () => {
       if (editingEventData && editingEventData.certificate_layout) {
-        certificateLayout = JSON.parse(JSON.stringify(editingEventData.certificate_layout));
+        try { certificateLayout = JSON.parse(JSON.stringify(editingEventData.certificate_layout)); } catch (e) { certificateLayout = {}; }
       } else {
         certificateLayout = {};
       }
-      window._fieldBoxes = {};
-      window._designerImage = null;
-      window._designerImageUrl = null;
-      layoutField.value = '';
-      layoutX.value = '';
-      layoutY.value = '';
-      designer.hidden = true;
+      selectedField = null;
+      renderFields();
+      setTemplateStatus('Đã khôi phục layout đã lưu.', 2000);
     });
-  });
-
-  // Drag-to-position support (mouse + touch) using an edge handle
-  let isDragging = false;
-  let draggingField = null;
-  let isResizing = false;
-  let resizingField = null;
-  let _resizeState = null; // { anchor: {x,y}, startDist, startSize, startBox }
-  // dragOffset keeps the delta between pointer and stored text anchor during dragging
-  let dragOffset = { dx: 0, dy: 0 };
-  window._showHandle = false;
-  window._handlePos = null;
-  window._resizeHandle = null; // 'tl'|'tr'|'bl'|'br'
-
-  function getCanvasCoordsFromEvent(e) {
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.clientX;
-    const clientY = e.clientY;
-    const x = Math.round((clientX - rect.left) * (canvas.width / rect.width));
-    const y = Math.round((clientY - rect.top) * (canvas.height / rect.height));
-    return { x, y };
   }
 
-  function isPointInRect(px, py, r) {
-    return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
-  }
-
-  // Ensure the given field has a position/size in `certificateLayout`.
-  // If not present, place it at the canvas center with sensible defaults.
-  function ensureFieldHasPosition(field) {
-    if (!field) return;
-    const prev = certificateLayout[field] || {};
-    if (typeof prev.x === 'number' && typeof prev.y === 'number') return;
-    // place at canvas center
-    const defaultSize = Number(layoutSize.value || 64) || 64;
-    const centerX = Math.round(canvas.width / 2);
-    const centerY = Math.round(canvas.height / 2);
-    // center the text visually: measure sample text width and offset X accordingly
-    try {
-      const text = sampleText(field);
-      ctx.font = `${prev.bold === false ? '' : 'bold '}${defaultSize}px "${(prev.font_family || 'Arial')}"`;
-      const metrics = ctx.measureText(text);
-      const textWidth = Math.ceil(metrics.width);
-      const textHeight = Math.ceil(defaultSize * 1.1);
-      // determine default align for a new placement: prefer previous or default to center
-      const alignVal = prev.align || 'center';
-      let posX = Math.round(centerX);
-      const leftPos = Math.round(centerX - textWidth / 2);
-      if (alignVal === 'left') posX = leftPos;
-      else if (alignVal === 'right') posX = leftPos + textWidth;
-      certificateLayout[field] = {
-        ...prev,
-        x: posX,
-        y: Math.round(centerY - textHeight / 2),
-        size: prev.size || defaultSize,
-        color: prev.color || (layoutColor.value || '#6f1d1b'),
-        bold: true,
-        align: alignVal,
-      };
-    } catch (e) {
-      certificateLayout[field] = {
-        ...prev,
-        x: centerX,
-        y: centerY,
-        size: prev.size || defaultSize,
-        color: prev.color || (layoutColor.value || '#6f1d1b'),
-        bold: true,
-        align: prev.align || 'center',
-      };
-    }
-    // update controls
-    layoutX.value = certificateLayout[field].x;
-    layoutY.value = certificateLayout[field].y;
-    layoutSize.value = certificateLayout[field].size;
-    layoutColor.value = certificateLayout[field].color;
-  }
-
-  function updateHandleState(clientX, clientY) {
-    const activeField = layoutField.value;
-    window._showHandle = false;
-    window._handlePos = null;
-    canvas.style.cursor = '';
-    window._hoverZoom = null;
-    // if delete button exists and the pointer is over it, show pointer cursor
-    if (window._deleteBtn) {
-      const btn = window._deleteBtn;
-      const crect = canvas.getBoundingClientRect();
-      const btnLeft = crect.left + (btn.x / canvas.width) * crect.width;
-      const btnTop = crect.top + (btn.y / canvas.height) * crect.height;
-      const btnRight = btnLeft + (btn.w / canvas.width) * crect.width;
-      const btnBottom = btnTop + (btn.h / canvas.height) * crect.height;
-      if (clientX >= btnLeft && clientX <= btnRight && clientY >= btnTop && clientY <= btnBottom) {
-        canvas.style.cursor = 'pointer';
-        return;
-      }
-    }
-    if (!activeField || !window._fieldBoxes || !window._fieldBoxes[activeField]) return;
-    const rect = window._fieldBoxes[activeField];
-    const canvasRect = canvas.getBoundingClientRect();
-    const toClientX = (cx) => canvasRect.left + (cx / canvas.width) * canvasRect.width;
-    const toClientY = (cy) => canvasRect.top + (cy / canvas.height) * canvasRect.height;
-
-    // detect corner handles first (resize)
-    const corners = {
-      tl: { cx: toClientX(rect.x - 6), cy: toClientY(rect.y - 6) },
-      tr: { cx: toClientX(rect.x + rect.w + 6), cy: toClientY(rect.y - 6) },
-      bl: { cx: toClientX(rect.x - 6), cy: toClientY(rect.y + rect.h + 6) },
-      br: { cx: toClientX(rect.x + rect.w + 6), cy: toClientY(rect.y + rect.h + 6) },
-    };
-    const cornerThreshold = 10;
-    for (const [name, p] of Object.entries(corners)) {
-      if (Math.hypot(clientX - p.cx, clientY - p.cy) <= cornerThreshold) {
-        window._resizeHandle = name;
-        window._showHandle = true;
-        // choose cursor for diagonal resize
-        canvas.style.cursor = (name === 'tl' || name === 'br') ? 'nwse-resize' : 'nesw-resize';
-        return;
-      }
-    }
-    window._resizeHandle = null;
-    // only show the move-handle (4-arrows) when the pointer is close to the handle center
-    // (prevents the whole box acting like a move-area and the move-cursor following the pointer)
-    const handleCanvasX = rect.x + Math.floor(rect.w / 2);
-    const handleCanvasY = rect.y + Math.floor(rect.h / 2);
-    const handleClientX = toClientX(handleCanvasX);
-    const handleClientY = toClientY(handleCanvasY);
-    const handleThreshold = 16; // pixels in client coords
-    const distToHandle = Math.hypot(clientX - handleClientX, clientY - handleClientY);
-    if (distToHandle <= handleThreshold) {
-      window._showHandle = true;
-      window._handlePos = { x: handleCanvasX, y: handleCanvasY };
-      canvas.style.cursor = 'move';
-      return;
-    }
-
-    // detect proximity to edges for resize cursor
-    const threshold = 8;
-    const leftX = toClientX(rect.x - 6);
-    const rightX = toClientX(rect.x + rect.w + 6);
-    const topY = toClientY(rect.y - 6);
-    const bottomY = toClientY(rect.y + rect.h + 6);
-    const clientThreshold = threshold;
-    // near left/right edge
-    if (clientY >= topY && clientY <= bottomY && Math.abs(clientX - leftX) <= clientThreshold) {
-      window._showHandle = true;
-      window._handlePos = { x: rect.x - 6, y: rect.y + Math.floor(rect.h / 2) };
-      canvas.style.cursor = 'ew-resize';
-      return;
-    }
-    if (clientY >= topY && clientY <= bottomY && Math.abs(clientX - rightX) <= clientThreshold) {
-      window._showHandle = true;
-      window._handlePos = { x: rect.x + rect.w + 6, y: rect.y + Math.floor(rect.h / 2) };
-      canvas.style.cursor = 'ew-resize';
-      return;
-    }
-    // near top/bottom edge
-    if (clientX >= toClientX(rect.x - 6) && clientX <= toClientX(rect.x + rect.w + 6) && Math.abs(clientY - topY) <= clientThreshold) {
-      window._showHandle = true;
-      window._handlePos = { x: rect.x + Math.floor(rect.w / 2), y: rect.y - 6 };
-      canvas.style.cursor = 'ns-resize';
-      return;
-    }
-    if (clientX >= toClientX(rect.x - 6) && clientX <= toClientX(rect.x + rect.w + 6) && Math.abs(clientY - bottomY) <= clientThreshold) {
-      window._showHandle = true;
-      window._handlePos = { x: rect.x + Math.floor(rect.w / 2), y: rect.y + rect.h + 6 };
-      canvas.style.cursor = 'ns-resize';
-      return;
-    }
-
-    // no zoom hover targets
-    window._hoverZoom = null;
-  }
-
-  // mouse move: only used to update hover/resize visuals; we NO LONGER move fields while
-  // the user is simply moving the mouse. Placement happens on click (see click handler).
-  canvas.addEventListener('mousemove', (event) => {
-    updateHandleState(event.clientX, event.clientY);
-    // if we are actively dragging a field (mousedown on handle + move), update its position
-    if (isDragging && draggingField) {
-      const coords = getCanvasCoordsFromEvent(event);
-      const previousConfig = certificateLayout[draggingField] || {};
-      certificateLayout[draggingField] = {
-        ...previousConfig,
-        x: coords.x + (dragOffset && typeof dragOffset.dx === 'number' ? dragOffset.dx : 0),
-        y: coords.y + (dragOffset && typeof dragOffset.dy === 'number' ? dragOffset.dy : 0),
-        size: previousConfig.size || Number(layoutSize.value || 64),
-        color: previousConfig.color || layoutColor.value || '#6f1d1b',
-        bold: typeof previousConfig.bold === 'boolean' ? previousConfig.bold : true,
-      };
-      layoutX.value = certificateLayout[draggingField].x;
-      layoutY.value = certificateLayout[draggingField].y;
-      drawDesigner();
-      if (window._debug) console.debug('canvas mousemove drag', { field: draggingField, x: certificateLayout[draggingField].x, y: certificateLayout[draggingField].y });
-      return;
-    }
-    // handle resize in-progress
-    if (isResizing && resizingField && _resizeState) {
-      const coords = getCanvasCoordsFromEvent(event);
-      const anchor = _resizeState.anchor; // canvas coords
-      const startDist = _resizeState.startDist;
-      const currentDist = Math.hypot(coords.x - anchor.x, coords.y - anchor.y);
-      const delta = currentDist - startDist;
-      const sensitivity = 0.12;
-      const newSize = Math.max(8, Math.round(_resizeState.startSize + delta * sensitivity));
-      const previousConfig = certificateLayout[resizingField] || {};
-      certificateLayout[resizingField] = {
-        ...previousConfig,
-        size: newSize,
-      };
-      layoutSize.value = certificateLayout[resizingField].size;
-    }
-    // always redraw to show/hide handles
-    drawDesigner();
-  });
-
-  // mousedown: used only to detect intent for resizing or selection. We DO NOT start
-  // continuous dragging here; repositioning occurs when the user clicks on the canvas.
-  canvas.addEventListener('mousedown', (event) => {
-    if (!designingEventId) return;
-    let activeField = layoutField.value;
-    const coords = getCanvasCoordsFromEvent(event);
-    if (!activeField || !window._fieldBoxes || !isPointInRect(coords.x, coords.y, (window._fieldBoxes[activeField] || {}))) {
-      if (window._fieldBoxes) {
-        for (const [f, r] of Object.entries(window._fieldBoxes)) {
-          if (isPointInRect(coords.x, coords.y, r)) {
-            activeField = f;
-            layoutField.value = f;
-            updateFontStatus();
-            drawDesigner();
-            break;
-          }
-        }
-      }
-    }
-    const rect = window._fieldBoxes && window._fieldBoxes[activeField];
-    // handle resize start as before
-    if (window._resizeHandle && rect) {
-      const r = rect;
-      let anchor = { x: r.x + r.w, y: r.y + r.h };
-      if (window._resizeHandle === 'tr') anchor = { x: r.x, y: r.y + r.h };
-      if (window._resizeHandle === 'bl') anchor = { x: r.x + r.w, y: r.y };
-      if (window._resizeHandle === 'tl') anchor = { x: r.x + r.w, y: r.y + r.h };
-      const coords = getCanvasCoordsFromEvent(event);
-      const startDist = Math.hypot(coords.x - anchor.x, coords.y - anchor.y);
-      const startSize = (certificateLayout[activeField] && certificateLayout[activeField].size) || Number(layoutSize.value || 64);
-      isResizing = true;
-      resizingField = activeField;
-      _resizeState = { anchor, startDist, startSize, startBox: { ...rect } };
-      if (window._debug) console.debug('start resize', { resizingField, _resizeState, clientX: event.clientX, clientY: event.clientY });
-      return;
-    }
-    // start dragging only when user pressed near the move-handle center
-    if (window._showHandle && window._handlePos && rect) {
-      const canvasRect = canvas.getBoundingClientRect();
-      const hx = canvasRect.left + (window._handlePos.x / canvas.width) * canvasRect.width;
-      const hy = canvasRect.top + (window._handlePos.y / canvas.height) * canvasRect.height;
-      const dist = Math.hypot(event.clientX - hx, event.clientY - hy);
-      const handleThreshold = 20;
-      if (dist <= handleThreshold && activeField) {
-        isDragging = true;
-        draggingField = activeField;
-        // preserve pointer -> text anchor offset so element doesn't jump when drag starts
-        const cfg = certificateLayout[activeField] || {};
-        dragOffset.dx = (typeof cfg.x === 'number' ? cfg.x : 0) - coords.x;
-        dragOffset.dy = (typeof cfg.y === 'number' ? cfg.y : 0) - coords.y;
-        if (window._debug) console.debug('start drag', { draggingField, dragOffset, clientX: event.clientX, clientY: event.clientY });
-        return;
-      }
-    }
-    // otherwise: do not start drag; click will either select a field (handled above) or place it (handled on click)
-  });
-
-  // click (mouse) sets position immediately if not clicking the handle
-  canvas.addEventListener('click', (event) => {
-    if (!designingEventId) return;
-    const activeField = layoutField.value;
-    if (!activeField) return;
-    // if click was near handle, ignore (handled by drag)
-    if (window._showHandle && window._handlePos) {
-      const rect = canvas.getBoundingClientRect();
-      const hx = rect.left + (window._handlePos.x / canvas.width) * rect.width;
-      const hy = rect.top + (window._handlePos.y / canvas.height) * rect.height;
-      const dx = Math.abs(event.clientX - hx);
-      const dy = Math.abs(event.clientY - hy);
-      if (Math.max(dx, dy) <= 20) return;
-    }
-    // Instead of setting position on click, if the user clicked inside any field box,
-    // select that field for editing. Dragging (mousedown+move) still moves the field.
-    const { x, y } = getCanvasCoordsFromEvent(event);
-    // if clicked on delete button, remove that field
-    if (window._deleteBtn && isPointInRect(x, y, window._deleteBtn)) {
-      const df = window._deleteBtn.field;
-      if (df && certificateLayout[df]) {
-        delete certificateLayout[df];
-        if (window._fieldBoxes) delete window._fieldBoxes[df];
-        if (layoutField.value === df) {
-          layoutField.value = '';
-          updateFontStatus();
-        }
-        setTemplateStatus('Đã xóa trường.', 2000);
-        drawDesigner();
-        return;
-      }
-    }
-    // if click landed inside any existing box, select that field for editing
-    if (window._fieldBoxes) {
-      for (const [field, r] of Object.entries(window._fieldBoxes)) {
-        if (isPointInRect(x, y, r)) {
-          layoutField.value = field;
-          updateFontStatus();
-          drawDesigner();
-          return;
-        }
-      }
-    }
-    // If an active field is selected and the user clicked on canvas outside boxes,
-    // set that field's position to the clicked point (this is the explicit "place" action).
-    if (activeField) {
-      const prev = certificateLayout[activeField] || {};
-      // determine chosen align: prefer the control if present, otherwise previous or center
-      const chosenAlign = (layoutAlign && layoutAlign.value) ? layoutAlign.value : (prev.align || 'center');
-      // measure text width for display calculations
-      const text = sampleText(activeField);
-      const fontSize = prev.size || Number(layoutSize.value || 64);
-      const fontFamily = (prev.__loaded_family || prev.font_family) || 'Arial';
-      ctx.font = `${prev.bold === false ? '' : 'bold '}${fontSize}px "${fontFamily}"`;
-      const metrics = ctx.measureText(text);
-      const textWidth = Math.ceil(metrics.width || (fontSize * text.length * 0.5));
-      // set stored coordinates according to alignment semantics: x is left/center/right depending on align
-      let newX = x;
-      let newY = y;
-      certificateLayout[activeField] = {
-        ...prev,
-        x: newX,
-        y: newY,
-        size: prev.size || fontSize,
-        color: prev.color || layoutColor.value || '#6f1d1b',
-        bold: typeof prev.bold === 'boolean' ? prev.bold : true,
-        align: chosenAlign,
-      };
-      layoutX.value = certificateLayout[activeField].x;
-      layoutY.value = certificateLayout[activeField].y;
-      // after placing, exit selection state
-      layoutField.value = '';
-      updateFontStatus();
-      setTemplateStatus('Đã đặt vị trí.', 1500);
-      drawDesigner();
-    }
-  });
-
-  ['mouseup', 'mouseleave'].forEach((ev) => {
-    canvas.addEventListener(ev, () => {
-      if (isDragging) {
-        isDragging = false;
-        draggingField = null;
-      }
-      if (isResizing) {
-        isResizing = false;
-        resizingField = null;
-        _resizeState = null;
-      }
-    });
-  });
-
-  // Touch support: show handle on touchmove and require initial touch near handle to drag
-  canvas.addEventListener('touchstart', (event) => {
-    if (!designingEventId) return;
-    const touch = event.touches[0];
-    if (!touch) return;
-    updateHandleState(touch.clientX, touch.clientY);
-    window._lastTouch = touch;
-    // allow selecting any field by touch and start dragging immediately
-    let activeField = layoutField.value;
-    const coords = getCanvasCoordsFromEvent(touch);
-    if (!activeField || !window._fieldBoxes || !isPointInRect(coords.x, coords.y, (window._fieldBoxes[activeField] || {}))) {
-      if (window._fieldBoxes) {
-        for (const [f, r] of Object.entries(window._fieldBoxes)) {
-          if (isPointInRect(coords.x, coords.y, r)) {
-            activeField = f;
-            layoutField.value = f;
-            updateFontStatus();
-            drawDesigner();
-            break;
-          }
-        }
-      }
-    }
-    const rect = window._fieldBoxes && window._fieldBoxes[activeField];
-    // no zoom buttons
-    // if touch inside box -> start dragging
-    if (rect) {
-      // if touch on resize handle -> start resizing
-      if (window._resizeHandle) {
-        const r = rect;
-        let anchor = { x: r.x + r.w, y: r.y + r.h };
-        if (window._resizeHandle === 'tr') anchor = { x: r.x, y: r.y + r.h };
-        if (window._resizeHandle === 'bl') anchor = { x: r.x + r.w, y: r.y };
-        if (window._resizeHandle === 'tl') anchor = { x: r.x + r.w, y: r.y + r.h };
-        const coords = getCanvasCoordsFromEvent(touch);
-        const startDist = Math.hypot(coords.x - anchor.x, coords.y - anchor.y);
-        const startSize = (certificateLayout[activeField] && certificateLayout[activeField].size) || Number(layoutSize.value || 64);
-        isResizing = true;
-        resizingField = activeField;
-        _resizeState = { anchor, startDist, startSize, startBox: { ...rect } };
-        if (window._debug) console.debug('touch start resize', { resizingField, _resizeState });
-        event.preventDefault();
-        return;
-      }
-      // touch inside an existing box: select it, but do not start dragging
-      const coords = getCanvasCoordsFromEvent(touch);
-      if (isPointInRect(coords.x, coords.y, rect)) {
-        layoutField.value = activeField;
-        updateFontStatus();
-        drawDesigner();
-        event.preventDefault();
-        return;
-      }
-    }
-    // if touch started near handle, begin dragging
-    if (window._showHandle && window._handlePos && rect && activeField) {
-      const canvasRect = canvas.getBoundingClientRect();
-      const hx = canvasRect.left + (window._handlePos.x / canvas.width) * canvasRect.width;
-      const hy = canvasRect.top + (window._handlePos.y / canvas.height) * canvasRect.height;
-      const dist = Math.hypot(touch.clientX - hx, touch.clientY - hy);
-      const handleThreshold = 20;
-      if (dist <= handleThreshold) {
-        isDragging = true;
-        draggingField = activeField;
-        const cfg = certificateLayout[activeField] || {};
-        dragOffset.dx = (typeof cfg.x === 'number' ? cfg.x : 0) - coords.x;
-        dragOffset.dy = (typeof cfg.y === 'number' ? cfg.y : 0) - coords.y;
-        if (window._debug) console.debug('start touch drag', { draggingField, dragOffset });
-        event.preventDefault();
-        return;
-      }
-    }
-  }, { passive: false });
-
-  canvas.addEventListener('touchmove', (event) => {
-    const touch = event.touches[0];
-    if (!touch) return;
-    // handle resizing via touch
-    if (isResizing && resizingField && _resizeState) {
-      const coords = getCanvasCoordsFromEvent(touch);
-      const anchor = _resizeState.anchor;
-      const startDist = _resizeState.startDist;
-      const currentDist = Math.hypot(coords.x - anchor.x, coords.y - anchor.y);
-      const delta = currentDist - startDist;
-      const sensitivity = 0.12;
-      const newSize = Math.max(8, Math.round(_resizeState.startSize + delta * sensitivity));
-      const previousConfig = certificateLayout[resizingField] || {};
-      certificateLayout[resizingField] = { ...previousConfig, size: newSize };
-      layoutSize.value = certificateLayout[resizingField].size;
-      drawDesigner();
-      event.preventDefault();
-      return;
-    }
-    // no zoom buttons
-    // if dragging, update position
-    if (!isDragging || !draggingField) return;
-    const { x, y } = getCanvasCoordsFromEvent(touch);
-    const previousConfig = certificateLayout[draggingField] || {};
-    certificateLayout[draggingField] = {
-      ...previousConfig,
-      x,
-      y,
-      size: Number(layoutSize.value || 64),
-      color: layoutColor.value || '#6f1d1b',
-      bold: true,
-    };
-    layoutX.value = x;
-    layoutY.value = y;
-    drawDesigner();
-    if (window._debug) console.debug('canvas touchmove drag', { x, y });
-    event.preventDefault();
-  }, { passive: false });
-
-  canvas.addEventListener('touchend', () => {
-    // if we were dragging via touch, finish drag and stop
-    if (isDragging) {
-      isDragging = false;
-      draggingField = null;
-      window._lastTouch = null;
-      drawDesigner();
-      return;
-    }
-    // treat as tap: if an active field is selected, place it at the touched point
-    if (isResizing) {
-      isResizing = false;
-      resizingField = null;
-      _resizeState = null;
-      return;
-    }
-    if (!window._lastTouch) return;
-    const coords = getCanvasCoordsFromEvent(window._lastTouch);
-    // if tapped the delete button, remove the field
-    if (window._deleteBtn && isPointInRect(coords.x, coords.y, window._deleteBtn)) {
-      const df = window._deleteBtn.field;
-      if (df && certificateLayout[df]) {
-        delete certificateLayout[df];
-        if (window._fieldBoxes) delete window._fieldBoxes[df];
-        if (layoutField.value === df) { layoutField.value = ''; updateFontStatus(); }
-        setTemplateStatus('Đã xóa trường.', 2000);
-        drawDesigner();
-        return;
-      }
-    }
-    // if tapped inside a box, select it
-    if (window._fieldBoxes) {
-      for (const [field, r] of Object.entries(window._fieldBoxes)) {
-        if (isPointInRect(coords.x, coords.y, r)) {
-          layoutField.value = field;
-          updateFontStatus();
-          drawDesigner();
-          return;
-        }
-      }
-    }
-    // place selected field if any
-    const activeField = layoutField.value;
-    if (activeField) {
-      const prev = certificateLayout[activeField] || {};
-      const text = sampleText(activeField);
-      const fontSize = prev.size || Number(layoutSize.value || 64);
-      const fontFamily = (prev.__loaded_family || prev.font_family) || 'Arial';
-      ctx.font = `${prev.bold === false ? '' : 'bold '}${fontSize}px "${fontFamily}"`;
-      const metrics = ctx.measureText(text);
-      const textWidth = Math.ceil(metrics.width || (fontSize * text.length * 0.5));
-      let newX = coords.x;
-      let newY = coords.y;
-      if (activeField === 'student_name') {
-        newX = Math.round(coords.x - textWidth / 2);
-      }
-      certificateLayout[activeField] = { ...prev, x: newX, y: newY, size: prev.size || fontSize, color: prev.color || layoutColor.value || '#6f1d1b', bold: typeof prev.bold === 'boolean' ? prev.bold : true };
-      layoutX.value = certificateLayout[activeField].x;
-      layoutY.value = certificateLayout[activeField].y;
-      layoutField.value = '';
-      updateFontStatus();
-      setTemplateStatus('Đã đặt vị trí.', 1500);
-      drawDesigner();
-      return;
-    }
-  });
-
-  layoutField.addEventListener('change', (e) => {
-    const field = layoutField.value;
-    ensureFieldHasPosition(field);
-    updateFontStatus(e);
-    // set align control to current field value
-    if (layoutAlign && field) layoutAlign.value = (certificateLayout[field] && certificateLayout[field].align) || 'center';
-    drawDesigner();
-  });
-  // also ensure creation when user actively clicks/selects the dropdown
-  layoutField.addEventListener('click', (e) => {
-    const field = layoutField.value;
-    if (field) {
-      ensureFieldHasPosition(field);
-      updateFontStatus();
-      if (layoutAlign) layoutAlign.value = (certificateLayout[field] && certificateLayout[field].align) || 'center';
-      drawDesigner();
-    }
-  });
-
-  fontUploadForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    await uploadSelectedFont();
-  });
-
-  async function uploadSelectedFont() {
-    if (!designingEventId) return false;
-    const fileInput = document.getElementById('layoutFont');
-    if (!fileInput.files.length) {
-      setTemplateStatus('Vui lòng chọn file font.');
-      return false;
-    }
-    const field = layoutField.value;
-    const formData = new FormData();
-    formData.append('field', field);
-    formData.append('certificate_font', fileInput.files[0]);
-    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-font`, {
-      method: 'POST',
-      body: formData,
-    });
-    const data = await response.json();
-    if (!data.success) {
-      setTemplateStatus(data.message || 'Không thể tải font lên.');
-      return false;
-    }
-    // Merge server-returned layout for the specific field instead of replacing
-    const returnedLayout = data.data && data.data.certificate_layout ? data.data.certificate_layout : {};
-    if (returnedLayout && returnedLayout[field]) {
-      const prev = certificateLayout[field] || {};
-      const returned = returnedLayout[field] || {};
-      // prefer preserving existing position/size unless server explicitly changed them
-      const x = (typeof prev.x === 'number') ? prev.x : (typeof returned.x === 'number' ? returned.x : prev.x);
-      const y = (typeof prev.y === 'number') ? prev.y : (typeof returned.y === 'number' ? returned.y : prev.y);
-      const size = (typeof prev.size === 'number') ? prev.size : (typeof returned.size === 'number' ? returned.size : prev.size);
-      certificateLayout[field] = { ...prev, ...returned, x, y, size };
-      // If a font family was already loaded for this field, remove it so the newly uploaded
-      // font (which may overwrite the same filename) is actually reloaded by `loadFieldFont`.
-      try {
-        const fam = (returned && returned.font_family) || certificateLayout[field].font_family;
-        if (fam && loadedFonts && loadedFonts.has && loadedFonts.has(fam)) {
-          loadedFonts.delete(fam);
-        }
-      } catch (e) { /* ignore */ }
-    } else {
-      // fallback: merge top-level returned data
-      certificateLayout = { ...certificateLayout, ...returnedLayout };
-    }
-    // ensure the UI selects this field so changes apply immediately
-    if (layoutField && layoutField.value !== field) {
-      layoutField.value = field;
-    }
-    // ensure field has a position so it will be visible for editing
-    ensureFieldHasPosition(field);
-    if (editingEventId === designingEventId) {
-      editingEventData = data.data;
-    }
-    fileInput.value = '';
-    // ensure the newly uploaded font is loaded before redrawing so text uses it immediately
-    try {
-      await loadFieldFont(field, certificateLayout[field]);
-    } catch (e) {
-      console.warn('Font load after upload failed', e);
-    }
-    updateFontStatus();
-    drawDesigner();
-    // success
-    return true;
-  }
-
-  designerUploadForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!designingEventId) return;
-    const formData = new FormData(designerUploadForm);
-    if (window._debug) console.debug('designer submit files', Array.from(formData.entries()).map(([k,v])=>[k, v && v.name || v]));
-    let data;
-    try {
-      const response = await fetch(`/api/admin/events/${designingEventId}/certificate-template`, {
-        method: 'POST',
-        body: formData,
-      });
-      data = await response.json();
-    } catch (err) {
-      console.error('upload error', err);
-      setTemplateStatus('Lỗi kết nối khi tải ảnh.');
-      return;
-    }
-    if (!data.success) {
-      setTemplateStatus(data.message || 'Không thể tải ảnh chứng chỉ lên.');
-      return;
-    }
-    designingTemplateUrl = data.data.certificate_template_url;
-    // clear cached image so browser will reload updated template
-    window._designerImage = null;
-    window._designerImageUrl = null;
-    if (editingEventId === designingEventId) {
-      editingEventData = data.data;
-    }
-    drawDesigner();
-    // success: show brief success message for visibility
-    setTemplateStatus('Mẫu đã tải lên.', 3000);
-  });
-
-  // Auto-upload template when a file is selected (no need to press upload button)
+  // Background upload: auto-upload as soon as a file is chosen. If it doesn't already match
+  // the 2000x1414 ratio, crop it first (via Cropper.js) so certificates stay visually consistent.
   (function () {
     const templateInput = designerUploadForm.querySelector('input[name="certificate_template"]');
     const cropModal = document.getElementById('cropModal');
-    const cropCanvas = document.getElementById('cropCanvas');
-    const cropCtx = cropCanvas.getContext && cropCanvas.getContext('2d');
-    const cropScaleInput = document.getElementById('cropScale');
+    const cropImage = document.getElementById('cropImage');
     const cropConfirmBtn = document.getElementById('cropConfirm');
     const cropCancelBtn = document.getElementById('cropCancel');
     const closeCrop = document.getElementById('closeCrop');
@@ -1476,282 +872,78 @@
     const TARGET_W = 2000;
     const TARGET_H = 1414;
     const TARGET_RATIO = TARGET_W / TARGET_H;
+    const RATIO_TOLERANCE = 0.01;
 
-    // cropper state
-    let _cropImage = null;
-    let _imgNaturalW = 0;
-    let _imgNaturalH = 0;
-    let _displayScale = 1; // image -> canvas scale
-    let _cropRect = { x: 0, y: 0, w: 0, h: 0 }; // in image coords
-    let _isDraggingCrop = false;
-    let _dragOffset = { x: 0, y: 0 };
+    let cropper = null;
+    let cropObjectUrl = null;
 
-    function showCropModal() { cropModal.hidden = false; }
-    function hideCropModal() { cropModal.hidden = true; }
-
-    function drawCrop() {
-      if (!cropCtx || !_cropImage) return;
-      const canvas = cropCanvas;
-      // clear
-      cropCtx.clearRect(0, 0, canvas.width, canvas.height);
-      // draw image scaled
-      cropCtx.drawImage(_cropImage, 0, 0, _imgNaturalW * _displayScale, _imgNaturalH * _displayScale);
-      // overlay
-      cropCtx.fillStyle = 'rgba(0,0,0,0.45)';
-      cropCtx.fillRect(0, 0, canvas.width, canvas.height);
-      // crop rect in display coords
-      const dx = Math.round(_cropRect.x * _displayScale);
-      const dy = Math.round(_cropRect.y * _displayScale);
-      const dw = Math.round(_cropRect.w * _displayScale);
-      const dh = Math.round(_cropRect.h * _displayScale);
-      // clear crop area
-      cropCtx.clearRect(dx, dy, dw, dh);
-      // draw border
-      cropCtx.strokeStyle = '#ffcc00';
-      cropCtx.lineWidth = 2;
-      cropCtx.strokeRect(dx + 0.5, dy + 0.5, dw - 1, dh - 1);
+    function hideCropModal() {
+      cropModal.hidden = true;
+      if (cropper) { cropper.destroy(); cropper = null; }
+      if (cropObjectUrl) { URL.revokeObjectURL(cropObjectUrl); cropObjectUrl = null; }
     }
 
-    function initCropFromImage(img) {
-      _cropImage = img;
-      _imgNaturalW = img.naturalWidth;
-      _imgNaturalH = img.naturalHeight;
-      // choose display scale to fit modal (max width 860, max height 600)
-      const maxW = 860; const maxH = 600;
-      _displayScale = Math.min(1, maxW / _imgNaturalW, maxH / _imgNaturalH);
-      cropCanvas.width = Math.round(_imgNaturalW * _displayScale);
-      cropCanvas.height = Math.round(_imgNaturalH * _displayScale);
-      // initial crop rect: largest area with target ratio that fits image
-      let sw, sh;
-      if ((_imgNaturalW / _imgNaturalH) > TARGET_RATIO) {
-        sh = _imgNaturalH;
-        sw = Math.round(sh * TARGET_RATIO);
-      } else {
-        sw = _imgNaturalW;
-        sh = Math.round(sw / TARGET_RATIO);
-      }
-      _cropRect.w = sw; _cropRect.h = sh;
-      _cropRect.x = Math.round((_imgNaturalW - sw) / 2);
-      _cropRect.y = Math.round((_imgNaturalH - sh) / 2);
-      // set scale slider initial value relative to fit
-      cropScaleInput.value = 0.9;
-      drawCrop();
-      showCropModal();
-    }
-
-    function uploadCroppedBlob(blob, filename) {
+    async function uploadTemplateFile(file) {
       const formData = new FormData();
-      formData.append('certificate_template', blob, filename || 'certificate.png');
-      return fetch(`/api/admin/events/${designingEventId}/certificate-template`, { method: 'POST', body: formData }).then(r => r.json());
+      formData.append('certificate_template', file, file.name || 'certificate.png');
+      setTemplateStatus('Đang tải ảnh...');
+      const response = await fetch(`/api/admin/events/${designingEventId}/certificate-template`, { method: 'POST', body: formData });
+      const data = await response.json();
+      if (!data.success) {
+        setTemplateStatus(data.message || 'Không thể tải ảnh chứng chỉ lên.');
+        return;
+      }
+      if (editingEventId === designingEventId) editingEventData = data.data;
+      await applyTemplateUrl(data.data.certificate_template_url);
+      setTemplateStatus('Mẫu đã tải lên.', 3000);
     }
 
-    // crop confirm handler: create a canvas of TARGET size and draw source crop into it
-    cropConfirmBtn.addEventListener('click', async () => {
-      if (!_cropImage) return;
-      const srcX = Math.max(0, Math.min(_imgNaturalW - 1, Math.round(_cropRect.x)));
-      const srcY = Math.max(0, Math.min(_imgNaturalH - 1, Math.round(_cropRect.y)));
-      const srcW = Math.max(1, Math.min(_imgNaturalW - srcX, Math.round(_cropRect.w)));
-      const srcH = Math.max(1, Math.min(_imgNaturalH - srcY, Math.round(_cropRect.h)));
-      const outCanvas = document.createElement('canvas');
-      outCanvas.width = TARGET_W; outCanvas.height = TARGET_H;
-      const outCtx = outCanvas.getContext('2d');
-      outCtx.fillStyle = '#fff'; outCtx.fillRect(0,0,TARGET_W,TARGET_H);
-      outCtx.drawImage(_cropImage, srcX, srcY, srcW, srcH, 0, 0, TARGET_W, TARGET_H);
-      outCanvas.toBlob(async (blob) => {
-        try {
-          setTemplateStatus('Đang tải ảnh đã crop...');
-          const data = await uploadCroppedBlob(blob, 'certificate_cropped.png');
-          if (!data || !data.success) {
-            setTemplateStatus((data && data.message) || 'Không thể tải ảnh sau khi crop.');
-            return;
-          }
-          designingTemplateUrl = data.data.certificate_template_url;
-          window._designerImage = null; window._designerImageUrl = null;
-          if (editingEventId === designingEventId) editingEventData = data.data;
-          hideCropModal();
-          templateInput.value = '';
-          drawDesigner();
-          setTemplateStatus('Mẫu đã tải lên.', 3000);
-        } catch (err) {
-          console.error('crop upload error', err);
-          setTemplateStatus('Lỗi khi tải ảnh.');
-        }
+    cropConfirmBtn.addEventListener('click', () => {
+      if (!cropper) return;
+      cropper.getCroppedCanvas({ width: TARGET_W, height: TARGET_H }).toBlob((blob) => {
+        hideCropModal();
+        templateInput.value = '';
+        uploadTemplateFile(new File([blob], 'certificate_cropped.png', { type: 'image/png' }));
       }, 'image/png');
     });
 
-    // cancel/close handlers
-    cropCancelBtn.addEventListener('click', () => { hideCropModal(); templateInput.value = ''; setTemplateStatus('Hủy tải ảnh.'); });
-    closeCrop.addEventListener('click', () => { hideCropModal(); templateInput.value = ''; setTemplateStatus('Hủy tải ảnh.'); });
-    document.querySelectorAll('[data-close-crop]').forEach(el => el.addEventListener('click', () => { hideCropModal(); templateInput.value = ''; setTemplateStatus('Hủy tải ảnh.'); }));
+    [cropCancelBtn, closeCrop].forEach((btn) => btn.addEventListener('click', () => {
+      hideCropModal();
+      templateInput.value = '';
+      setTemplateStatus('Đã hủy tải ảnh.');
+    }));
 
-    // scale control: adjust crop rect size (keep centered)
-    cropScaleInput.addEventListener('input', () => {
-      if (!_cropImage) return;
-      const scale = Number(cropScaleInput.value) || 1;
-      // base fit size
-      let baseW, baseH;
-      if ((_imgNaturalW / _imgNaturalH) > TARGET_RATIO) { baseH = _imgNaturalH; baseW = Math.round(baseH * TARGET_RATIO); }
-      else { baseW = _imgNaturalW; baseH = Math.round(baseW / TARGET_RATIO); }
-      const nw = Math.max(16, Math.round(baseW * scale));
-      const nh = Math.max(16, Math.round(baseH * scale));
-      // center on previous center
-      const cx = _cropRect.x + _cropRect.w / 2;
-      const cy = _cropRect.y + _cropRect.h / 2;
-      _cropRect.w = Math.min(nw, _imgNaturalW);
-      _cropRect.h = Math.min(nh, _imgNaturalH);
-      _cropRect.x = Math.round(Math.max(0, Math.min(_imgNaturalW - _cropRect.w, cx - _cropRect.w / 2)));
-      _cropRect.y = Math.round(Math.max(0, Math.min(_imgNaturalH - _cropRect.h, cy - _cropRect.h / 2)));
-      drawCrop();
-    });
-
-    // drag to move crop rect on display canvas
-    let _mouseDown = false;
-    cropCanvas.addEventListener('mousedown', (ev) => {
-      if (!_cropImage) return;
-      const rect = cropCanvas.getBoundingClientRect();
-      const clientX = ev.clientX - rect.left;
-      const clientY = ev.clientY - rect.top;
-      const ix = clientX / _displayScale;
-      const iy = clientY / _displayScale;
-      if (ix >= _cropRect.x && ix <= _cropRect.x + _cropRect.w && iy >= _cropRect.y && iy <= _cropRect.y + _cropRect.h) {
-        _isDraggingCrop = true; _mouseDown = true;
-        _dragOffset.x = ix - _cropRect.x; _dragOffset.y = iy - _cropRect.y;
-      }
-    });
-    window.addEventListener('mousemove', (ev) => {
-      if (!_isDraggingCrop || !_cropImage || !_mouseDown) return;
-      const rect = cropCanvas.getBoundingClientRect();
-      const clientX = ev.clientX - rect.left;
-      const clientY = ev.clientY - rect.top;
-      const ix = clientX / _displayScale;
-      const iy = clientY / _displayScale;
-      _cropRect.x = Math.round(Math.max(0, Math.min(_imgNaturalW - _cropRect.w, ix - _dragOffset.x)));
-      _cropRect.y = Math.round(Math.max(0, Math.min(_imgNaturalH - _cropRect.h, iy - _dragOffset.y)));
-      drawCrop();
-    });
-    window.addEventListener('mouseup', () => { _isDraggingCrop = false; _mouseDown = false; });
-
-    // main template input handler
-    templateInput.addEventListener('change', async () => {
+    templateInput.addEventListener('change', () => {
       if (!templateInput.files.length) return;
-      if (window._debug) console.debug('template input changed', templateInput.files[0] && templateInput.files[0].name);
       if (!designingEventId) {
-        setTemplateStatus('Hãy lưu sự kiện và mở trình thiết lập trước khi tải mẫu chứng chỉ.');
+        setTemplateStatus('Hãy lưu sự kiện trước khi tải mẫu chứng chỉ.');
         templateInput.value = '';
         return;
       }
       const file = templateInput.files[0];
-      setTemplateStatus(file && file.name ? file.name : 'Đã chọn file');
-      // load image to check dimensions
       const img = new Image();
-      img.onload = async () => {
-        // exact match -> upload directly
-        if (img.naturalWidth === TARGET_W && img.naturalHeight === TARGET_H) {
-          // proceed with existing upload
-          try {
-            const formData = new FormData();
-            formData.append('certificate_template', file);
-            const response = await fetch(`/api/admin/events/${designingEventId}/certificate-template`, { method: 'POST', body: formData });
-            const data = await response.json();
-            if (!data.success) { setTemplateStatus(data.message || 'Không thể tải ảnh chứng chỉ lên.'); templateInput.value = ''; return; }
-            designingTemplateUrl = data.data.certificate_template_url;
-            window._designerImage = null; window._designerImageUrl = null;
-            if (editingEventId === designingEventId) editingEventData = data.data;
-            templateInput.value = '';
-            drawDesigner();
-            setTemplateStatus('Mẫu đã tải lên.', 3000);
-          } catch (err) { console.error('auto-upload error', err); setTemplateStatus('Lỗi kết nối khi tải ảnh.'); templateInput.value = ''; }
+      img.onload = () => {
+        const ratio = img.naturalWidth / img.naturalHeight;
+        if (Math.abs(ratio - TARGET_RATIO) <= RATIO_TOLERANCE) {
+          uploadTemplateFile(file);
+          templateInput.value = '';
           return;
         }
-        // otherwise open cropper
-        try {
-          if (window._localPreviewUrl) { URL.revokeObjectURL(window._localPreviewUrl); window._localPreviewUrl = null; }
-          window._localPreviewUrl = URL.createObjectURL(file);
-        } catch (e) { /* ignore */ }
-        initCropFromImage(img);
+        cropObjectUrl = URL.createObjectURL(file);
+        cropImage.src = cropObjectUrl;
+        cropModal.hidden = false;
+        if (cropper) cropper.destroy();
+        cropper = new Cropper(cropImage, {
+          aspectRatio: TARGET_RATIO,
+          viewMode: 1,
+          autoCropArea: 1,
+          background: false,
+        });
       };
-      img.onerror = () => { setTemplateStatus('Không thể đọc file ảnh.'); templateInput.value = ''; };
+      img.onerror = () => setTemplateStatus('Không thể đọc file ảnh.');
       img.src = URL.createObjectURL(file);
     });
   })();
-
-  // Auto-upload font when a file is selected (no need to press upload button)
-  (function () {
-    const fontInput = document.getElementById('layoutFont');
-    if (!fontInput) return;
-    fontInput.addEventListener('change', async () => {
-      if (!fontInput.files.length) return;
-      // show selected filename immediately
-      const file = fontInput.files[0];
-      if (file) fontStatus.textContent = file.name;
-      if (!designingEventId) {
-        setTemplateStatus('Hãy lưu sự kiện và mở trình thiết lập trước khi tải font.');
-        fontInput.value = '';
-        return;
-      }
-      const field = layoutField.value;
-      if (!field) {
-        setTemplateStatus('Vui lòng chọn trường trước khi tải font.');
-        fontInput.value = '';
-        return;
-      }
-      if (window._debug) console.debug('font input changed', fontInput.files[0] && fontInput.files[0].name, 'field', field);
-      const uploaded = await uploadSelectedFont();
-      if (!uploaded) {
-        setTemplateStatus('Không thể tải font lên.');
-        return;
-      }
-      // update UI: reflect returned font name and apply it to selected field
-      updateFontStatus();
-      drawDesigner();
-      setTemplateStatus('Font đã tải lên.', 2500);
-    });
-  })();
-
-  saveLayout.addEventListener('click', async () => {
-    if (!designingEventId) return;
-    const fontInput = document.getElementById('layoutFont');
-    if (fontInput.files.length) {
-      const uploaded = await uploadSelectedFont();
-      if (!uploaded) return;
-    }
-    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-layout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        layout: certificateLayout,
-        base_width: canvas.width,
-        base_height: canvas.height,
-      }),
-    });
-    const data = await response.json();
-    if (data.success) {
-      // success: silent reload
-      window.location.reload();
-      return;
-    }
-    setTemplateStatus(data.message || 'Không thể lưu vị trí.');
-  });
-
-  // Reset/discard session changes and restore saved layout from the server copy
-  const resetLayoutBtn = document.getElementById('resetLayout');
-  if (resetLayoutBtn) {
-    resetLayoutBtn.addEventListener('click', () => {
-      if (editingEventData && editingEventData.certificate_layout) {
-        try { certificateLayout = JSON.parse(JSON.stringify(editingEventData.certificate_layout)); } catch (e) { certificateLayout = {}; }
-      } else {
-        certificateLayout = {};
-      }
-      layoutField.value = '';
-      layoutX.value = '';
-      layoutY.value = '';
-      window._fieldBoxes = {};
-      window._designerImage = null;
-      window._designerImageUrl = null;
-      drawDesigner();
-      setTemplateStatus('Đã khôi phục layout đã lưu.', 2000);
-    });
-  }
 })();
 </script>
 {% endblock %}
