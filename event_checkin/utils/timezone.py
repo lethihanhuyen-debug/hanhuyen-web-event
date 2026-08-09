@@ -1,4 +1,4 @@
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 # Vietnam has a single fixed UTC+7 offset year-round (no DST), so a plain fixed
 # offset is correct and avoids depending on the system/tzdata having IANA zone
@@ -31,3 +31,11 @@ def format_local(dt, fmt=DEFAULT_FORMAT):
     `datetime-local` input) -- no timezone conversion is applied here.
     """
     return dt.strftime(fmt) if dt else ""
+
+
+def now_vn_naive():
+    """Current Vietnam wall-clock time as a naive datetime, directly comparable
+    to the event schedule fields (ngay_bat_dau, thoi_gian_mo_dang_ky, ...) which
+    are stored as naive VN-local wall-clock values, never UTC.
+    """
+    return datetime.now(VN_TZ).replace(tzinfo=None)

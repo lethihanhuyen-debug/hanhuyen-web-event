@@ -43,14 +43,6 @@
         <span>Đóng đăng ký</span>
         <input name="thoi_gian_dong_dang_ky" type="datetime-local" required>
       </label>
-      <label>
-        <span>Trạng thái</span>
-        <select name="trang_thai">
-          <option value="upcoming">Sắp diễn ra</option>
-          <option value="ongoing">Đang diễn ra</option>
-          <option value="closed">Đã đóng</option>
-        </select>
-      </label>
       <label class="field-wide">
         <span>Mô tả</span>
         <textarea name="mo_ta" rows="3"></textarea>
@@ -89,7 +81,7 @@
         </div>
         <div class="admin-event-card__schedule">
           <span class="badge badge--success">
-            {% if event.trang_thai == 'upcoming' %}Sắp diễn ra{% elif event.trang_thai == 'ongoing' %}Đang diễn ra{% elif event.trang_thai == 'closed' %}Đã đóng{% else %}{{ event.trang_thai }}{% endif %}
+            {% if event.trang_thai == 'upcoming' %}Sắp diễn ra{% elif event.trang_thai == 'ongoing' %}Đang diễn ra{% elif event.trang_thai == 'ended' %}Đã hết sự kiện{% else %}{{ event.trang_thai }}{% endif %}
           </span>
           <div>
             <small>Diễn ra</small>
@@ -270,6 +262,12 @@
     return value.slice(0, 16);
   }
 
+  function nowLocalString() {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  }
+
   function resetForm() {
     editingEventId = null;
     editingEventData = null;
@@ -315,6 +313,10 @@
   openButton.addEventListener('click', () => {
     formCard.hidden = false;
     resetForm();
+    const minValue = nowLocalString();
+    [form.ngay_bat_dau, form.ngay_ket_thuc, form.thoi_gian_mo_dang_ky, form.thoi_gian_dong_dang_ky].forEach((input) => {
+      input.min = minValue;
+    });
   });
 
   cancelButton.addEventListener('click', () => {
@@ -375,7 +377,9 @@
       form.ngay_ket_thuc.value = toDatetimeLocal(event.ngay_ket_thuc);
       form.thoi_gian_mo_dang_ky.value = toDatetimeLocal(event.thoi_gian_mo_dang_ky);
       form.thoi_gian_dong_dang_ky.value = toDatetimeLocal(event.thoi_gian_dong_dang_ky);
-      form.trang_thai.value = event.trang_thai || 'upcoming';
+      [form.ngay_bat_dau, form.ngay_ket_thuc, form.thoi_gian_mo_dang_ky, form.thoi_gian_dong_dang_ky].forEach((input) => {
+        input.removeAttribute('min');
+      });
       form.mo_ta.value = event.mo_ta || '';
       eventImageInput.value = '';
       setImagePreview(event.hinh_url);

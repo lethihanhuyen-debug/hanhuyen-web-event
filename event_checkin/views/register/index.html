@@ -35,7 +35,7 @@
           </div>
           <div>
             <span class="badge badge--success">
-              {% if event.trang_thai == 'upcoming' %}Sắp diễn ra{% elif event.trang_thai == 'ongoing' %}Đang diễn ra{% elif event.trang_thai == 'closed' %}Đã đóng{% else %}{{ event.trang_thai }}{% endif %}
+              {% if event.computed_status == 'upcoming' %}Sắp diễn ra{% elif event.computed_status == 'ongoing' %}Đang diễn ra{% else %}Đã hết sự kiện{% endif %}
             </span>
             <h2>{{ event.ten_su_kien }}</h2>
             <p class="muted">{{ event.mo_ta or 'Chưa có mô tả.' }}</p>
@@ -56,6 +56,11 @@
     {% if selected_event.hinh %}
       <img class="event-detail-image" src="{{ url_for('static', filename=selected_event.hinh) }}" alt="Hình sự kiện {{ selected_event.ten_su_kien }}">
     {% endif %}
+    {% if not selected_event.is_registration_open %}
+      <div class="form-card">
+        <p class="muted">{{ selected_event.registration_block_reason }}</p>
+      </div>
+    {% else %}
     <div class="form-card">
       <div id="registerMessage" class="message" hidden></div>
       <form id="registerForm" class="form-grid">
@@ -66,7 +71,7 @@
         </label>
         <label>
           <span>Họ tên</span>
-          <input type="text" name="ho_ten" id="ho_ten" placeholder="Họ và tên" required>
+          <input type="text" name="ho_ten" id="ho_ten" placeholder="Họ và tên" pattern="[^0-9]*" title="Họ tên không được chứa chữ số" required>
         </label>
         <label>
           <span>Đơn vị</span>
@@ -83,7 +88,7 @@
         </label>
         <label>
           <span>SĐT</span>
-          <input type="text" name="so_dien_thoai" id="so_dien_thoai" placeholder="Số điện thoại">
+          <input type="text" name="so_dien_thoai" id="so_dien_thoai" placeholder="Số điện thoại" pattern="\d{9,11}" title="Số điện thoại chỉ gồm 9-11 chữ số">
         </label>
         <label>
           <span>Email</span>
@@ -92,6 +97,7 @@
         <button class="btn btn--primary btn--full" type="submit">Gửi đăng ký</button>
       </form>
     </div>
+    {% endif %}
   {% endif %}
 </section>
 {% endblock %}
@@ -101,6 +107,7 @@
 <script>
 (function () {
   const form = document.getElementById('registerForm');
+  if (!form) return;
   const message = document.getElementById('registerMessage');
   const eventInput = document.getElementById('event_id');
   const maInput = document.getElementById('ma_cbsv');
