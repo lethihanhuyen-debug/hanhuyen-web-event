@@ -19,7 +19,7 @@ from event_checkin.models.don_vi import DonVi
 from event_checkin.models.email_log import EmailLog
 from event_checkin.models.event import Event
 from event_checkin.models.registration import Registration
-from event_checkin.utils.timezone import format_utc_as_vn
+from event_checkin.utils.timezone import format_utc_as_vn, now_vn_naive
 
 
 admin_bp = Blueprint("admin", __name__)
@@ -92,7 +92,7 @@ def _event_payload(event):
         "thoi_gian_mo_dang_ky_display": _format_vn_datetime(event.thoi_gian_mo_dang_ky),
         "thoi_gian_dong_dang_ky": event.thoi_gian_dong_dang_ky.isoformat() if event.thoi_gian_dong_dang_ky else None,
         "thoi_gian_dong_dang_ky_display": _format_vn_datetime(event.thoi_gian_dong_dang_ky),
-        "trang_thai": event.trang_thai,
+        "trang_thai": event.computed_status,
         "certificate_enabled": event.certificate_enabled,
         "certificate_template": event.certificate_template,
         "certificate_template_url": url_for("static", filename=event.certificate_template) if event.certificate_template else None,
@@ -358,6 +358,14 @@ def create_event():
     if thoi_gian_dong_dang_ky < thoi_gian_mo_dang_ky:
         return jsonify({"success": False, "message": "Thời gian đóng đăng ký phải sau thời gian mở đăng ký."}), 400
 
+    now = now_vn_naive()
+    if ngay_bat_dau < now:
+        return jsonify({"success": False, "message": "Ngày bắt đầu không được ở trong quá khứ."}), 400
+    if thoi_gian_mo_dang_ky < now:
+        return jsonify({"success": False, "message": "Thời gian mở đăng ký không được ở trong quá khứ."}), 400
+    if thoi_gian_dong_dang_ky < now:
+        return jsonify({"success": False, "message": "Thời gian đóng đăng ký không được ở trong quá khứ."}), 400
+
     event = Event(
         ten_su_kien=ten_su_kien,
         hinh=(payload.get("hinh") or "").strip() or None,
@@ -369,7 +377,10 @@ def create_event():
         nam=ngay_bat_dau.year,
         thoi_gian_mo_dang_ky=thoi_gian_mo_dang_ky,
         thoi_gian_dong_dang_ky=thoi_gian_dong_dang_ky,
-        trang_thai=(payload.get("trang_thai") or "upcoming").strip(),
+        # Status is derived live from the schedule (Event.computed_status), never
+        # picked by the admin -- a brand-new event always starts out "upcoming"
+        # since ngay_bat_dau/thoi_gian_mo_dang_ky are guaranteed not in the past above.
+        trang_thai="upcoming",
         certificate_enabled=True,
         created_by=session["admin_id"],
         created_at=datetime.utcnow(),
@@ -413,7 +424,8 @@ def update_event(event_id):
     event.nam = ngay_bat_dau.year
     event.thoi_gian_mo_dang_ky = thoi_gian_mo_dang_ky
     event.thoi_gian_dong_dang_ky = thoi_gian_dong_dang_ky
-    event.trang_thai = (payload.get("trang_thai") or "upcoming").strip()
+    # Recomputed from the new schedule (see Event.computed_status) -- not admin-picked.
+    event.trang_thai = event.computed_status
     event.updated_by = session["admin_id"]
     event.updated_at = datetime.utcnow()
     db.session.commit()

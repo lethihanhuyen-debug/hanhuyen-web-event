@@ -12,6 +12,7 @@ from event_checkin.models.user import User
 
 register_bp = Blueprint("register", __name__)
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+PHONE_PATTERN = re.compile(r"^\d{9,11}$")
 
 
 def _get_or_create_don_vi(ten_don_vi):
@@ -62,7 +63,8 @@ def public_events():
                 "hinh": event.hinh,
                 "hinh_url": url_for("static", filename=event.hinh) if event.hinh else None,
                 "dia_diem": event.dia_diem,
-                "trang_thai": event.trang_thai,
+                "trang_thai": event.computed_status,
+                "can_register": event.is_registration_open,
                 "ngay_bat_dau": event.ngay_bat_dau.isoformat() if event.ngay_bat_dau else None,
                 "ngay_ket_thuc": event.ngay_ket_thuc.isoformat() if event.ngay_ket_thuc else None,
                 "thoi_gian_mo_dang_ky": event.thoi_gian_mo_dang_ky.isoformat() if event.thoi_gian_mo_dang_ky else None,
@@ -96,9 +98,19 @@ def register():
     if not EMAIL_PATTERN.match(email):
         return jsonify({"success": False, "message": "Email không hợp lệ."}), 400
 
+    if any(ch.isdigit() for ch in ho_ten):
+        return jsonify({"success": False, "message": "Họ tên không được chứa chữ số."}), 400
+
+    so_dien_thoai = (payload.get("so_dien_thoai") or "").strip()
+    if so_dien_thoai and not PHONE_PATTERN.match(so_dien_thoai):
+        return jsonify({"success": False, "message": "Số điện thoại không hợp lệ (chỉ gồm 9-11 chữ số)."}), 400
+
     event = Event.query.get(event_id)
     if not event:
         return jsonify({"success": False, "message": "Sự kiện không tồn tại."}), 404
+
+    if not event.is_registration_open:
+        return jsonify({"success": False, "message": event.registration_block_reason}), 400
 
     don_vi = None
     if don_vi_id:
@@ -119,7 +131,7 @@ def register():
             ho_ten=ho_ten,
             don_vi_id=don_vi.id if don_vi else None,
             chuc_vu=(payload.get("chuc_vu") or None),
-            so_dien_thoai=(payload.get("so_dien_thoai") or None),
+            so_dien_thoai=so_dien_thoai or None,
             email=email,
             created_at=now,
         )
