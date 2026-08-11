@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 
 from flask import Blueprint, jsonify, render_template, request, url_for
+from sqlalchemy import and_, or_
 
 from event_checkin.models import db
 from event_checkin.models.don_vi import DonVi
@@ -13,6 +14,7 @@ from event_checkin.models.user import User
 register_bp = Blueprint("register", __name__)
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 PHONE_PATTERN = re.compile(r"^\d{9,11}$")
+MONTH_GROUPS_PER_PAGE = 3
 
 
 def _get_or_create_don_vi(ten_don_vi):
@@ -27,19 +29,97 @@ def _get_or_create_don_vi(ten_don_vi):
     return don_vi
 
 
+def _distinct_month_keys():
+    """(nam, thang) pairs that have at least one event, newest month first. Kept as
+    its own lightweight query so paging through months never has to load every
+    event just to find out which months exist.
+    """
+    rows = (
+        db.session.query(Event.nam, Event.thang)
+        .distinct()
+        .order_by(Event.nam.desc(), Event.thang.desc())
+        .all()
+    )
+    return [(row[0], row[1]) for row in rows]
+
+
+def _month_groups_page(offset, limit=MONTH_GROUPS_PER_PAGE):
+    """Returns (groups, next_offset, has_more) for the `limit` non-empty months
+    starting at `offset` (both counted in "months that actually have events", not
+    events or fixed calendar months -- an empty month is never counted or fetched).
+    Months are newest-first; events within a month are ordered by ngay_bat_dau
+    ascending. Only the events belonging to the requested page of months are
+    queried, never the whole table.
+    """
+    month_keys = _distinct_month_keys()
+    page_keys = month_keys[offset:offset + limit]
+    next_offset = offset + len(page_keys)
+    has_more = next_offset < len(month_keys)
+
+    # Year is only appended to the label when the event list as a whole spans more
+    # than one year, so "Tháng 9:" stays short in the common single-year case --
+    # based on every known month, not just this page, so labels stay consistent
+    # as more pages are appended.
+    multi_year = len({nam for nam, _thang in month_keys}) > 1
+
+    events_by_key = {}
+    if page_keys:
+        conditions = [and_(Event.nam == nam, Event.thang == thang) for nam, thang in page_keys]
+        page_events = Event.query.filter(or_(*conditions)).order_by(Event.ngay_bat_dau.asc()).all()
+        for event in page_events:
+            events_by_key.setdefault((event.nam, event.thang), []).append(event)
+
+    groups = [
+        {
+            "nam": nam,
+            "thang": thang,
+            "label": f"Tháng {thang}/{nam}" if multi_year else f"Tháng {thang}",
+            "events": events_by_key.get((nam, thang), []),
+        }
+        for nam, thang in page_keys
+    ]
+    return groups, next_offset, has_more
+
+
 @register_bp.get("/")
 def index():
-    events = Event.query.order_by(Event.ngay_bat_dau.desc()).all()
+    event_groups, next_offset, has_more = _month_groups_page(0)
     don_vi_items = DonVi.query.filter_by(is_active=True).order_by(DonVi.ten_don_vi.asc()).all()
-    return render_template("register/index.html", events=events, selected_event=None, don_vi_items=don_vi_items)
+    return render_template(
+        "register/index.html",
+        event_groups=event_groups,
+        next_offset=next_offset,
+        has_more=has_more,
+        selected_event=None,
+        don_vi_items=don_vi_items,
+    )
 
 
 @register_bp.get("/events/<int:event_id>/register")
 def event_register(event_id):
     event = Event.query.get_or_404(event_id)
-    events = Event.query.order_by(Event.ngay_bat_dau.desc()).all()
     don_vi_items = DonVi.query.filter_by(is_active=True).order_by(DonVi.ten_don_vi.asc()).all()
-    return render_template("register/index.html", events=events, selected_event=event, don_vi_items=don_vi_items)
+    return render_template("register/index.html", selected_event=event, don_vi_items=don_vi_items)
+
+
+@register_bp.get("/api/events/month-groups")
+def events_month_groups():
+    try:
+        offset = int(request.args.get("offset", 0))
+    except (TypeError, ValueError):
+        offset = 0
+    offset = max(offset, 0)
+
+    groups, next_offset, has_more = _month_groups_page(offset)
+    html = render_template("register/_month_groups.html", event_groups=groups)
+    return jsonify({
+        "success": True,
+        "data": {
+            "html": html,
+            "next_offset": next_offset,
+            "has_more": has_more,
+        },
+    })
 
 
 @register_bp.get("/api/lookup/<ma_cbsv>")

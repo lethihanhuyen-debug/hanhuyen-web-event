@@ -1,0 +1,34 @@
+{# Danh sách khối tháng -- dùng chung cho lần render đầu tiên (index.html include)
+   và cho endpoint /api/events/month-groups (trả về dưới dạng chuỗi HTML để nối
+   thêm vào #eventGroups khi bấm "Xem thêm"), để logic hiển thị badge trạng thái
+   và định dạng ngày giờ chỉ nằm ở một chỗ duy nhất. #}
+{% for group in event_groups %}
+  <section class="event-month-group">
+    <h2 class="event-month-group__title">{{ group.label }}:</h2>
+    <div class="event-list">
+      {% for event in group.events %}
+        <a class="event-card" href="{{ url_for('register.event_register', event_id=event.id) }}">
+          <div class="event-card__image">
+            {% if event.hinh %}
+              <img src="{{ url_for('static', filename=event.hinh) }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
+            {% else %}
+              <span>Chưa có hình</span>
+            {% endif %}
+          </div>
+          <div>
+            <span class="badge badge--success">
+              {% if event.computed_status == 'upcoming' %}Sắp diễn ra{% elif event.computed_status == 'ongoing' %}Đang diễn ra{% else %}Đã hết sự kiện{% endif %}
+            </span>
+            <h3>{{ event.ten_su_kien }}</h3>
+            <p class="muted">{{ event.mo_ta or 'Chưa có mô tả.' }}</p>
+          </div>
+          <div class="event-meta">
+            <strong>{{ event.dia_diem or 'Chưa có địa điểm' }}</strong>
+            <span>{{ event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if event.ngay_bat_dau else '' }}</span>
+            <span>Đăng ký đến {{ event.thoi_gian_dong_dang_ky.strftime('%H:%M %d/%m/%Y') if event.thoi_gian_dong_dang_ky else '' }}</span>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endfor %}

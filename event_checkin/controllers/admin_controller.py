@@ -1,12 +1,17 @@
 import csv
 import json
 import re
+import unicodedata
 from functools import wraps
-from io import StringIO
+from io import BytesIO, StringIO
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from flask import Blueprint, Response, current_app, jsonify, make_response, redirect, render_template, request, session, url_for
+from openpyxl import Workbook
+from openpyxl.styles import Font
+from openpyxl.utils import get_column_letter
 from sqlalchemy import func
 from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
@@ -210,6 +215,77 @@ def event_detail(event_id):
             "pending": max(len(rows) - len(checkin_map), 0),
         },
     )
+
+
+def _ascii_filename_component(text):
+    # Chuyển tên sự kiện có dấu tiếng Việt thành phần ASCII an toàn, dùng làm
+    # fallback filename= cho các client HTTP cũ không hiểu filename*=UTF-8''...
+    normalized = unicodedata.normalize("NFKD", text or "")
+    ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
+    ascii_only = re.sub(r"[^A-Za-z0-9]+", "_", ascii_only).strip("_")
+    return ascii_only or "SuKien"
+
+
+@admin_bp.get("/api/admin/events/<int:event_id>/export-registrations")
+@admin_required
+def export_event_registrations(event_id):
+    event = Event.query.get_or_404(event_id)
+    registrations = (
+        Registration.query
+        .filter_by(event_id=event_id)
+        .order_by(Registration.thoi_gian_dang_ky.asc())
+        .all()
+    )
+    if not registrations:
+        return jsonify({"success": False, "message": "Chưa có người đăng ký tham gia sự kiện này."}), 400
+
+    checkin_map = {item.ma_cbsv: item for item in CheckIn.query.filter_by(event_id=event_id).all()}
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Danh sach dang ky"
+
+    headers = ["STT", "Mã CB/SV", "Họ tên", "Email", "Số điện thoại", "Đơn vị", "Thời gian đăng ký", "Trạng thái"]
+    sheet.append(headers)
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+
+    for position, registration in enumerate(registrations, start=1):
+        user = registration.user
+        checkin_item = checkin_map.get(registration.ma_cbsv)
+        sheet.append([
+            position,
+            registration.ma_cbsv,
+            user.ho_ten if user else "",
+            user.email if user else "",
+            user.so_dien_thoai if user else "",
+            user.ten_don_vi if user else "",
+            format_utc_as_vn(registration.thoi_gian_dang_ky),
+            "Đã check-in" if checkin_item else "Chưa check-in",
+        ])
+
+    column_widths = [6, 16, 26, 28, 16, 24, 20, 16]
+    for index, width in enumerate(column_widths, start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+
+    today = now_vn_naive().strftime("%d-%m-%Y")
+    utf8_filename = f"DanhSachDangKy_{event.ten_su_kien}_{today}.xlsx"
+    ascii_filename = f"DanhSachDangKy_{_ascii_filename_component(event.ten_su_kien)}_{today}.xlsx"
+
+    response = Response(
+        buffer.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    # filename= la fallback ASCII, filename*=UTF-8'' giữ đúng tên tiếng Việt có dấu
+    # trên các trình duyệt hiện đại (RFC 5987).
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{quote(utf8_filename)}"
+    )
+    return response
 
 
 @admin_bp.get("/admin/login")
