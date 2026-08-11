@@ -13,6 +13,54 @@ window.appUtils = {
   },
 };
 
+// Header: đổ bóng khi cuộn trang + menu dạng hamburger trên mobile.
+(function () {
+  const header = document.getElementById('siteHeader');
+  const SCROLL_THRESHOLD = 12;
+
+  function updateHeaderOnScroll() {
+    if (!header) return;
+    header.classList.toggle('is-scrolled', window.scrollY > SCROLL_THRESHOLD);
+  }
+  window.addEventListener('scroll', updateHeaderOnScroll, { passive: true });
+  updateHeaderOnScroll();
+
+  const navToggle = document.getElementById('navToggle');
+  const primaryNav = document.getElementById('primaryNav');
+  const navOverlay = document.getElementById('navOverlay');
+  if (!navToggle || !primaryNav || !navOverlay) return;
+
+  function openMobileNav() {
+    primaryNav.classList.add('is-open');
+    navOverlay.classList.add('is-visible');
+    navToggle.setAttribute('aria-expanded', 'true');
+    navToggle.setAttribute('aria-label', 'Đóng menu điều hướng');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeMobileNav() {
+    primaryNav.classList.remove('is-open');
+    navOverlay.classList.remove('is-visible');
+    navToggle.setAttribute('aria-expanded', 'false');
+    navToggle.setAttribute('aria-label', 'Mở menu điều hướng');
+    document.body.style.overflow = '';
+  }
+
+  navToggle.addEventListener('click', () => {
+    const isOpen = navToggle.getAttribute('aria-expanded') === 'true';
+    if (isOpen) closeMobileNav(); else openMobileNav();
+  });
+  navOverlay.addEventListener('click', closeMobileNav);
+  primaryNav.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', closeMobileNav);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeMobileNav();
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 860) closeMobileNav();
+  });
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   const settings = document.querySelector('.admin-settings');
   if (!settings) return;

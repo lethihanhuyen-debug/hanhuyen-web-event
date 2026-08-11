@@ -23,35 +23,19 @@
   </div>
 
   {% if not selected_event %}
-    <div class="event-list">
-      {% for event in events %}
-        <a class="event-card" href="{{ url_for('register.event_register', event_id=event.id) }}">
-          <div class="event-card__image">
-            {% if event.hinh %}
-              <img src="{{ url_for('static', filename=event.hinh) }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
-            {% else %}
-              <span>Chưa có hình</span>
-            {% endif %}
-          </div>
-          <div>
-            <span class="badge badge--success">
-              {% if event.computed_status == 'upcoming' %}Sắp diễn ra{% elif event.computed_status == 'ongoing' %}Đang diễn ra{% else %}Đã hết sự kiện{% endif %}
-            </span>
-            <h2>{{ event.ten_su_kien }}</h2>
-            <p class="muted">{{ event.mo_ta or 'Chưa có mô tả.' }}</p>
-          </div>
-          <div class="event-meta">
-            <strong>{{ event.dia_diem or 'Chưa có địa điểm' }}</strong>
-            <span>{{ event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if event.ngay_bat_dau else '' }}</span>
-            <span>Đăng ký đến {{ event.thoi_gian_dong_dang_ky.strftime('%H:%M %d/%m/%Y') if event.thoi_gian_dong_dang_ky else '' }}</span>
-          </div>
-        </a>
+    <div class="event-groups" id="eventGroups">
+      {% if event_groups %}
+        {% include 'register/_month_groups.html' %}
       {% else %}
         <div class="form-card">
           <p class="muted">Chưa có sự kiện nào để đăng ký.</p>
         </div>
-      {% endfor %}
+      {% endif %}
     </div>
+    <div class="event-load-more" id="eventLoadMore" data-next-offset="{{ next_offset }}"{% if not has_more %} hidden{% endif %}>
+      <button id="loadMoreEvents" class="btn btn--ghost" type="button">Xem thêm</button>
+    </div>
+    <p id="eventLoadMoreMessage" class="muted event-load-more__message" hidden></p>
   {% else %}
     {% if selected_event.hinh %}
       <img class="event-detail-image" src="{{ url_for('static', filename=selected_event.hinh) }}" alt="Hình sự kiện {{ selected_event.ten_su_kien }}">
@@ -103,6 +87,57 @@
 {% endblock %}
 
 {% block scripts %}
+{% if not selected_event %}
+<script>
+(function () {
+  const loadMoreWrap = document.getElementById('eventLoadMore');
+  const loadMoreBtn = document.getElementById('loadMoreEvents');
+  const loadMoreMessage = document.getElementById('eventLoadMoreMessage');
+  const eventGroups = document.getElementById('eventGroups');
+  if (!loadMoreWrap || !loadMoreBtn) return;
+
+  let nextOffset = Number(loadMoreWrap.dataset.nextOffset || 0);
+  let isLoading = false;
+
+  function showLoadMoreMessage(text) {
+    loadMoreMessage.textContent = text;
+    loadMoreMessage.hidden = false;
+  }
+
+  loadMoreBtn.addEventListener('click', async () => {
+    if (isLoading) return; // chặn bấm liên tục gây gọi API trùng lặp
+    isLoading = true;
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = 'Đang tải...';
+    loadMoreMessage.hidden = true;
+
+    try {
+      const response = await fetch(`/api/events/month-groups?offset=${nextOffset}`);
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message || 'Không thể tải thêm sự kiện.');
+      }
+      // Nối thêm khối tháng mới vào cuối danh sách hiện có, không load lại từ đầu.
+      eventGroups.insertAdjacentHTML('beforeend', result.data.html);
+      nextOffset = result.data.next_offset;
+      if (result.data.has_more) {
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.textContent = 'Xem thêm';
+      } else {
+        loadMoreWrap.hidden = true;
+        showLoadMoreMessage('Đã hiển thị tất cả sự kiện.');
+      }
+    } catch (error) {
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.textContent = 'Xem thêm';
+      showLoadMoreMessage(error.message || 'Không thể tải thêm sự kiện. Vui lòng thử lại.');
+    } finally {
+      isLoading = false;
+    }
+  });
+})();
+</script>
+{% endif %}
 {% if selected_event %}
 <script>
 (function () {
@@ -130,7 +165,9 @@
       const response = await fetch('/api/lookup/' + encodeURIComponent(value));
       const result = await response.json();
       if (!result.success) {
-        showMessage(result.message || 'Không tìm thấy thông tin.', 'error');
+        // Mã chưa có trong hệ thống — không chặn hay báo lỗi, chỉ đơn giản là
+        // không tự động điền được thông tin. Người dùng vẫn tự nhập và đăng ký
+        // bình thường (backend /register tự tạo User mới nếu mã chưa tồn tại).
         return;
       }
       const data = result.data;
