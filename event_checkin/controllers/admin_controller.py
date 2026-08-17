@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 
 from flask import Blueprint, Response, current_app, jsonify, make_response, redirect, render_template, request, session, url_for
-from sqlalchemy import func
 from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
 
@@ -19,7 +18,7 @@ from event_checkin.models.don_vi import DonVi
 from event_checkin.models.email_log import EmailLog
 from event_checkin.models.event import Event
 from event_checkin.models.registration import Registration
-from event_checkin.utils.timezone import format_utc_as_vn, now_vn_naive
+from event_checkin.utils.timezone import format_utc_as_vn, now_vn_naive, vn_today_utc_range
 
 
 admin_bp = Blueprint("admin", __name__)
@@ -101,11 +100,11 @@ def _event_payload(event):
 
 
 def _dashboard_payload():
-    from datetime import date
-
-    current_day = date.today().isoformat()
+    day_start_utc, day_end_utc = vn_today_utc_range()
     registrations = Registration.query.order_by(Registration.thoi_gian_dang_ky.desc()).all()
-    today_checkins = CheckIn.query.filter(func.date(CheckIn.thoi_gian_checkin) == current_day).all()
+    today_checkins = CheckIn.query.filter(
+        CheckIn.thoi_gian_checkin >= day_start_utc, CheckIn.thoi_gian_checkin < day_end_utc
+    ).all()
     today_checkin_map = {(item.ma_cbsv, item.event_id): item for item in today_checkins}
     certificate_map = {
         (item.ma_cbsv, item.event_id): item
@@ -747,11 +746,11 @@ def delete_event_checkin(event_id, ma_cbsv):
 @admin_bp.get("/admin/export/csv")
 @admin_required
 def export_csv():
-    from datetime import date
-
-    current_day = date.today().isoformat()
+    day_start_utc, day_end_utc = vn_today_utc_range()
     registrations = Registration.query.order_by(Registration.thoi_gian_dang_ky.asc()).all()
-    today_checkins = CheckIn.query.filter(func.date(CheckIn.thoi_gian_checkin) == current_day).all()
+    today_checkins = CheckIn.query.filter(
+        CheckIn.thoi_gian_checkin >= day_start_utc, CheckIn.thoi_gian_checkin < day_end_utc
+    ).all()
     today_checkin_map = {(item.ma_cbsv, item.event_id): item for item in today_checkins}
 
     buffer = StringIO()

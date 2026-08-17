@@ -39,3 +39,15 @@ def now_vn_naive():
     are stored as naive VN-local wall-clock values, never UTC.
     """
     return datetime.now(VN_TZ).replace(tzinfo=None)
+
+
+def vn_today_utc_range():
+    """UTC datetime range (start inclusive, end exclusive) covering "today" in
+    Vietnam wall-clock time. Use this instead of comparing a UTC-stored column
+    (e.g. thoi_gian_checkin) against date.today(), which uses the server/UTC
+    date and can misclassify check-ins made shortly after VN midnight. The
+    range form is also index-friendly, unlike wrapping the column in func.date().
+    """
+    vn_today_start = now_vn_naive().replace(hour=0, minute=0, second=0, microsecond=0)
+    vn_tomorrow_start = vn_today_start + timedelta(days=1)
+    return vn_today_start - timedelta(hours=7), vn_tomorrow_start - timedelta(hours=7)

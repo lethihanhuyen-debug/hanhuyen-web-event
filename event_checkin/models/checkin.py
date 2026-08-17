@@ -12,7 +12,7 @@ class CheckIn(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     ma_cbsv = db.Column(db.String(50), db.ForeignKey("users.ma_cbsv"), nullable=False, index=True)
     event_id = db.Column(db.Integer, db.ForeignKey("events.id"), nullable=False, index=True)
-    thoi_gian_checkin = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    thoi_gian_checkin = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     user = db.relationship("User", lazy="joined")
     event = db.relationship("Event", lazy="joined")

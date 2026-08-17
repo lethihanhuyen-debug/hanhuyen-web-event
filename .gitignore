@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+.uv-cache/
+logs/
+flask_stdout.log
+flask_stderr.log
+database/
