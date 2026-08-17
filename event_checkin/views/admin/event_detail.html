@@ -17,6 +17,7 @@
         <button id="openTemplatePreview" class="btn btn--ghost" type="button">Xem mẫu chứng chỉ</button>
       {% endif %}
       <button id="openEventCheckinForm" class="btn btn--primary" type="button">Check-in</button>
+      <button id="exportRegistrations" class="btn btn--ghost" type="button" data-event-id="{{ event.id }}">Xuất danh sách đăng ký</button>
       <a class="btn btn--ghost" href="{{ url_for('admin.index') }}">Quay lại</a>
     </div>
   </div>
@@ -169,11 +170,67 @@
   const openTemplatePreview = document.getElementById('openTemplatePreview');
   const templatePreviewModal = document.getElementById('templatePreviewModal');
   const closeTemplatePreview = document.getElementById('closeTemplatePreview');
+  const exportButton = document.getElementById('exportRegistrations');
 
   function showMessage(type, text) {
     message.className = `message message--${type}`;
     message.textContent = text;
     message.hidden = false;
+  }
+
+  // Ưu tiên đọc filename*=UTF-8''... (giữ đúng dấu tiếng Việt) trong header
+  // Content-Disposition trả về từ server, phòng khi trình duyệt không tự đặt tên
+  // file đúng từ header khi tải qua blob thay vì điều hướng trực tiếp.
+  function parseFilenameFromContentDisposition(headerValue, fallback) {
+    if (!headerValue) return fallback;
+    const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match) {
+      try {
+        return decodeURIComponent(utf8Match[1]);
+      } catch (error) {
+        // rơi xuống fallback bên dưới nếu chuỗi percent-encode bị hỏng
+      }
+    }
+    const plainMatch = headerValue.match(/filename="?([^";]+)"?/i);
+    if (plainMatch) return plainMatch[1];
+    return fallback;
+  }
+
+  if (exportButton) {
+    exportButton.addEventListener('click', async () => {
+      if (exportButton.disabled) return; // chặn bấm liên tục gây gọi API trùng lặp
+      const eventId = exportButton.dataset.eventId;
+      const originalText = exportButton.textContent;
+      exportButton.disabled = true;
+      exportButton.textContent = 'Đang xuất...';
+      message.hidden = true;
+
+      try {
+        const response = await fetch(`/api/admin/events/${eventId}/export-registrations`);
+        if (!response.ok) {
+          const data = await response.json().catch(() => null);
+          showMessage('error', (data && data.message) || 'Không thể xuất danh sách đăng ký.');
+          return;
+        }
+        const blob = await response.blob();
+        const fallbackName = `DanhSachDangKy_${eventId}.xlsx`;
+        const filename = parseFilenameFromContentDisposition(response.headers.get('Content-Disposition'), fallbackName);
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        showMessage('error', 'Không thể kết nối máy chủ.');
+      } finally {
+        exportButton.disabled = false;
+        exportButton.textContent = originalText;
+      }
+    });
   }
 
   async function submitCheckin(maCbsv, eventId, button) {

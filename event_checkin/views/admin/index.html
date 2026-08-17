@@ -240,6 +240,9 @@
   let editingEventData = null;
   let designingEventId = null;
   let designingTemplateUrl = null;
+  // file chosen but not yet committed to the server — only applied on "Lưu vị trí"
+  let pendingTemplateFile = null;
+  let pendingTemplateObjectUrl = null;
   // natural (original) pixel size of the uploaded template, and the current on-screen scale factor
   let naturalWidth = 0;
   let naturalHeight = 0;
@@ -338,18 +341,13 @@
       });
       const data = await response.json();
       if (data.success) {
-        const savedEvent = eventImageInput.files.length ? await uploadEventImage(data.data.id) : data.data;
-        if (!editingEventId) {
-          editingEventId = savedEvent.id;
-          editingEventData = savedEvent;
-          submitButton.textContent = 'Cập nhật sự kiện';
-          openDesignerFromForm.disabled = false;
-          message.className = 'message message--success field-wide';
-          setImagePreview(savedEvent.hinh_url);
-          message.textContent = 'Đã tạo sự kiện. Bạn có thể bấm Chứng chỉ để thiết lập mẫu.';
-          message.hidden = false;
-          return;
+        // Đợi upload ảnh (nếu có) xong hẳn rồi mới rời trang, tránh mất ảnh vừa chọn
+        // và tránh race condition giữa lưu sự kiện / upload ảnh / chuyển trang.
+        if (eventImageInput.files.length) {
+          await uploadEventImage(data.data.id);
         }
+        // Tải lại trang quản trị: danh sách sự kiện do server render trực tiếp từ
+        // database nên sẽ luôn thấy ngay sự kiện vừa thêm/sửa, không cần F5 thủ công.
         window.location.reload();
         return;
       }
@@ -791,6 +789,46 @@
     });
   }
 
+  // Drops the local blob preview (if any) and forgets the pending file, without
+  // touching the server — used when the user saves (file already uploaded by then),
+  // discards, or opens a different event's designer.
+  function revokePendingTemplatePreview() {
+    if (pendingTemplateObjectUrl) {
+      URL.revokeObjectURL(pendingTemplateObjectUrl);
+      pendingTemplateObjectUrl = null;
+    }
+    pendingTemplateFile = null;
+  }
+
+  // Shows the newly chosen file immediately via a local blob URL — nothing is sent to
+  // the server yet. The file itself is held in pendingTemplateFile until Save commits it.
+  function showPendingTemplate(file) {
+    revokePendingTemplatePreview();
+    pendingTemplateFile = file;
+    pendingTemplateObjectUrl = URL.createObjectURL(file);
+    applyTemplateUrl(pendingTemplateObjectUrl);
+    setTemplateStatus('Ảnh xem trước — bấm "Lưu vị trí" để áp dụng.');
+  }
+
+  // Uploads the pending file to the server. Called right before the layout save so the
+  // template and the field positions are committed together. Returns false (and leaves
+  // pendingTemplateFile intact for a retry) if the upload fails.
+  async function commitPendingTemplate() {
+    if (!pendingTemplateFile) return true;
+    const formData = new FormData();
+    formData.append('certificate_template', pendingTemplateFile, pendingTemplateFile.name || 'certificate.png');
+    setTemplateStatus('Đang tải ảnh...');
+    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-template`, { method: 'POST', body: formData });
+    const data = await response.json();
+    if (!data.success) {
+      setTemplateStatus(data.message || 'Không thể tải ảnh chứng chỉ lên.');
+      return false;
+    }
+    if (editingEventId === designingEventId) editingEventData = data.data;
+    revokePendingTemplatePreview();
+    return true;
+  }
+
   async function applyTemplateUrl(url) {
     designingTemplateUrl = url;
     templatePreview.hidden = false;
@@ -823,6 +861,7 @@
   }
 
   function openDesigner(event) {
+    revokePendingTemplatePreview();
     designingEventId = event.id;
     editingEventData = event;
     selectedField = null;
@@ -850,6 +889,17 @@
 
   function discardDesignerChanges() {
     certificateLayout = cloneLayout(editingEventData);
+    revokePendingTemplatePreview();
+    // Drop the unsaved local preview and fall back to the last saved template, if any,
+    // so a reopen (or a stale reference to this still-mounted modal) never shows an
+    // image that was never actually persisted.
+    if (editingEventData && editingEventData.certificate_template_url) {
+      applyTemplateUrl(editingEventData.certificate_template_url);
+    } else {
+      designingTemplateUrl = null;
+      templatePreview.hidden = true;
+      templatePreview.removeAttribute('src');
+    }
     selectedField = null;
     designer.hidden = true;
   }
@@ -868,6 +918,7 @@
 
   saveLayout.addEventListener('click', async () => {
     if (!designingEventId) return;
+    if (pendingTemplateFile && !(await commitPendingTemplate())) return;
     const response = await fetch(`/api/admin/events/${designingEventId}/certificate-layout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -894,8 +945,9 @@
     });
   }
 
-  // Background upload: auto-upload as soon as a file is chosen. If it doesn't already match
-  // the 2000x1414 ratio, crop it first (via Cropper.js) so certificates stay visually consistent.
+  // Background image: show a local preview as soon as a file is chosen (nothing is sent to
+  // the server until Save). If it doesn't already match the 2000x1414 ratio, crop it first
+  // (via Cropper.js) so certificates stay visually consistent.
   (function () {
     const templateInput = designerUploadForm.querySelector('input[name="certificate_template"]');
     const cropModal = document.getElementById('cropModal');
@@ -919,27 +971,12 @@
       if (cropObjectUrl) { URL.revokeObjectURL(cropObjectUrl); cropObjectUrl = null; }
     }
 
-    async function uploadTemplateFile(file) {
-      const formData = new FormData();
-      formData.append('certificate_template', file, file.name || 'certificate.png');
-      setTemplateStatus('Đang tải ảnh...');
-      const response = await fetch(`/api/admin/events/${designingEventId}/certificate-template`, { method: 'POST', body: formData });
-      const data = await response.json();
-      if (!data.success) {
-        setTemplateStatus(data.message || 'Không thể tải ảnh chứng chỉ lên.');
-        return;
-      }
-      if (editingEventId === designingEventId) editingEventData = data.data;
-      await applyTemplateUrl(data.data.certificate_template_url);
-      setTemplateStatus('Mẫu đã tải lên.', 3000);
-    }
-
     cropConfirmBtn.addEventListener('click', () => {
       if (!cropper) return;
       cropper.getCroppedCanvas({ width: TARGET_W, height: TARGET_H }).toBlob((blob) => {
         hideCropModal();
         templateInput.value = '';
-        uploadTemplateFile(new File([blob], 'certificate_cropped.png', { type: 'image/png' }));
+        showPendingTemplate(new File([blob], 'certificate_cropped.png', { type: 'image/png' }));
       }, 'image/png');
     });
 
@@ -965,7 +1002,7 @@
         const ratio = img.naturalWidth / img.naturalHeight;
         if (Math.abs(ratio - TARGET_RATIO) <= RATIO_TOLERANCE) {
           URL.revokeObjectURL(objectUrl);
-          uploadTemplateFile(file);
+          showPendingTemplate(file);
           templateInput.value = '';
           return;
         }

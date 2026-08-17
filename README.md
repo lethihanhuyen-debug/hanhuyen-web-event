@@ -10,7 +10,7 @@ Nhánh `main` của repo này **chỉ chứa thư mục `event_checkin/`** (cont
 
 - Python 3.10+
 - MySQL 8.0+ đang chạy
-- Các gói Python: `flask`, `flask-sqlalchemy`, `flask-mail`, `flask-wtf`, `python-dotenv`, `Pillow`, `PyMySQL`
+- Các gói Python: `flask`, `flask-sqlalchemy`, `flask-mail`, `flask-wtf`, `python-dotenv`, `Pillow`, `PyMySQL`, `openpyxl`
 
 ## Cài đặt & chạy
 
@@ -45,7 +45,7 @@ Nhánh `main` của repo này **chỉ chứa thư mục `event_checkin/`** (cont
 
 3. **Cài thư viện và chạy**:
    ```bash
-   pip install flask flask-sqlalchemy flask-mail flask-wtf python-dotenv Pillow PyMySQL
+   pip install flask flask-sqlalchemy flask-mail flask-wtf python-dotenv Pillow PyMySQL openpyxl
    python app.py
    ```
    Lần chạy đầu tiên, app tự tạo toàn bộ bảng trong database và seed sẵn:

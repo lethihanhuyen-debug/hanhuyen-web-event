@@ -6,20 +6,37 @@
   <title>{% block title %}Event Check-in{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Playfair+Display:wght@600;700&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
   {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-  <header class="topbar">
-    <div class="container topbar__inner">
-      <a class="brand" href="{{ url_for('register.index') }}">Event Check-in</a>
-      <nav class="nav">
-        <a class="nav__link {% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng ký</a>
-        <a class="nav__link {% if request.path.startswith('/admin') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản trị</a>
+  <header class="site-header" id="siteHeader">
+    <div class="header-container">
+      <a class="brand" href="{{ url_for('register.index') }}">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo CILM" class="brand__logo">
+        <span class="brand__text">
+          <span class="brand__eyebrow">Trường Đại học Khoa học Xã hội và Nhân văn</span>
+          <span class="brand__title">Trung tâm Thông tin – Thư viện – Bảo tàng</span>
+        </span>
+      </a>
+
+      <button type="button" class="nav-toggle" id="navToggle" aria-label="Mở menu điều hướng" aria-expanded="false" aria-controls="primaryNav">
+        <span class="nav-toggle__bar"></span>
+        <span class="nav-toggle__bar"></span>
+        <span class="nav-toggle__bar"></span>
+      </button>
+
+      <nav class="primary-nav" id="primaryNav" aria-label="Điều hướng chính">
+        <ul class="primary-nav__list">
+          <li><a class="{% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng ký</a></li>
+          <li><a class="{% if request.path.startswith('/admin') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản trị</a></li>
+          {% if request.path.startswith('/admin') %}
+            <li><button type="button" data-admin-logout>Đăng xuất</button></li>
+          {% endif %}
+        </ul>
         {% if request.path.startswith('/admin') %}
-          <button class="nav__link nav__button" type="button" data-admin-logout>Đăng xuất</button>
           <div class="admin-settings">
             <button class="admin-settings__button" type="button" aria-label="Cài đặt admin" title="Cài đặt admin" aria-expanded="false">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -35,6 +52,7 @@
       </nav>
     </div>
   </header>
+  <div class="nav-overlay" id="navOverlay"></div>
 
   <main class="page-shell">
     <div class="container">
