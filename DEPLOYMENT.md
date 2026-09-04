@@ -213,6 +213,10 @@ Tạo `C:\apps\eventcheckin\iis-site\web.config`:
           </conditions>
           <action type="Redirect" url="https://{HTTP_HOST}/{R:1}" redirectType="Permanent" />
         </rule>
+        <rule name="StaticFilesPassThrough" stopProcessing="true">
+          <match url="^static/.*" />
+          <action type="None" />
+        </rule>
         <rule name="ReverseProxyToWaitress" stopProcessing="true">
           <match url="(.*)" />
           <serverVariables>
@@ -230,7 +234,15 @@ Tạo `C:\apps\eventcheckin\iis-site\web.config`:
   </system.webServer>
 </configuration>
 ```
-Rule đầu ép mọi request HTTP sang HTTPS trước; rule thứ hai (chỉ chạy được khi đã là HTTPS) mới proxy tiếp sang waitress kèm header `X-Forwarded-Proto: https` — Flask (qua `ProxyFix` đã thêm trong `app.py`) đọc header này để biết request gốc là HTTPS, nhờ vậy cookie `Secure` và link tuyệt đối (`url_for(_external=True)`, dùng khi gửi email chứng chỉ) mới đúng.
+Rule đầu ép mọi request HTTP sang HTTPS trước. Rule thứ hai để `/static/...` đi qua bình thường (`action type="None"`) thay vì bị proxy sang waitress — kết hợp với virtual directory `static` trỏ thẳng vào thư mục static thật (xem mục 5.3), để IIS tự phục vụ CSS/JS/ảnh/chứng chỉ trực tiếp, nhanh hơn và không tốn luồng xử lý của app Python. Rule thứ ba (chỉ chạy được khi đã là HTTPS, và không phải `/static/...`) mới proxy tiếp sang waitress kèm header `X-Forwarded-Proto: https` — Flask (qua `ProxyFix` đã thêm trong `app.py`) đọc header này để biết request gốc là HTTPS, nhờ vậy cookie `Secure` và link tuyệt đối (`url_for(_external=True)`, dùng khi gửi email chứng chỉ) mới đúng.
+
+### 5.3 Virtual Directory cho `/static` (để IIS phục vụ trực tiếp)
+
+Trong IIS Manager, chuột phải vào site `EventCheckin` → **Add Virtual Directory...**:
+- Alias: `static`
+- Physical path: `C:\apps\eventcheckin\event_checkin\static`
+
+OK. IIS giờ sẽ tự phục vụ mọi request `/static/...` (CSS, JS, ảnh sự kiện, chứng chỉ đã tạo, font) trực tiếp từ ổ đĩa, không đi qua app Python nữa.
 
 ## 6. SSL miễn phí với win-acme (Let's Encrypt)
 

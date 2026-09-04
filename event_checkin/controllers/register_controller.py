@@ -3,6 +3,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, render_template, request, url_for
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 
 from event_checkin.models import db
 from event_checkin.models.don_vi import DonVi
@@ -192,6 +193,13 @@ def register():
     if not event.is_registration_open:
         return jsonify({"success": False, "message": event.registration_block_reason}), 400
 
+    # Checked before touching User/Registration so a duplicate-registration attempt
+    # (which is rejected below) never has the side effect of overwriting the
+    # already-registered user's profile fields.
+    existed = Registration.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
+    if existed:
+        return jsonify({"success": False, "message": f"Mã {ma_cbsv} đã đăng ký sự kiện này."}), 409
+
     don_vi = None
     if don_vi_id:
         try:
@@ -223,18 +231,21 @@ def register():
             user.don_vi_id = don_vi.id
         user.updated_at = now
 
-    existed = Registration.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
-    if existed:
-        db.session.commit()
-        return jsonify({"success": False, "message": f"Mã {ma_cbsv} đã đăng ký sự kiện này."}), 409
-
     registration = Registration(
         ma_cbsv=ma_cbsv,
         event_id=event_id,
         thoi_gian_dang_ky=now,
     )
     db.session.add(registration)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # Two submits for the same ma_cbsv+event_id landed at (almost) the same
+        # time (e.g. a double-tap on the register button) -- the unique
+        # constraint rejects the second insert; treat it as already-registered
+        # instead of a 500, matching how checkin() handles the same race.
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Mã {ma_cbsv} đã đăng ký sự kiện này."}), 409
 
     return jsonify({
         "success": True,

@@ -765,21 +765,35 @@ def delete_certificate_font(event_id, field):
 @admin_bp.delete("/api/admin/events/<int:event_id>")
 @admin_required
 def delete_event(event_id):
+    # Deleting an event with existing registrations/check-ins/certificates is
+    # allowed -- the admin UI warns and asks for confirmation before calling
+    # this endpoint (see the js-delete-event handler), so by the time the
+    # request arrives here the admin has already accepted that everything
+    # below is removed along with the event.
     event = Event.query.get_or_404(event_id)
-    has_data = (
-        Registration.query.filter_by(event_id=event_id).first()
-        or CheckIn.query.filter_by(event_id=event_id).first()
-        or Certificate.query.filter_by(event_id=event_id).first()
-        or EmailLog.query.filter_by(event_id=event_id).first()
-    )
-    if has_data:
-        return jsonify({
-            "success": False,
-            "message": "Không thể xóa sự kiện đã có đăng ký, check-in, chứng chỉ hoặc email log.",
-        }), 409
 
+    certificate_paths = []
+    for certificate in Certificate.query.filter_by(event_id=event_id).all():
+        if certificate.file_url:
+            static_prefix = url_for("static", filename="", _external=False)
+            relative_path = certificate.file_url
+            if relative_path.startswith(static_prefix):
+                relative_path = relative_path[len(static_prefix):]
+            certificate_paths.append(Path(current_app.static_folder) / relative_path)
+
+    # Deleted in FK-dependency order: EmailLog references Certificate, both
+    # reference Registration/CheckIn's (ma_cbsv, event_id) pair indirectly.
+    EmailLog.query.filter_by(event_id=event_id).delete()
+    Certificate.query.filter_by(event_id=event_id).delete()
+    CheckIn.query.filter_by(event_id=event_id).delete()
+    Registration.query.filter_by(event_id=event_id).delete()
     db.session.delete(event)
     db.session.commit()
+
+    for path in certificate_paths:
+        if path.exists():
+            path.unlink(missing_ok=True)
+
     return jsonify({"success": True, "message": "Đã xóa sự kiện."})
 
 

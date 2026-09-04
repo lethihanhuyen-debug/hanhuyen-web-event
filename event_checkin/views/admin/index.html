@@ -410,7 +410,7 @@
   document.querySelectorAll('.js-delete-event').forEach((button) => {
     button.addEventListener('click', async () => {
       const eventName = button.dataset.name || 'sự kiện này';
-      if (!confirm(`Xóa ${eventName}?`)) return;
+      if (!confirm(`Xóa ${eventName}?\n\nToàn bộ dữ liệu đăng ký, check-in, chứng chỉ và email log của sự kiện này (nếu có) sẽ bị xóa vĩnh viễn theo. Hành động này không thể hoàn tác.`)) return;
       try {
         const response = await fetch(`/api/admin/events/${button.dataset.id}`, {
           method: 'DELETE',
