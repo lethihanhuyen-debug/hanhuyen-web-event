@@ -23,6 +23,7 @@ from event_checkin.models.don_vi import DonVi
 from event_checkin.models.email_log import EmailLog
 from event_checkin.models.event import Event
 from event_checkin.models.registration import Registration
+from event_checkin.models.user import User
 from event_checkin.utils.timezone import format_utc_as_vn, now_vn_naive, vn_today_utc_range
 
 
@@ -392,7 +393,9 @@ def update_don_vi(item_id):
     if not ten_don_vi:
         return jsonify({"success": False, "message": "Vui lòng nhập tên đơn vị."}), 400
 
-    duplicate = DonVi.query.filter(DonVi.id != item_id, DonVi.ten_don_vi == ten_don_vi).first()
+    duplicate = DonVi.query.filter(
+        DonVi.id != item_id, DonVi.ten_don_vi == ten_don_vi, DonVi.is_active.is_(True)
+    ).first()
     if duplicate:
         return jsonify({"success": False, "message": "Đơn vị này đã tồn tại."}), 409
 
@@ -407,9 +410,62 @@ def update_don_vi(item_id):
 @admin_required
 def delete_don_vi(item_id):
     item = DonVi.query.get_or_404(item_id)
-    item.is_active = False
+    usage_count = User.query.filter_by(don_vi_id=item.id).count()
+    if usage_count > 0:
+        return jsonify({
+            "success": False,
+            "message": f"Không thể xóa vì đang có {usage_count} người dùng gắn với đơn vị này. Hãy dùng chức năng Ẩn thay thế.",
+        }), 409
+
+    db.session.delete(item)
     db.session.commit()
-    return jsonify({"success": True, "message": "Đã xóa đơn vị khỏi danh sách hiển thị.", "data": item.to_dict()})
+    return jsonify({"success": True, "message": "Đã xóa đơn vị."})
+
+
+@admin_bp.post("/api/admin/don-vi/an-hang-loat")
+@admin_required
+def bulk_hide_don_vi():
+    payload = request.get_json(silent=True) or {}
+    ids = [int(item_id) for item_id in (payload.get("ids") or []) if str(item_id).isdigit()]
+    if not ids:
+        return jsonify({"success": False, "message": "Vui lòng chọn ít nhất một đơn vị."}), 400
+
+    items = DonVi.query.filter(DonVi.id.in_(ids)).all()
+    da_an = [item.id for item in items]
+    for item in items:
+        item.is_active = False
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "message": f"Đã ẩn {len(da_an)} đơn vị.",
+        "data": {"da_an": da_an, "loi": []},
+    })
+
+
+@admin_bp.post("/api/admin/don-vi/xoa-hang-loat")
+@admin_required
+def bulk_delete_don_vi():
+    payload = request.get_json(silent=True) or {}
+    ids = [int(item_id) for item_id in (payload.get("ids") or []) if str(item_id).isdigit()]
+    if not ids:
+        return jsonify({"success": False, "message": "Vui lòng chọn ít nhất một đơn vị."}), 400
+
+    items = DonVi.query.filter(DonVi.id.in_(ids)).all()
+    da_xoa = []
+    loi = []
+    for item in items:
+        usage_count = User.query.filter_by(don_vi_id=item.id).count()
+        if usage_count > 0:
+            loi.append({
+                "id": item.id,
+                "ten_don_vi": item.ten_don_vi,
+                "ly_do": f"Đang có {usage_count} người dùng gắn với đơn vị này.",
+            })
+            continue
+        da_xoa.append(item.id)
+        db.session.delete(item)
+    db.session.commit()
+    return jsonify({"success": True, "data": {"da_xoa": da_xoa, "loi": loi}})
 
 
 @admin_bp.post("/api/admin/events")

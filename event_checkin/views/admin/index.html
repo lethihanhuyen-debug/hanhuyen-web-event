@@ -9,7 +9,6 @@
 <section class="admin-panel">
   <div class="panel-head">
     <div>
-      <p class="eyebrow">Quản trị</p>
       <h1>Danh sách sự kiện</h1>
     </div>
     <div class="panel-actions">
@@ -73,23 +72,19 @@
           {% endif %}
         </div>
         <div class="admin-event-card__main">
-          <div class="admin-event-card__top">
-            <span class="event-id">#{{ event.id }}</span>
-          </div>
           <h2>{{ event.ten_su_kien }}</h2>
-          <p class="admin-event-location">{{ event.dia_diem or 'Chưa có địa điểm' }}</p>
         </div>
         <div class="admin-event-card__schedule">
           <span class="badge badge--success">
             {% if event.trang_thai == 'upcoming' %}Sắp diễn ra{% elif event.trang_thai == 'ongoing' %}Đang diễn ra{% elif event.trang_thai == 'ended' %}Đã hết sự kiện{% else %}{{ event.trang_thai }}{% endif %}
           </span>
           <div>
-            <small>Diễn ra</small>
-            <strong>{{ event.ngay_bat_dau_display }} - {{ event.ngay_ket_thuc_display }}</strong>
-          </div>
-          <div>
             <small>Đăng ký</small>
             <strong>{{ event.thoi_gian_mo_dang_ky_display }} - {{ event.thoi_gian_dong_dang_ky_display }}</strong>
+          </div>
+          <div>
+            <small>Diễn ra</small>
+            <strong>{{ event.ngay_bat_dau_display }} - {{ event.ngay_ket_thuc_display }}</strong>
           </div>
         </div>
         <div class="admin-event-card__side">
