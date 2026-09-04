@@ -2,10 +2,10 @@
   /* Bảng màu học thuật: navy trầm làm màu chính, vàng đồng làm điểm nhấn phụ.
      --success/--warning/--danger giữ nguyên vì đó là màu trạng thái (thành
      công/cảnh báo/lỗi), không phải màu thương hiệu, nên không đổi theo theme. */
-  --blue-900: #0f2b4d;
-  --blue-700: #234a76;
-  --blue-100: #e9eef5;
-  --gold: #c9a24a;
+  --blue-900: #1257a3;
+  --blue-700: #1f7fff;
+  --blue-100: #e8f2ff;
+  --gold: #0d3b66;
   --text: #1c2b3a;
   --muted: #5b6b83;
   --surface: rgba(255, 255, 255, 0.92);
@@ -60,7 +60,7 @@ a {
   height: 92px;
   display: flex;
   align-items: center;
-  background: var(--blue-900);
+  background: var(--blue-700);
   border-bottom: 1px solid rgba(201, 162, 74, 0.35);
   transition: height .25s ease, box-shadow .25s ease;
 }
@@ -109,21 +109,21 @@ a {
 }
 
 .brand__eyebrow {
-  font-family: 'Be Vietnam Pro', 'Roboto', sans-serif;
-  font-size: 11px;
+  font-family: Arial, 'Be Vietnam Pro', 'Roboto', sans-serif;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: #fff;
   white-space: nowrap;
 }
 
 .brand__title {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: Arial, 'Be Vietnam Pro', 'Roboto', sans-serif;
   font-weight: 700;
-  font-size: 19px;
+  font-size: 24px;
   line-height: 1.2;
-  color: #f3efe2;
+  color: #fff;
   white-space: nowrap;
 }
 
@@ -245,7 +245,7 @@ a {
     width: min(78vw, 320px);
     flex-direction: column;
     align-items: stretch;
-    background: var(--blue-900);
+    background: var(--blue-700);
     border-left: 1px solid rgba(201, 162, 74, 0.35);
     box-shadow: -12px 0 32px -16px rgba(0, 0, 0, 0.5);
     padding: 100px 28px 28px;
@@ -333,6 +333,15 @@ a {
   color: var(--blue-900);
 }
 
+.admin-settings__item--danger {
+  color: var(--danger);
+}
+
+.admin-settings__item--danger:hover {
+  background: rgba(180, 35, 24, 0.12);
+  color: var(--danger);
+}
+
 .admin-data-modal.is-open {
   display: flex;
 }
@@ -340,7 +349,7 @@ a {
 .admin-data-modal__dialog {
   width: min(680px, 100%);
   max-height: calc(100vh - 48px);
-  overflow: auto;
+  overflow-y: scroll;
 }
 
 .admin-data-form {
@@ -368,8 +377,12 @@ a {
 
 .admin-data-list {
   display: grid;
+  align-content: start;
   gap: 10px;
   margin-top: 18px;
+  height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .admin-data-item {
@@ -399,6 +412,68 @@ a {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.admin-data-item--bulk {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.admin-data-item__check {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+
+.admin-data-item__check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--gold);
+}
+
+.admin-data-menu-wrap {
+  position: relative;
+}
+
+.admin-data-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  width: 160px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(15, 43, 77, 0.16);
+  display: grid;
+  gap: 2px;
+}
+
+.admin-data-menu[hidden] {
+  display: none;
+}
+
+.admin-data-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--blue-100);
+}
+
+.admin-data-bulk-toolbar[hidden] {
+  display: none;
+}
+
+.admin-data-bulk-toolbar span {
+  font-weight: 800;
+  color: var(--blue-900);
 }
 
 .page-shell {
@@ -1278,8 +1353,9 @@ textarea:focus {
 }
 
 .admin-event-card {
+  position: relative;
   display: grid;
-  grid-template-columns: 170px minmax(220px, 1.05fr) minmax(340px, 1.35fr) minmax(240px, auto);
+  grid-template-columns: 170px minmax(220px, 1.05fr) minmax(400px, auto);
   gap: 22px;
   align-items: center;
   padding: 22px;
@@ -1328,15 +1404,19 @@ textarea:focus {
 
 .admin-event-card__schedule {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.admin-event-card__schedule > .badge {
+  justify-self: start;
 }
 
 .admin-event-card__schedule div {
   display: grid;
-  gap: 4px;
-  min-height: 64px;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: baseline;
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(15, 43, 77, 0.05);
@@ -1350,12 +1430,22 @@ textarea:focus {
 .admin-event-card__schedule strong {
   font-size: 0.95rem;
   line-height: 1.35;
+  white-space: nowrap;
 }
 
 .admin-event-card__side {
-  display: grid;
-  justify-items: end;
-  gap: 12px;
+  position: absolute;
+  top: -16px;
+  right: 24px;
+  z-index: 2;
+}
+
+.admin-event-card__side .btn-row {
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
 }
 
 .stat-card {
@@ -1501,8 +1591,13 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .admin-event-card__schedule strong {
+    white-space: normal;
+  }
+
   .admin-event-card__side {
-    justify-items: start;
+    right: auto;
+    left: 24px;
   }
 
   .checkin-card,

@@ -77,10 +77,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const donViMessage = document.getElementById('donViMessage');
   const donViList = document.getElementById('donViList');
   const resetDonViForm = document.getElementById('resetDonViForm');
+  const donViBulkToolbar = document.getElementById('donViBulkToolbar');
+  const donViBulkCount = document.getElementById('donViBulkCount');
+  const donViBulkHide = document.getElementById('donViBulkHide');
+  const donViBulkDelete = document.getElementById('donViBulkDelete');
+  const donViBulkCancel = document.getElementById('donViBulkCancel');
+
+  let donViItems = [];
+  let bulkMode = false;
+  let selectedIds = new Set();
+  let openRowMenu = null;
 
   function closeMenu() {
     menu.hidden = true;
     button.setAttribute('aria-expanded', 'false');
+  }
+
+  function closeRowMenu() {
+    if (!openRowMenu) return;
+    openRowMenu.menu.hidden = true;
+    openRowMenu.toggleButton.setAttribute('aria-expanded', 'false');
+    openRowMenu = null;
   }
 
   button.addEventListener('click', (event) => {
@@ -109,11 +126,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!settings.contains(event.target)) {
       closeMenu();
     }
+    if (openRowMenu && !openRowMenu.toggleButton.parentElement.contains(event.target)) {
+      closeRowMenu();
+    }
   });
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       closeMenu();
+      closeRowMenu();
       closeDonViModal();
     }
   });
@@ -135,6 +156,8 @@ document.addEventListener('DOMContentLoaded', () => {
     donViModal.classList.add('is-open');
     donViModal.setAttribute('aria-hidden', 'false');
     donViMessage.hidden = true;
+    bulkMode = false;
+    selectedIds.clear();
     closeMenu();
     loadDonVi();
     window.setTimeout(() => donViName.focus(), 0);
@@ -159,27 +182,84 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderDonVi(items) {
+    donViItems = items;
+    closeRowMenu();
+
     if (!items.length) {
       donViList.innerHTML = '<p class="muted">Chưa có đơn vị nào.</p>';
+      donViBulkToolbar.hidden = true;
       return;
     }
+
+    if (bulkMode) {
+      donViList.innerHTML = items.map((item) => `
+        <div class="admin-data-item admin-data-item--bulk" data-id="${item.id}">
+          <label class="admin-data-item__check">
+            <input type="checkbox" data-bulk-checkbox ${selectedIds.has(item.id) ? 'checked' : ''}>
+          </label>
+          <div>
+            <strong>${escapeHtml(item.ten_don_vi)}</strong>
+            <span>${item.is_active ? 'Đang sử dụng' : 'Đã ẩn'}</span>
+          </div>
+        </div>
+      `).join('');
+      bindBulkCheckboxes();
+      updateBulkToolbar();
+      return;
+    }
+
+    donViBulkToolbar.hidden = true;
     donViList.innerHTML = items.map((item) => `
       <div class="admin-data-item" data-id="${item.id}">
         <div>
           <strong>${escapeHtml(item.ten_don_vi)}</strong>
           <span>${item.is_active ? 'Đang sử dụng' : 'Đã ẩn'}</span>
         </div>
-        <div class="admin-data-actions">
-          <button class="btn btn--ghost btn--sm" type="button" data-edit-don-vi>Sửa</button>
-          <button class="btn btn--danger btn--sm" type="button" data-delete-don-vi>${item.is_active ? 'Xóa' : 'Đã xóa'}</button>
+        <div class="admin-data-actions admin-data-menu-wrap">
+          <button class="btn btn--ghost btn--sm" type="button" data-menu-toggle aria-haspopup="true" aria-expanded="false">⋯</button>
+          <div class="admin-data-menu" hidden>
+            <button class="admin-settings__item" type="button" data-menu-edit>Sửa</button>
+            <button class="admin-settings__item" type="button" data-menu-toggle-active>${item.is_active ? 'Ẩn' : 'Hiện'}</button>
+            <button class="admin-settings__item" type="button" data-menu-delete>Xóa</button>
+            <button class="admin-settings__item" type="button" data-menu-bulk>Chọn nhiều</button>
+          </div>
         </div>
       </div>
     `).join('');
+    bindRowMenus();
+  }
 
-    donViList.querySelectorAll('[data-edit-don-vi]').forEach((itemButton) => {
-      itemButton.addEventListener('click', () => {
-        const row = itemButton.closest('.admin-data-item');
-        const item = items.find((entry) => String(entry.id) === row.dataset.id);
+  function bindRowMenus() {
+    donViList.querySelectorAll('[data-menu-toggle]').forEach((toggleButton) => {
+      const rowMenu = toggleButton.nextElementSibling;
+      toggleButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const isOpen = !rowMenu.hidden;
+        closeRowMenu();
+        if (!isOpen) {
+          // Định vị theo viewport (fixed) thay vì absolute trong item, để menu
+          // không bị cắt bởi #donViList (khung danh sách có overflow-y cố định).
+          const rect = toggleButton.getBoundingClientRect();
+          rowMenu.style.position = 'fixed';
+          rowMenu.style.top = `${rect.bottom + 6}px`;
+          rowMenu.style.left = 'auto';
+          rowMenu.style.right = `${window.innerWidth - rect.right}px`;
+          rowMenu.hidden = false;
+          toggleButton.setAttribute('aria-expanded', 'true');
+          openRowMenu = { menu: rowMenu, toggleButton };
+        }
+      });
+    });
+
+    function findItem(button) {
+      const row = button.closest('.admin-data-item');
+      return donViItems.find((entry) => String(entry.id) === row.dataset.id);
+    }
+
+    donViList.querySelectorAll('[data-menu-edit]').forEach((menuButton) => {
+      menuButton.addEventListener('click', () => {
+        const item = findItem(menuButton);
+        closeRowMenu();
         if (!item) return;
         donViId.value = item.id;
         donViName.value = item.ten_don_vi;
@@ -188,21 +268,76 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    donViList.querySelectorAll('[data-delete-don-vi]').forEach((itemButton) => {
-      itemButton.addEventListener('click', async () => {
-        const row = itemButton.closest('.admin-data-item');
-        const item = items.find((entry) => String(entry.id) === row.dataset.id);
-        if (!item || !item.is_active) return;
-        if (!confirm(`Xóa đơn vị "${item.ten_don_vi}" khỏi danh sách hiển thị?`)) return;
+    donViList.querySelectorAll('[data-menu-toggle-active]').forEach((menuButton) => {
+      menuButton.addEventListener('click', async () => {
+        const item = findItem(menuButton);
+        closeRowMenu();
+        if (!item) return;
+        const willActivate = !item.is_active;
+        const confirmText = willActivate ? 'Khôi phục đơn vị này?' : 'Ẩn đơn vị này?';
+        if (!confirm(confirmText)) return;
         try {
-          await requestJson(`/api/admin/don-vi/${item.id}`, { method: 'DELETE' });
-          showDonViMessage('Đã xóa đơn vị khỏi danh sách hiển thị.');
+          await requestJson(`/api/admin/don-vi/${item.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ ten_don_vi: item.ten_don_vi, is_active: willActivate }),
+          });
+          showDonViMessage(willActivate ? 'Đã khôi phục đơn vị.' : 'Đã ẩn đơn vị.');
           loadDonVi();
         } catch (error) {
           showDonViMessage(error.message, 'error');
         }
       });
     });
+
+    donViList.querySelectorAll('[data-menu-delete]').forEach((menuButton) => {
+      menuButton.addEventListener('click', async () => {
+        const item = findItem(menuButton);
+        closeRowMenu();
+        if (!item) return;
+        if (!confirm(`Xóa vĩnh viễn đơn vị "${item.ten_don_vi}"? Hành động này không thể hoàn tác.`)) return;
+        try {
+          await requestJson(`/api/admin/don-vi/${item.id}`, { method: 'DELETE' });
+          showDonViMessage('Đã xóa đơn vị.');
+          loadDonVi();
+        } catch (error) {
+          showDonViMessage(error.message, 'error');
+        }
+      });
+    });
+
+    donViList.querySelectorAll('[data-menu-bulk]').forEach((menuButton) => {
+      menuButton.addEventListener('click', () => {
+        closeRowMenu();
+        bulkMode = true;
+        selectedIds.clear();
+        renderDonVi(donViItems);
+      });
+    });
+  }
+
+  function bindBulkCheckboxes() {
+    donViList.querySelectorAll('[data-bulk-checkbox]').forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        const row = checkbox.closest('.admin-data-item');
+        const id = Number(row.dataset.id);
+        if (checkbox.checked) selectedIds.add(id); else selectedIds.delete(id);
+        updateBulkToolbar();
+      });
+    });
+  }
+
+  function updateBulkToolbar() {
+    donViBulkToolbar.hidden = false;
+    donViBulkCount.textContent = `Đã chọn ${selectedIds.size} đơn vị`;
+    const hasSelection = selectedIds.size > 0;
+    donViBulkHide.disabled = !hasSelection;
+    donViBulkDelete.disabled = !hasSelection;
+  }
+
+  function exitBulkMode() {
+    bulkMode = false;
+    selectedIds.clear();
+    renderDonVi(donViItems);
   }
 
   async function loadDonVi() {
@@ -233,6 +368,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (resetDonViForm) {
     resetDonViForm.addEventListener('click', resetForm);
+  }
+
+  if (donViBulkCancel) {
+    donViBulkCancel.addEventListener('click', exitBulkMode);
+  }
+
+  if (donViBulkHide) {
+    donViBulkHide.addEventListener('click', async () => {
+      if (!selectedIds.size) return;
+      if (!confirm(`Ẩn ${selectedIds.size} đơn vị đã chọn?`)) return;
+      try {
+        await requestJson('/api/admin/don-vi/an-hang-loat', {
+          method: 'POST',
+          body: JSON.stringify({ ids: Array.from(selectedIds) }),
+        });
+        showDonViMessage('Đã ẩn các đơn vị đã chọn.');
+        exitBulkMode();
+        loadDonVi();
+      } catch (error) {
+        showDonViMessage(error.message, 'error');
+      }
+    });
+  }
+
+  if (donViBulkDelete) {
+    donViBulkDelete.addEventListener('click', async () => {
+      if (!selectedIds.size) return;
+      if (!confirm(`Xóa vĩnh viễn ${selectedIds.size} đơn vị đã chọn? Hành động này không thể hoàn tác.`)) return;
+      try {
+        const result = await requestJson('/api/admin/don-vi/xoa-hang-loat', {
+          method: 'POST',
+          body: JSON.stringify({ ids: Array.from(selectedIds) }),
+        });
+        const { da_xoa, loi } = result.data;
+        if (loi.length) {
+          const chiTiet = loi.map((entry) => `${entry.ten_don_vi}: ${entry.ly_do}`).join('; ');
+          showDonViMessage(`Đã xóa ${da_xoa.length} đơn vị. Không xóa được ${loi.length} đơn vị — ${chiTiet}`, 'error');
+        } else {
+          showDonViMessage(`Đã xóa ${da_xoa.length} đơn vị.`);
+        }
+        exitBulkMode();
+        loadDonVi();
+      } catch (error) {
+        showDonViMessage(error.message, 'error');
+      }
+    });
   }
 
   if (donViForm) {

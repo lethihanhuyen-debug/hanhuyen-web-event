@@ -32,11 +32,8 @@
         <ul class="primary-nav__list">
           <li><a class="{% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng ký</a></li>
           <li><a class="{% if request.path.startswith('/admin') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản trị</a></li>
-          {% if request.path.startswith('/admin') %}
-            <li><button type="button" data-admin-logout>Đăng xuất</button></li>
-          {% endif %}
         </ul>
-        {% if request.path.startswith('/admin') %}
+        {% if session.get('admin_id') %}
           <div class="admin-settings">
             <button class="admin-settings__button" type="button" aria-label="Cài đặt admin" title="Cài đặt admin" aria-expanded="false">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -46,6 +43,7 @@
             </button>
             <div class="admin-settings__menu" hidden>
               <button class="admin-settings__item" type="button" data-open-don-vi>Quản lý đơn vị</button>
+              <button class="admin-settings__item admin-settings__item--danger" type="button" data-admin-logout>Đăng xuất</button>
             </div>
           </div>
         {% endif %}
@@ -60,7 +58,7 @@
     </div>
   </main>
 
-  {% if request.path.startswith('/admin') %}
+  {% if session.get('admin_id') %}
     <div id="donViModal" class="modal admin-data-modal" aria-hidden="true">
       <div class="modal__backdrop" data-close-don-vi></div>
       <div class="modal__dialog admin-data-modal__dialog">
@@ -84,9 +82,16 @@
           </label>
           <div class="btn-row">
             <button class="btn btn--primary" type="submit">Lưu</button>
-            <button id="resetDonViForm" class="btn btn--ghost" type="button">Thêm mới</button>
           </div>
         </form>
+        <div id="donViBulkToolbar" class="admin-data-bulk-toolbar" hidden>
+          <span id="donViBulkCount">Đã chọn 0 đơn vị</span>
+          <div class="btn-row">
+            <button id="donViBulkHide" class="btn btn--ghost btn--sm" type="button" disabled>Ẩn</button>
+            <button id="donViBulkDelete" class="btn btn--danger btn--sm" type="button" disabled>Xóa</button>
+            <button id="donViBulkCancel" class="btn btn--ghost btn--sm" type="button">Hủy</button>
+          </div>
+        </div>
         <div id="donViList" class="admin-data-list"></div>
       </div>
     </div>

@@ -5,7 +5,6 @@
 <section class="admin-panel">
   <div class="panel-head">
     <div>
-      <p class="eyebrow">Đăng ký tham gia</p>
       {% if selected_event %}
         <h1>{{ selected_event.ten_su_kien }}</h1>
         <p class="muted">
@@ -124,8 +123,7 @@
         loadMoreBtn.disabled = false;
         loadMoreBtn.textContent = 'Xem thêm';
       } else {
-        loadMoreWrap.hidden = true;
-        showLoadMoreMessage('Đã hiển thị tất cả sự kiện.');
+        loadMoreWrap.remove();
       }
     } catch (error) {
       loadMoreBtn.disabled = false;
