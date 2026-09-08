@@ -5,6 +5,9 @@ from event_checkin.models import db
 
 class EmailLog(db.Model):
     __tablename__ = "email_logs"
+    __table_args__ = (
+        db.Index("ix_email_logs_lookup", "ma_cbsv", "event_id", "email_type", "sent_at"),
+    )
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     ma_cbsv = db.Column(db.String(50), db.ForeignKey("users.ma_cbsv"), nullable=False, index=True)

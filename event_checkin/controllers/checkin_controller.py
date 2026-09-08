@@ -1,4 +1,5 @@
-import threading
+import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify, render_template, request, url_for
@@ -18,6 +19,16 @@ from event_checkin.utils.timezone import format_utc_as_vn
 
 
 checkin_bp = Blueprint("checkin", __name__)
+
+# Certificate rendering (Pillow, CPU-bound) + the live SMTP round-trip both
+# happen off the request thread (see _process_checkin_extras). A bounded pool
+# instead of one raw thread per check-in caps how many run at once, so a burst
+# of simultaneous check-ins (e.g. everyone arriving at once) queues extra work
+# instead of spawning hundreds of threads that fight each other for CPU/Gmail.
+_checkin_extras_executor = ThreadPoolExecutor(
+    max_workers=int(os.getenv("CHECKIN_WORKER_THREADS", "6")),
+    thread_name_prefix="checkin-extras",
+)
 
 
 def _format_vn_datetime(dt):
@@ -105,6 +116,12 @@ def checkin():
     if not registration:
         return jsonify({"success": False, "message": f"Mã {ma_cbsv} chưa đăng ký sự kiện này."}), 404
 
+    event_status = registration.event.computed_status if registration.event else None
+    if event_status == "upcoming":
+        return jsonify({"success": False, "message": "Sự kiện chưa bắt đầu, chưa thể check-in."}), 400
+    if event_status == "ended":
+        return jsonify({"success": False, "message": "Sự kiện đã kết thúc, không thể check-in."}), 400
+
     existing_checkin = CheckIn.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
 
     if existing_checkin:
@@ -130,20 +147,17 @@ def checkin():
     # Certificate rendering + email delivery happen off the request thread (see
     # _process_checkin_extras) -- the client polls /api/checkin/email-status for
     # the real outcome instead of waiting for it here.
-    threading.Thread(
-        target=_process_checkin_extras,
-        args=(
-            current_app._get_current_object(),
-            request.host_url,
-            ma_cbsv,
-            event_id,
-            user.ho_ten,
-            user.email,
-            checkin_record.thoi_gian_checkin,
-            registration.event.ten_su_kien if registration.event else "",
-        ),
-        daemon=True,
-    ).start()
+    _checkin_extras_executor.submit(
+        _process_checkin_extras,
+        current_app._get_current_object(),
+        request.host_url,
+        ma_cbsv,
+        event_id,
+        user.ho_ten,
+        user.email,
+        checkin_record.thoi_gian_checkin,
+        registration.event.ten_su_kien if registration.event else "",
+    )
 
     return jsonify({
         "success": True,

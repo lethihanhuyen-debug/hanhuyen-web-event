@@ -54,7 +54,6 @@
       </label>
       <div class="btn-row">
         <button id="submitEventForm" class="btn btn--primary" type="submit">Lưu sự kiện</button>
-        <button id="openDesignerFromForm" class="btn btn--ghost" type="button" disabled>Chứng chỉ</button>
         <button id="cancelEventForm" class="btn btn--ghost" type="button">Hủy</button>
       </div>
       <div id="eventMessage" class="message field-wide" hidden></div>
@@ -75,9 +74,29 @@
           <h2>{{ event.ten_su_kien }}</h2>
         </div>
         <div class="admin-event-card__schedule">
-          <span class="badge badge--success">
-            {% if event.trang_thai == 'upcoming' %}Sắp diễn ra{% elif event.trang_thai == 'ongoing' %}Đang diễn ra{% elif event.trang_thai == 'ended' %}Đã hết sự kiện{% else %}{{ event.trang_thai }}{% endif %}
-          </span>
+          <div class="admin-event-card__status-row">
+            <span class="badge badge--success">
+              {% if event.trang_thai == 'upcoming' %}Sắp diễn ra{% elif event.trang_thai == 'ongoing' %}Đang diễn ra{% elif event.trang_thai == 'ended' %}Đã hết sự kiện{% else %}{{ event.trang_thai }}{% endif %}
+            </span>
+            <div class="btn-row table-actions">
+              <button
+                class="btn btn--ghost btn--sm js-edit-event"
+                type="button"
+                data-event='{{ event|tojson }}'
+              >Sửa</button>
+              <button
+                class="btn btn--ghost btn--sm js-certificate-event"
+                type="button"
+                data-event='{{ event|tojson }}'
+              >Chứng chỉ</button>
+              <button
+                class="btn btn--danger btn--sm js-delete-event"
+                type="button"
+                data-id="{{ event.id }}"
+                data-name="{{ event.ten_su_kien }}"
+              >Xóa</button>
+            </div>
+          </div>
           <div>
             <small>Đăng ký</small>
             <strong>{{ event.thoi_gian_mo_dang_ky_display }} - {{ event.thoi_gian_dong_dang_ky_display }}</strong>
@@ -85,26 +104,6 @@
           <div>
             <small>Diễn ra</small>
             <strong>{{ event.ngay_bat_dau_display }} - {{ event.ngay_ket_thuc_display }}</strong>
-          </div>
-        </div>
-        <div class="admin-event-card__side">
-          <div class="btn-row table-actions">
-            <button
-              class="btn btn--ghost btn--sm js-edit-event"
-              type="button"
-              data-event='{{ event|tojson }}'
-            >Sửa</button>
-            <button
-              class="btn btn--ghost btn--sm js-certificate-event"
-              type="button"
-              data-event='{{ event|tojson }}'
-            >Chứng chỉ</button>
-            <button
-              class="btn btn--danger btn--sm js-delete-event"
-              type="button"
-              data-id="{{ event.id }}"
-              data-name="{{ event.ten_su_kien }}"
-            >Xóa</button>
           </div>
         </div>
       </article>
@@ -209,7 +208,6 @@
   const openButton = document.getElementById('openEventForm');
   const cancelButton = document.getElementById('cancelEventForm');
   const submitButton = document.getElementById('submitEventForm');
-  const openDesignerFromForm = document.getElementById('openDesignerFromForm');
   const form = document.getElementById('eventForm');
   const eventImageInput = document.getElementById('eventImageInput');
   const eventImagePreview = document.getElementById('eventImagePreview');
@@ -270,7 +268,6 @@
     editingEventId = null;
     editingEventData = null;
     submitButton.textContent = 'Lưu sự kiện';
-    openDesignerFromForm.disabled = true;
     form.reset();
     eventImagePreview.hidden = true;
     eventImagePreview.removeAttribute('src');
@@ -363,7 +360,6 @@
       editingEventData = event;
       formCard.hidden = false;
       submitButton.textContent = 'Cập nhật sự kiện';
-      openDesignerFromForm.disabled = false;
       form.ten_su_kien.value = event.ten_su_kien || '';
       form.dia_diem.value = event.dia_diem || '';
       form.ngay_bat_dau.value = toDatetimeLocal(event.ngay_bat_dau);
@@ -388,24 +384,10 @@
     });
   });
 
-  openDesignerFromForm.addEventListener('click', () => {
-    if (!editingEventId) {
-      if (message) { message.textContent = 'Hãy lưu sự kiện trước khi thiết lập chứng chỉ.'; message.hidden = false; }
-      return;
-    }
-    const fallbackEvent = {
-      id: editingEventId,
-      ten_su_kien: form.ten_su_kien.value,
-      certificate_template_url: editingEventData && editingEventData.certificate_template_url,
-      certificate_layout: editingEventData && editingEventData.certificate_layout || {},
-    };
-    openDesigner(editingEventData || fallbackEvent);
-  });
-
   document.querySelectorAll('.js-delete-event').forEach((button) => {
     button.addEventListener('click', async () => {
       const eventName = button.dataset.name || 'sự kiện này';
-      if (!confirm(`Xóa ${eventName}?`)) return;
+      if (!confirm(`Xóa ${eventName}?\n\nToàn bộ dữ liệu đăng ký, check-in, chứng chỉ và email log của sự kiện này (nếu có) sẽ bị xóa vĩnh viễn theo. Hành động này không thể hoàn tác.`)) return;
       try {
         const response = await fetch(`/api/admin/events/${button.dataset.id}`, {
           method: 'DELETE',

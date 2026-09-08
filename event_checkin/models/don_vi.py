@@ -6,7 +6,7 @@ class DonVi(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     ten_don_vi = db.Column(db.String(255), unique=True, nullable=False)
-    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
 
     def to_dict(self):
         return {

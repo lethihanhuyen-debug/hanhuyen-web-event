@@ -12,7 +12,6 @@ from flask import Blueprint, Response, current_app, jsonify, make_response, redi
 from openpyxl import Workbook
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
-from sqlalchemy import func
 from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
 
@@ -25,7 +24,7 @@ from event_checkin.models.email_log import EmailLog
 from event_checkin.models.event import Event
 from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
-from event_checkin.utils.timezone import format_utc_as_vn, now_vn_naive
+from event_checkin.utils.timezone import format_utc_as_vn, now_vn_naive, vn_today_utc_range
 
 
 admin_bp = Blueprint("admin", __name__)
@@ -107,11 +106,11 @@ def _event_payload(event):
 
 
 def _dashboard_payload():
-    from datetime import date
-
-    current_day = date.today().isoformat()
+    day_start_utc, day_end_utc = vn_today_utc_range()
     registrations = Registration.query.order_by(Registration.thoi_gian_dang_ky.desc()).all()
-    today_checkins = CheckIn.query.filter(func.date(CheckIn.thoi_gian_checkin) == current_day).all()
+    today_checkins = CheckIn.query.filter(
+        CheckIn.thoi_gian_checkin >= day_start_utc, CheckIn.thoi_gian_checkin < day_end_utc
+    ).all()
     today_checkin_map = {(item.ma_cbsv, item.event_id): item for item in today_checkins}
     certificate_map = {
         (item.ma_cbsv, item.event_id): item
@@ -489,6 +488,14 @@ def create_event():
         return jsonify({"success": False, "message": "Ngày kết thúc phải sau ngày bắt đầu."}), 400
     if thoi_gian_dong_dang_ky < thoi_gian_mo_dang_ky:
         return jsonify({"success": False, "message": "Thời gian đóng đăng ký phải sau thời gian mở đăng ký."}), 400
+    # Registration must open no later than the event itself starts -- otherwise
+    # the event would already be running with nobody able to register yet.
+    if thoi_gian_mo_dang_ky > ngay_bat_dau:
+        return jsonify({"success": False, "message": "Thời gian mở đăng ký phải trước hoặc bằng lúc sự kiện bắt đầu."}), 400
+    # Registration must close no later than the event itself starts -- no
+    # walk-in/late registration once the event is already running.
+    if thoi_gian_dong_dang_ky > ngay_bat_dau:
+        return jsonify({"success": False, "message": "Thời gian đóng đăng ký phải trước hoặc bằng lúc sự kiện bắt đầu."}), 400
 
     now = now_vn_naive()
     if ngay_bat_dau < now:
@@ -544,6 +551,14 @@ def update_event(event_id):
         return jsonify({"success": False, "message": "Ngày kết thúc phải sau ngày bắt đầu."}), 400
     if thoi_gian_dong_dang_ky < thoi_gian_mo_dang_ky:
         return jsonify({"success": False, "message": "Thời gian đóng đăng ký phải sau thời gian mở đăng ký."}), 400
+    # Registration must open no later than the event itself starts -- otherwise
+    # the event would already be running with nobody able to register yet.
+    if thoi_gian_mo_dang_ky > ngay_bat_dau:
+        return jsonify({"success": False, "message": "Thời gian mở đăng ký phải trước hoặc bằng lúc sự kiện bắt đầu."}), 400
+    # Registration must close no later than the event itself starts -- no
+    # walk-in/late registration once the event is already running.
+    if thoi_gian_dong_dang_ky > ngay_bat_dau:
+        return jsonify({"success": False, "message": "Thời gian đóng đăng ký phải trước hoặc bằng lúc sự kiện bắt đầu."}), 400
 
     event.ten_su_kien = ten_su_kien
     if "hinh" in payload:
@@ -822,21 +837,35 @@ def delete_certificate_font(event_id, field):
 @admin_bp.delete("/api/admin/events/<int:event_id>")
 @admin_required
 def delete_event(event_id):
+    # Deleting an event with existing registrations/check-ins/certificates is
+    # allowed -- the admin UI warns and asks for confirmation before calling
+    # this endpoint (see the js-delete-event handler), so by the time the
+    # request arrives here the admin has already accepted that everything
+    # below is removed along with the event.
     event = Event.query.get_or_404(event_id)
-    has_data = (
-        Registration.query.filter_by(event_id=event_id).first()
-        or CheckIn.query.filter_by(event_id=event_id).first()
-        or Certificate.query.filter_by(event_id=event_id).first()
-        or EmailLog.query.filter_by(event_id=event_id).first()
-    )
-    if has_data:
-        return jsonify({
-            "success": False,
-            "message": "Không thể xóa sự kiện đã có đăng ký, check-in, chứng chỉ hoặc email log.",
-        }), 409
 
+    certificate_paths = []
+    for certificate in Certificate.query.filter_by(event_id=event_id).all():
+        if certificate.file_url:
+            static_prefix = url_for("static", filename="", _external=False)
+            relative_path = certificate.file_url
+            if relative_path.startswith(static_prefix):
+                relative_path = relative_path[len(static_prefix):]
+            certificate_paths.append(Path(current_app.static_folder) / relative_path)
+
+    # Deleted in FK-dependency order: EmailLog references Certificate, both
+    # reference Registration/CheckIn's (ma_cbsv, event_id) pair indirectly.
+    EmailLog.query.filter_by(event_id=event_id).delete()
+    Certificate.query.filter_by(event_id=event_id).delete()
+    CheckIn.query.filter_by(event_id=event_id).delete()
+    Registration.query.filter_by(event_id=event_id).delete()
     db.session.delete(event)
     db.session.commit()
+
+    for path in certificate_paths:
+        if path.exists():
+            path.unlink(missing_ok=True)
+
     return jsonify({"success": True, "message": "Đã xóa sự kiện."})
 
 
@@ -879,11 +908,11 @@ def delete_event_checkin(event_id, ma_cbsv):
 @admin_bp.get("/admin/export/csv")
 @admin_required
 def export_csv():
-    from datetime import date
-
-    current_day = date.today().isoformat()
+    day_start_utc, day_end_utc = vn_today_utc_range()
     registrations = Registration.query.order_by(Registration.thoi_gian_dang_ky.asc()).all()
-    today_checkins = CheckIn.query.filter(func.date(CheckIn.thoi_gian_checkin) == current_day).all()
+    today_checkins = CheckIn.query.filter(
+        CheckIn.thoi_gian_checkin >= day_start_utc, CheckIn.thoi_gian_checkin < day_end_utc
+    ).all()
     today_checkin_map = {(item.ma_cbsv, item.event_id): item for item in today_checkins}
 
     buffer = StringIO()
