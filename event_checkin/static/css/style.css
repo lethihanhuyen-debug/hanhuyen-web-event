@@ -1408,8 +1408,18 @@ textarea:focus {
   gap: 10px;
 }
 
-.admin-event-card__schedule > .badge {
-  justify-self: start;
+.admin-event-card__schedule > .admin-event-card__status-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  flex-wrap: nowrap;
+  padding: 0;
+  background: none;
+}
+
+.admin-event-card__status-row .btn-row {
+  display: contents;
 }
 
 .admin-event-card__schedule div {
@@ -1431,21 +1441,6 @@ textarea:focus {
   font-size: 0.95rem;
   line-height: 1.35;
   white-space: nowrap;
-}
-
-.admin-event-card__side {
-  position: absolute;
-  top: -16px;
-  right: 24px;
-  z-index: 2;
-}
-
-.admin-event-card__side .btn-row {
-  padding: 6px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  box-shadow: var(--shadow);
 }
 
 .stat-card {
@@ -1473,14 +1468,28 @@ textarea:focus {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 900px;
+  min-width: 1260px;
+  table-layout: fixed;
 }
 
 th, td {
   text-align: left;
   padding: 16px 18px;
   border-bottom: 1px solid rgba(15, 43, 77, 0.08);
-  vertical-align: top;
+  vertical-align: middle;
+  overflow-wrap: break-word;
+}
+
+/* STT, Mã CB/SV, Giờ đăng ký, Trạng thái, Chứng nhận, Thao tác never wrap --
+   only Họ tên / Đơn vị / Email (3rd, 4th, 5th column) are allowed to break
+   onto a second line when the value genuinely doesn't fit. */
+th:nth-child(1), td:nth-child(1),
+th:nth-child(2), td:nth-child(2),
+th:nth-child(6), td:nth-child(6),
+th:nth-child(7), td:nth-child(7),
+th:nth-child(8), td:nth-child(8),
+th:nth-child(9), td:nth-child(9) {
+  white-space: nowrap;
 }
 
 th {
@@ -1503,6 +1512,7 @@ th {
   padding: 8px 12px;
   border-radius: 999px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .certificate-summary {
@@ -1593,11 +1603,6 @@ th {
 
   .admin-event-card__schedule strong {
     white-space: normal;
-  }
-
-  .admin-event-card__side {
-    right: auto;
-    left: 24px;
   }
 
   .checkin-card,

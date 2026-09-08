@@ -8,8 +8,11 @@
       {% if selected_event %}
         <h1>{{ selected_event.ten_su_kien }}</h1>
         <p class="muted">
-          {{ selected_event.dia_diem or 'Chưa có địa điểm' }} - {{ selected_event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if selected_event.ngay_bat_dau else '' }}
+          {{ selected_event.dia_diem or 'Chưa có địa điểm' }} - Diễn ra {{ selected_event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if selected_event.ngay_bat_dau else '' }}
           {% if selected_event.ngay_ket_thuc %} - {{ selected_event.ngay_ket_thuc.strftime('%H:%M %d/%m/%Y') }}{% endif %}
+        </p>
+        <p class="muted">
+          Đăng ký {{ selected_event.thoi_gian_mo_dang_ky.strftime('%H:%M %d/%m/%Y') if selected_event.thoi_gian_mo_dang_ky else '' }} - {{ selected_event.thoi_gian_dong_dang_ky.strftime('%H:%M %d/%m/%Y') if selected_event.thoi_gian_dong_dang_ky else '' }}
         </p>
       {% else %}
         <h1>Chọn sự kiện để đăng ký</h1>

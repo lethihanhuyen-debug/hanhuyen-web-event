@@ -24,8 +24,8 @@
           </div>
           <div class="event-meta">
             <strong>{{ event.dia_diem or 'Chưa có địa điểm' }}</strong>
-            <span>{{ event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if event.ngay_bat_dau else '' }}</span>
-            <span>Đăng ký đến {{ event.thoi_gian_dong_dang_ky.strftime('%H:%M %d/%m/%Y') if event.thoi_gian_dong_dang_ky else '' }}</span>
+            <span>Đăng ký: {{ event.thoi_gian_mo_dang_ky.strftime('%H:%M %d/%m/%Y') if event.thoi_gian_mo_dang_ky else '' }} - {{ event.thoi_gian_dong_dang_ky.strftime('%H:%M %d/%m/%Y') if event.thoi_gian_dong_dang_ky else '' }}</span>
+            <span>Diễn ra: {{ event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if event.ngay_bat_dau else '' }} - {{ event.ngay_ket_thuc.strftime('%H:%M %d/%m/%Y') if event.ngay_ket_thuc else '' }}</span>
           </div>
         </a>
       {% endfor %}
