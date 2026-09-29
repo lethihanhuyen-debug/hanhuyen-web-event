@@ -5,8 +5,8 @@
 <section class="checkin-stage">
   <div class="checkin-card">
     <p class="eyebrow">Check-in sự kiện</p>
-    <h1>Quét hoặc nhập mã CB/SV</h1>
-    <p class="muted">Hệ thống sẽ phản hồi ngay phía dưới và tự động sẵn sàng cho lần quét tiếp theo.</p>
+    <h1>{{ event.ten_su_kien }}</h1>
+    <p class="muted">Quét hoặc nhập mã CB/SV. Hệ thống sẽ phản hồi ngay phía dưới và tự động sẵn sàng cho lần quét tiếp theo.</p>
 
     <div class="checkin-form">
       <input id="checkinInput" type="text" placeholder="Nhập hoặc quét Mã CB/SV" autocomplete="off" autofocus>
@@ -14,6 +14,7 @@
     </div>
 
     <div id="checkinResult" class="checkin-result" aria-live="polite"></div>
+    <p class="muted"><a href="{{ url_for('checkin.index') }}">Chọn sự kiện khác</a></p>
   </div>
 </section>
 {% endblock %}
@@ -21,6 +22,7 @@
 {% block scripts %}
 <script>
 (function () {
+  const EVENT_ID = {{ event.id }};
   const input = document.getElementById('checkinInput');
   const button = document.getElementById('checkinBtn');
   const result = document.getElementById('checkinResult');
@@ -75,7 +77,7 @@
       const response = await fetch('/api/checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ma_cbsv }),
+        body: JSON.stringify({ ma_cbsv, event_id: EVENT_ID }),
       });
       const data = await response.json();
       if (token !== latestToken) return; // a newer scan already started
@@ -86,7 +88,7 @@
         paint('warning', '⚠️ ' + data.message);
       } else if (data.success) {
         paint('pending', '✅ Cảm ơn ' + data.ho_ten + ' đã check-in lúc ' + data.thoi_gian + '. Đang gửi email xác nhận...');
-        pollEmailStatus(token, ma_cbsv, 1, data.ho_ten, data.thoi_gian, data.email, 8);
+        pollEmailStatus(token, ma_cbsv, EVENT_ID, data.ho_ten, data.thoi_gian, data.email, 8);
       } else {
         paint('error', data.message || 'Đã xảy ra lỗi.');
       }

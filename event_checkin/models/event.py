@@ -12,6 +12,8 @@ class Event(db.Model):
     hinh = db.Column(db.String(255))
     mo_ta = db.Column(db.Text)
     dia_diem = db.Column(db.String(255))
+    co_so = db.Column(db.String(50))  # "Thủ Đức" | "Đinh Tiên Hoàng" | "Khác" -- dùng để lọc, khác với dia_diem (phòng/hội trường cụ thể)
+    so_luong_toi_da = db.Column(db.Integer)  # số người tối đa được đăng ký -- None nghĩa là không giới hạn
     ngay_bat_dau = db.Column(db.DateTime, nullable=False)
     ngay_ket_thuc = db.Column(db.DateTime, nullable=False)
     thang = db.Column(db.Integer, nullable=False)
@@ -40,6 +42,14 @@ class Event(db.Model):
         return "ended"
 
     @property
+    def registration_count(self):
+        """Số người đã đăng ký (số dòng Registration, mỗi mã CB/SV chỉ đăng ký
+        được 1 lần cho 1 sự kiện nhờ unique constraint -- xem models/registration.py).
+        Import cục bộ để tránh phụ thuộc vòng giữa event.py và registration.py."""
+        from event_checkin.models.registration import Registration
+        return Registration.query.filter_by(event_id=self.id).count()
+
+    @property
     def registration_block_reason(self):
         """None if registration is currently allowed, otherwise a Vietnamese
         message explaining why (event ended / registration window not open)."""
@@ -50,6 +60,8 @@ class Event(db.Model):
             return "Chưa đến thời gian mở đăng ký cho sự kiện này."
         if now > self.thoi_gian_dong_dang_ky:
             return "Đã hết thời gian đăng ký cho sự kiện này."
+        if self.so_luong_toi_da and self.registration_count >= self.so_luong_toi_da:
+            return "Sự kiện đã đủ số lượng đăng ký."
         return None
 
     @property

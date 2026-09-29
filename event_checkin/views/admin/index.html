@@ -23,8 +23,17 @@
         <input name="ten_su_kien" required>
       </label>
       <label>
-        <span>Địa điểm</span>
-        <input name="dia_diem">
+        <span>Cơ sở</span>
+        <select name="co_so">
+          <option value="">Chọn cơ sở</option>
+          {% for choice in co_so_choices %}
+            <option value="{{ choice }}">{{ choice }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Địa chỉ cụ thể</span>
+        <input name="dia_diem" placeholder="VD: Hội trường A -- chỉ hiện khi xem chi tiết sự kiện, không hiện ở danh sách">
       </label>
       <label>
         <span>Ngày bắt đầu</span>
@@ -41,6 +50,10 @@
       <label>
         <span>Đóng đăng ký</span>
         <input name="thoi_gian_dong_dang_ky" type="datetime-local" required>
+      </label>
+      <label>
+        <span>Số lượng tham gia</span>
+        <input name="so_luong_toi_da" type="number" min="1" step="1" placeholder="Để trống nếu không giới hạn">
       </label>
       <label class="field-wide">
         <span>Mô tả</span>
@@ -104,6 +117,10 @@
           <div>
             <small>Diễn ra</small>
             <strong>{{ event.ngay_bat_dau_display }} - {{ event.ngay_ket_thuc_display }}</strong>
+          </div>
+          <div>
+            <small>Đã đăng ký</small>
+            <strong>{{ event.registration_count }} / {{ event.so_luong_toi_da or 'Không giới hạn' }}</strong>
           </div>
         </div>
       </article>
@@ -362,6 +379,8 @@
       submitButton.textContent = 'Cập nhật sự kiện';
       form.ten_su_kien.value = event.ten_su_kien || '';
       form.dia_diem.value = event.dia_diem || '';
+      form.co_so.value = event.co_so || '';
+      form.so_luong_toi_da.value = event.so_luong_toi_da || '';
       form.ngay_bat_dau.value = toDatetimeLocal(event.ngay_bat_dau);
       form.ngay_ket_thuc.value = toDatetimeLocal(event.ngay_ket_thuc);
       form.thoi_gian_mo_dang_ky.value = toDatetimeLocal(event.thoi_gian_mo_dang_ky);

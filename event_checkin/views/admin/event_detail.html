@@ -17,6 +17,7 @@
         <button id="openTemplatePreview" class="btn btn--ghost" type="button">Xem mẫu chứng chỉ</button>
       {% endif %}
       <button id="openEventCheckinForm" class="btn btn--primary" type="button">Check-in</button>
+      <a class="btn btn--ghost" href="{{ url_for('checkin.event_index', event_id=event.id) }}" target="_blank" rel="noopener">Trang check-in công khai</a>
       <button id="exportRegistrations" class="btn btn--ghost" type="button" data-event-id="{{ event.id }}">Xuất danh sách đăng ký</button>
       <a class="btn btn--ghost" href="{{ url_for('admin.index') }}">Quay lại</a>
     </div>

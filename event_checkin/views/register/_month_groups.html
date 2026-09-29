@@ -2,12 +2,13 @@
    và cho endpoint /api/events/month-groups (trả về dưới dạng chuỗi HTML để nối
    thêm vào #eventGroups khi bấm "Xem thêm"), để logic hiển thị badge trạng thái
    và định dạng ngày giờ chỉ nằm ở một chỗ duy nhất. #}
+{% set wd_names = ["CN", "Th 2", "Th 3", "Th 4", "Th 5", "Th 6", "Th 7"] %}
 {% for group in event_groups %}
   <section class="event-month-group">
     <h2 class="event-month-group__title">{{ group.label }}:</h2>
     <div class="event-list">
       {% for event in group.events %}
-        <a class="event-card" href="{{ url_for('register.event_register', event_id=event.id) }}">
+        <a class="event-card" data-status="{{ event.computed_status }}" href="{{ url_for('register.event_register', event_id=event.id) }}">
           <div class="event-card__image">
             {% if event.hinh %}
               <img src="{{ url_for('static', filename=event.hinh) }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
@@ -15,17 +16,48 @@
               <span>Chưa có hình</span>
             {% endif %}
           </div>
-          <div>
-            <span class="badge badge--success">
-              {% if event.computed_status == 'upcoming' %}Sắp diễn ra{% elif event.computed_status == 'ongoing' %}Đang diễn ra{% else %}Đã hết sự kiện{% endif %}
-            </span>
+          <div class="event-main">
+            {% if event.computed_status == 'upcoming' %}
+              <span class="badge badge--success">Sắp diễn ra</span>
+            {% elif event.computed_status == 'ongoing' %}
+              <span class="badge badge--warning">Đang diễn ra</span>
+            {% else %}
+              <span class="badge badge--muted">Đã kết thúc</span>
+            {% endif %}
             <h3>{{ event.ten_su_kien }}</h3>
-            <p class="muted">{{ event.mo_ta or 'Chưa có mô tả.' }}</p>
+            <p class="muted event-description">{{ event.mo_ta or 'Chưa có mô tả.' }}</p>
           </div>
-          <div class="event-meta">
-            <strong>{{ event.dia_diem or 'Chưa có địa điểm' }}</strong>
-            <span>Đăng ký: {{ event.thoi_gian_mo_dang_ky.strftime('%H:%M %d/%m/%Y') if event.thoi_gian_mo_dang_ky else '' }} - {{ event.thoi_gian_dong_dang_ky.strftime('%H:%M %d/%m/%Y') if event.thoi_gian_dong_dang_ky else '' }}</span>
-            <span>Diễn ra: {{ event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if event.ngay_bat_dau else '' }} - {{ event.ngay_ket_thuc.strftime('%H:%M %d/%m/%Y') if event.ngay_ket_thuc else '' }}</span>
+          <div class="event-info">
+            {# Ô lịch bóc thay cho dòng "Diễn ra" cũ -- gộp ngày/tháng/thứ vào 1 khối
+               trực quan hơn là chỉ ghi chữ. Nhiều ngày (event kéo dài) thì hiện dạng
+               khoảng "15–17" + số ngày thay vì tên thứ. #}
+            <div class="event-cal" aria-hidden="true">
+              <span class="event-cal__month">Thg {{ event.ngay_bat_dau.month }}{% if event.ngay_ket_thuc and (event.ngay_ket_thuc.month != event.ngay_bat_dau.month or event.ngay_ket_thuc.year != event.ngay_bat_dau.year) %}–{{ event.ngay_ket_thuc.month }}{% endif %}</span>
+              {% if event.ngay_ket_thuc and event.ngay_bat_dau.date() != event.ngay_ket_thuc.date() %}
+                <span class="event-cal__day event-cal__day--range">{{ event.ngay_bat_dau.day }}–{{ event.ngay_ket_thuc.day }}</span>
+                <span class="event-cal__wd">{{ (event.ngay_ket_thuc.date() - event.ngay_bat_dau.date()).days + 1 }} ngày</span>
+              {% else %}
+                <span class="event-cal__day">{{ event.ngay_bat_dau.day }}</span>
+                <span class="event-cal__wd">{{ wd_names[(event.ngay_bat_dau.weekday() + 1) % 7] }}</span>
+              {% endif %}
+            </div>
+            <dl class="event-meta-list">
+              <div class="event-meta-row">
+                <dt>Cơ sở</dt>
+                <!-- Chỉ hiện cơ sở (Linh Xuân/Sài Gòn/Khác) ở đây -- địa chỉ cụ
+                     thể (event.dia_diem) chỉ hiện khi bấm vào xem chi tiết sự
+                     kiện, xem register/index.html (khối selected_event). -->
+                <dd>{{ event.co_so or 'Chưa cập nhật' }}</dd>
+              </div>
+              <div class="event-meta-row">
+                <dt>Đăng ký</dt>
+                <dd>{{ event.thoi_gian_mo_dang_ky.strftime('%d/%m') if event.thoi_gian_mo_dang_ky else '' }} – {{ event.thoi_gian_dong_dang_ky.strftime('%d/%m/%Y') if event.thoi_gian_dong_dang_ky else '' }}</dd>
+              </div>
+              <div class="event-meta-row">
+                <dt>Đã đăng ký</dt>
+                <dd>{{ event.registration_count }} / {{ event.so_luong_toi_da or 'Không giới hạn' }}</dd>
+              </div>
+            </dl>
           </div>
         </a>
       {% endfor %}

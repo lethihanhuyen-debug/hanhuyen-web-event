@@ -11,7 +11,33 @@ window.appUtils = {
       year: 'numeric',
     }).format(date);
   },
+
+  // Thẻ sự kiện/card admin mờ dần + trượt lên khi cuộn tới (thay vì chạy ngay
+  // lúc tải trang) -- gọi lại hàm này sau khi thêm HTML mới vào DOM (ví dụ
+  // "Xem thêm" hoặc kết quả tìm kiếm) để quan sát luôn các thẻ vừa chèn.
+  observeReveal(root) {
+    const scope = root || document;
+    const targets = scope.querySelectorAll('.event-card:not(.is-revealed), .admin-event-card:not(.is-revealed)');
+    if (!targets.length) return;
+
+    if (!('IntersectionObserver' in window)) {
+      targets.forEach((el) => el.classList.add('is-revealed'));
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-revealed');
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+    targets.forEach((el) => observer.observe(el));
+  },
 };
+
+document.addEventListener('DOMContentLoaded', () => window.appUtils.observeReveal());
 
 // Header: đổ bóng khi cuộn trang + menu dạng hamburger trên mobile.
 (function () {

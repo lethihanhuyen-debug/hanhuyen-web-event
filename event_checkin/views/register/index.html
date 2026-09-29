@@ -2,17 +2,104 @@
 {% block title %}Đăng ký | Event Check-in{% endblock %}
 
 {% block content %}
-<section class="admin-panel">
+{% if not selected_event %}
+<!-- ===================================================================
+     Intro splash — chạy đúng 1 lần/phiên khi vào trang đăng ký lần đầu
+     (xem sessionStorage trong scripts block bên dưới). Thuần CSS, không
+     phụ thuộc script bên ngoài -- icon quyển sách "tự vẽ" bằng stroke-dash.
+=================================================================== -->
+<div class="intro-splash" id="introSplash" aria-hidden="true">
+  <svg class="intro-splash__icon" viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path class="intro-splash__stroke" d="M60 20 C 42 9, 14 10, 7 16 L7 72 C 14 66, 42 65, 60 76" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="intro-splash__stroke" d="M60 20 C 78 9, 106 10, 113 16 L113 72 C 106 66, 78 65, 60 76" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="intro-splash__stroke intro-splash__spine" d="M60 20 L60 76" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+  </svg>
+  <p class="intro-splash__text">Đang mở cổng đăng ký...</p>
+</div>
+<!-- ===================================================================
+     CILM Hero Slider — nội dung lấy tự động từ 3 sự kiện mới tạo gần đây
+     nhất (xem register_controller._hero_events), không cần admin nhập tay.
+     Nút CTA mỗi slide link thẳng tới trang đăng ký của đúng sự kiện đó.
+=================================================================== -->
+{% if hero_events %}
+<div class="hero-slider" id="heroSlider">
+  {% for event in hero_events %}
+    <div class="hero-slide{% if loop.first %} is-active{% endif %}" data-slide="{{ loop.index0 }}">
+      <div class="hero-slide__bg hero-slide__bg--{{ loop.index0 % 3 }}">
+        {% if event.image_url %}<img class="hero-slide__img" src="{{ event.image_url }}" alt="">{% endif %}
+      </div>
+      <div class="hero-slide__overlay"></div>
+      <div class="hero-slide__content">
+        {% if event.badge_text %}<span class="hero-slide__badge">{{ event.badge_text }}</span>{% endif %}
+        <h1 class="hero-slide__title">{{ event.title }}</h1>
+        <a class="btn btn--primary hero-slide__cta" href="{{ event.link }}">{{ event.cta_text }} <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  {% endfor %}
+
+  {% if hero_events|length > 1 %}
+    <button type="button" class="hero-slider__arrow hero-slider__arrow--prev" id="heroPrev" aria-label="Banner trước">‹</button>
+    <button type="button" class="hero-slider__arrow hero-slider__arrow--next" id="heroNext" aria-label="Banner tiếp theo">›</button>
+
+    <div class="hero-slider__dots" id="heroDots">
+      {% for event in hero_events %}
+        <button type="button" class="hero-slider__dot{% if loop.first %} is-active{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Banner {{ loop.index }}"></button>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ===================================================================
+     Thanh tìm kiếm + lọc theo tháng / cơ sở / trạng thái
+=================================================================== -->
+<div class="filter-panel">
+  <div class="filter-row">
+    <div class="search-box">
+      <input type="search" id="eventSearchInput" class="search-input" placeholder="Tìm kiếm sự kiện theo tên..." autocomplete="off">
+    </div>
+    <select id="eventMonthFilter" class="filter-select">
+      <option value="all">Tất cả tháng</option>
+      {% for value, label in month_options %}
+        <option value="{{ value }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select id="eventCoSoFilter" class="filter-select">
+      <option value="all">Tất cả cơ sở</option>
+      {% for choice in co_so_choices %}
+        <option value="{{ choice }}">{{ choice }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-tabs" id="eventFilterTabs">
+    <button type="button" class="filter-tab is-active" data-status="all">Tất cả</button>
+    <button type="button" class="filter-tab" data-status="upcoming">Sắp diễn ra</button>
+    <button type="button" class="filter-tab" data-status="ongoing">Đang diễn ra</button>
+    <button type="button" class="filter-tab" data-status="ended">Đã kết thúc</button>
+  </div>
+</div>
+{% endif %}
+<section class="admin-panel" id="events">
   <div class="panel-head">
     <div>
       {% if selected_event %}
         <h1>{{ selected_event.ten_su_kien }}</h1>
         <p class="muted">
-          {{ selected_event.dia_diem or 'Chưa có địa điểm' }} - Diễn ra {{ selected_event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if selected_event.ngay_bat_dau else '' }}
+          {%- if selected_event.co_so and selected_event.dia_diem -%}
+            {{ selected_event.co_so }} — {{ selected_event.dia_diem }}
+          {%- elif selected_event.co_so -%}
+            {{ selected_event.co_so }}
+          {%- else -%}
+            {{ selected_event.dia_diem or 'Chưa có địa điểm' }}
+          {%- endif %}
+          - Diễn ra {{ selected_event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if selected_event.ngay_bat_dau else '' }}
           {% if selected_event.ngay_ket_thuc %} - {{ selected_event.ngay_ket_thuc.strftime('%H:%M %d/%m/%Y') }}{% endif %}
         </p>
         <p class="muted">
           Đăng ký {{ selected_event.thoi_gian_mo_dang_ky.strftime('%H:%M %d/%m/%Y') if selected_event.thoi_gian_mo_dang_ky else '' }} - {{ selected_event.thoi_gian_dong_dang_ky.strftime('%H:%M %d/%m/%Y') if selected_event.thoi_gian_dong_dang_ky else '' }}
+        </p>
+        <p class="muted">
+          Đã đăng ký: {{ selected_event.registration_count }} / {{ selected_event.so_luong_toi_da or 'Không giới hạn' }}
         </p>
       {% else %}
         <h1>Chọn sự kiện để đăng ký</h1>
@@ -38,6 +125,11 @@
       <button id="loadMoreEvents" class="btn btn--ghost" type="button">Xem thêm</button>
     </div>
     <p id="eventLoadMoreMessage" class="muted event-load-more__message" hidden></p>
+    <div class="empty-state" id="eventEmptyState" hidden>
+      <div class="empty-state__icon" aria-hidden="true">🔍</div>
+      <h3>Không tìm thấy sự kiện phù hợp</h3>
+      <p class="muted">Thử đổi từ khoá tìm kiếm hoặc chọn lại bộ lọc trạng thái.</p>
+    </div>
   {% else %}
     {% if selected_event.hinh %}
       <img class="event-detail-image" src="{{ url_for('static', filename=selected_event.hinh) }}" alt="Hình sự kiện {{ selected_event.ten_su_kien }}">
@@ -92,10 +184,153 @@
 {% if not selected_event %}
 <script>
 (function () {
+  // ---------- Intro splash: chỉ chạy 1 lần/phiên (session) ----------
+  const splash = document.getElementById('introSplash');
+  if (splash) {
+    if (sessionStorage.getItem('introSplashShown')) {
+      splash.remove();
+    } else {
+      sessionStorage.setItem('introSplashShown', '1');
+      // Chuyển thành con trực tiếp của <body> -- nếu để trong .page-shell,
+      // animation transform của .page-shell biến nó thành containing block
+      // cho position:fixed, làm overlay bị kẹt trong khung nội dung thay vì
+      // phủ toàn màn hình.
+      document.body.prepend(splash);
+      splash.addEventListener('animationend', (event) => {
+        if (event.target === splash) splash.hidden = true;
+      });
+    }
+  }
+
+  // ---------- Hero slider: auto-advance + dots + arrows ----------
+  const slider = document.getElementById('heroSlider');
+  if (slider) {
+    const slides = Array.from(slider.querySelectorAll('.hero-slide'));
+    const dots = Array.from(slider.querySelectorAll('.hero-slider__dot'));
+    let current = 0;
+    let timer = null;
+
+    function goTo(index) {
+      current = (index + slides.length) % slides.length;
+      slides.forEach((slide, i) => slide.classList.toggle('is-active', i === current));
+      dots.forEach((dot, i) => dot.classList.toggle('is-active', i === current));
+    }
+
+    function restartAutoplay() {
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => goTo(current + 1), 6000);
+    }
+
+    // Mũi tên/dot chỉ được render khi có > 1 slide (xem index.html) -- guard
+    // null vì chỉ 1 slide thì không cần điều hướng hay tự chuyển.
+    const heroPrev = document.getElementById('heroPrev');
+    const heroNext = document.getElementById('heroNext');
+    if (heroPrev && heroNext && slides.length > 1) {
+      heroPrev.addEventListener('click', () => { goTo(current - 1); restartAutoplay(); });
+      heroNext.addEventListener('click', () => { goTo(current + 1); restartAutoplay(); });
+      dots.forEach((dot) => dot.addEventListener('click', () => { goTo(Number(dot.dataset.goto)); restartAutoplay(); }));
+      slider.addEventListener('mouseenter', () => timer && clearInterval(timer));
+      slider.addEventListener('mouseleave', restartAutoplay);
+      restartAutoplay();
+    }
+  }
+
+  // ---------- Tìm kiếm + lọc theo tháng / cơ sở / trạng thái ----------
+  // Lọc theo tháng và cơ sở cần dữ liệu từ MỌI tháng, không chỉ các tháng đã
+  // tải qua "Xem thêm" -- nên khi có bất kỳ bộ lọc nào khác mặc định, gọi hẳn
+  // API /api/events/search (trả về toàn bộ kết quả khớp, không phân trang)
+  // thay vì chỉ ẩn/hiện thẻ đã render sẵn trên trang.
+  const searchInput = document.getElementById('eventSearchInput');
+  const monthFilter = document.getElementById('eventMonthFilter');
+  const coSoFilter = document.getElementById('eventCoSoFilter');
+  const filterTabs = document.getElementById('eventFilterTabs');
+  const eventGroups = document.getElementById('eventGroups');
+  const emptyState = document.getElementById('eventEmptyState');
   const loadMoreWrap = document.getElementById('eventLoadMore');
   const loadMoreBtn = document.getElementById('loadMoreEvents');
   const loadMoreMessage = document.getElementById('eventLoadMoreMessage');
-  const eventGroups = document.getElementById('eventGroups');
+
+  let activeStatus = 'all';
+  let searchDebounce = null;
+  let searchRequestId = 0;
+
+  // Lưu lại trạng thái danh sách mặc định (phân trang theo tháng) để khôi
+  // phục nguyên vẹn khi người dùng xoá hết bộ lọc, không cần tải lại trang.
+  // Cập nhật lại (không chỉ đọc 1 lần) mỗi khi "Xem thêm" tải thành công, để
+  // không bị lùi về batch tháng đầu tiên nếu user đã tải thêm trước khi lọc.
+  let defaultGroupsHtml = eventGroups ? eventGroups.innerHTML : '';
+  let defaultLoadMoreOffset = loadMoreWrap ? loadMoreWrap.dataset.nextOffset : '0';
+  let defaultLoadMoreHidden = loadMoreWrap ? loadMoreWrap.hidden : true;
+
+  function isDefaultFilterState() {
+    return (
+      !(searchInput?.value || '').trim() &&
+      (monthFilter?.value || 'all') === 'all' &&
+      (coSoFilter?.value || 'all') === 'all' &&
+      activeStatus === 'all'
+    );
+  }
+
+  function restoreDefaultView() {
+    if (!eventGroups) return;
+    eventGroups.innerHTML = defaultGroupsHtml;
+    if (loadMoreWrap) {
+      loadMoreWrap.dataset.nextOffset = defaultLoadMoreOffset;
+      loadMoreWrap.hidden = defaultLoadMoreHidden;
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.textContent = 'Xem thêm';
+    }
+    if (emptyState) emptyState.hidden = true;
+  }
+
+  async function runSearch() {
+    if (!eventGroups) return;
+
+    if (isDefaultFilterState()) {
+      restoreDefaultView();
+      return;
+    }
+
+    const requestId = ++searchRequestId;
+    const params = new URLSearchParams({
+      q: (searchInput?.value || '').trim(),
+      month: monthFilter?.value || 'all',
+      co_so: coSoFilter?.value || 'all',
+      status: activeStatus,
+    });
+
+    try {
+      const response = await fetch(`/api/events/search?${params.toString()}`);
+      const result = await response.json();
+      if (requestId !== searchRequestId) return; // có request mới hơn, bỏ kết quả cũ
+      if (!result.success) {
+        throw new Error(result.message || 'Không thể tìm kiếm sự kiện.');
+      }
+      eventGroups.innerHTML = result.data.html;
+      window.appUtils.observeReveal(eventGroups);
+      if (loadMoreWrap) loadMoreWrap.hidden = true; // kết quả tìm kiếm đã đầy đủ, không phân trang
+      if (emptyState) emptyState.hidden = result.data.count !== 0;
+    } catch (error) {
+      if (requestId !== searchRequestId) return;
+      if (emptyState) emptyState.hidden = true;
+    }
+  }
+
+  searchInput?.addEventListener('input', () => {
+    window.clearTimeout(searchDebounce);
+    searchDebounce = window.setTimeout(runSearch, 300);
+  });
+  monthFilter?.addEventListener('change', runSearch);
+  coSoFilter?.addEventListener('change', runSearch);
+  filterTabs?.addEventListener('click', (event) => {
+    const tab = event.target.closest('.filter-tab');
+    if (!tab) return;
+    filterTabs.querySelectorAll('.filter-tab').forEach((el) => el.classList.toggle('is-active', el === tab));
+    activeStatus = tab.dataset.status;
+    runSearch();
+  });
+
+  // ---------- Xem thêm (chỉ áp dụng cho danh sách mặc định, không lọc) ----------
   if (!loadMoreWrap || !loadMoreBtn) return;
 
   let nextOffset = Number(loadMoreWrap.dataset.nextOffset || 0);
@@ -121,13 +356,18 @@
       }
       // Nối thêm khối tháng mới vào cuối danh sách hiện có, không load lại từ đầu.
       eventGroups.insertAdjacentHTML('beforeend', result.data.html);
+      window.appUtils.observeReveal(eventGroups);
       nextOffset = result.data.next_offset;
-      if (result.data.has_more) {
-        loadMoreBtn.disabled = false;
-        loadMoreBtn.textContent = 'Xem thêm';
-      } else {
-        loadMoreWrap.remove();
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.textContent = 'Xem thêm';
+      if (!result.data.has_more) {
+        loadMoreWrap.hidden = true;
       }
+      // Ghi lại làm trạng thái mặc định mới, để lọc rồi bỏ lọc không bị mất
+      // phần vừa tải thêm này.
+      defaultGroupsHtml = eventGroups.innerHTML;
+      defaultLoadMoreOffset = String(nextOffset);
+      defaultLoadMoreHidden = loadMoreWrap.hidden;
     } catch (error) {
       loadMoreBtn.disabled = false;
       loadMoreBtn.textContent = 'Xem thêm';

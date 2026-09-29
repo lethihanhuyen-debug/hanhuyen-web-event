@@ -16,6 +16,57 @@ register_bp = Blueprint("register", __name__)
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 PHONE_PATTERN = re.compile(r"^\d{9,11}$")
 MONTH_GROUPS_PER_PAGE = 3
+CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
+
+
+def _hero_events():
+    """Banner trang đăng ký lấy nội dung từ 3 sự kiện mới tạo gần đây nhất --
+    thay cho banner tĩnh admin phải tự nhập tay. Nút CTA link thẳng tới trang
+    đăng ký của đúng sự kiện đó (register.event_register)."""
+    events = Event.query.order_by(Event.created_at.desc()).limit(3).all()
+    result = []
+    for event in events:
+        result.append({
+            "id": event.id,
+            "badge_text": event.co_so or "Sự kiện mới",
+            "title": event.ten_su_kien,
+            "cta_text": "Đăng ký ngay",
+            "image_url": url_for("static", filename=event.hinh) if event.hinh else None,
+            "link": url_for("register.event_register", event_id=event.id),
+        })
+    return result
+
+
+def _month_select_options():
+    """[(value, label), ...] cho <select> lọc theo tháng ở thanh tìm kiếm --
+    value dạng "nam-thang" (vd "2026-9"), luôn kèm năm trong label để rõ ràng
+    (khác với label khối tháng ngoài danh sách, chỉ ẩn năm khi không cần)."""
+    return [(f"{nam}-{thang}", f"Tháng {thang}/{nam}") for nam, thang in _distinct_month_keys()]
+
+
+def _group_events_by_month(events):
+    """Gom 1 danh sách Event (đã lọc + sắp xếp sẵn) thành các khối theo tháng,
+    giữ nguyên thứ tự xuất hiện -- dùng cho kết quả tìm kiếm/lọc (không phân
+    trang theo tháng như _month_groups_page, vì đây đã là toàn bộ kết quả khớp)."""
+    groups_by_key = {}
+    order = []
+    for event in events:
+        key = (event.nam, event.thang)
+        if key not in groups_by_key:
+            groups_by_key[key] = []
+            order.append(key)
+        groups_by_key[key].append(event)
+
+    multi_year = len({nam for nam, _thang in order}) > 1
+    return [
+        {
+            "nam": nam,
+            "thang": thang,
+            "label": f"Tháng {thang}/{nam}" if multi_year else f"Tháng {thang}",
+            "events": groups_by_key[(nam, thang)],
+        }
+        for nam, thang in order
+    ]
 
 
 def _get_or_create_don_vi(ten_don_vi):
@@ -66,7 +117,10 @@ def _month_groups_page(offset, limit=MONTH_GROUPS_PER_PAGE):
     events_by_key = {}
     if page_keys:
         conditions = [and_(Event.nam == nam, Event.thang == thang) for nam, thang in page_keys]
-        page_events = Event.query.filter(or_(*conditions)).order_by(Event.ngay_bat_dau.asc()).all()
+        # Mới nhất lên trên, khớp với chiều sắp xếp của khối tháng (tháng mới
+        # nhất cũng ở trên) -- sự kiện vừa tạo/diễn ra muộn hơn trong tháng
+        # không bị chìm xuống dưới các sự kiện cũ hơn cùng tháng.
+        page_events = Event.query.filter(or_(*conditions)).order_by(Event.ngay_bat_dau.desc()).all()
         for event in page_events:
             events_by_key.setdefault((event.nam, event.thang), []).append(event)
 
@@ -93,6 +147,9 @@ def index():
         has_more=has_more,
         selected_event=None,
         don_vi_items=don_vi_items,
+        hero_events=_hero_events(),
+        month_options=_month_select_options(),
+        co_so_choices=CO_SO_CHOICES,
     )
 
 
@@ -121,6 +178,40 @@ def events_month_groups():
             "has_more": has_more,
         },
     })
+
+
+@register_bp.get("/api/events/search")
+def search_events():
+    """Lọc sự kiện theo từ khoá + tháng + cơ sở + trạng thái -- trả về TOÀN BỘ
+    kết quả khớp (không phân trang) vì đây là tìm kiếm chủ động, khác với
+    /api/events/month-groups (cuộn dần theo tháng cho danh sách mặc định)."""
+    q = (request.args.get("q") or "").strip()
+    month = (request.args.get("month") or "all").strip()
+    co_so = (request.args.get("co_so") or "all").strip()
+    status = (request.args.get("status") or "all").strip()
+
+    query = Event.query
+    if q:
+        query = query.filter(Event.ten_su_kien.ilike(f"%{q}%"))
+    if co_so != "all":
+        query = query.filter(Event.co_so == co_so)
+    if month != "all":
+        try:
+            nam_str, thang_str = month.split("-", 1)
+            query = query.filter(Event.nam == int(nam_str), Event.thang == int(thang_str))
+        except ValueError:
+            pass
+
+    events = query.order_by(Event.nam.desc(), Event.thang.desc(), Event.ngay_bat_dau.desc()).all()
+
+    # computed_status là property tính từ giờ hiện tại, không phải cột DB nên
+    # phải lọc ở Python sau khi query, không thể đưa vào .filter() ở trên.
+    if status != "all":
+        events = [event for event in events if event.computed_status == status]
+
+    groups = _group_events_by_month(events)
+    html = render_template("register/_month_groups.html", event_groups=groups)
+    return jsonify({"success": True, "data": {"html": html, "count": len(events)}})
 
 
 @register_bp.get("/api/lookup/<ma_cbsv>")

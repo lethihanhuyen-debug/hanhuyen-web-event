@@ -2,7 +2,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, render_template, request, url_for
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError
 from event_checkin.certificates.service import (
     CertificateError,
@@ -12,6 +12,7 @@ from event_checkin.certificates.service import (
 from event_checkin.models import db
 from event_checkin.models.checkin import CheckIn
 from event_checkin.models.email_log import EmailLog
+from event_checkin.models.event import Event
 from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
 from event_checkin.utils.email_service import send_checkin_email
@@ -48,9 +49,31 @@ def _already_checked_in_response(user, existing_checkin):
     }), 200
 
 
+def _events_open_for_checkin():
+    """Sự kiện đang diễn ra hoặc sắp diễn ra, mới nhất trước -- dùng cho trang
+    chọn sự kiện ở /checkin khi không có event_id trong URL. computed_status là
+    property tính từ giờ hiện tại, không phải cột DB nên phải lọc ở Python."""
+    events = Event.query.order_by(Event.ngay_bat_dau.asc()).all()
+    open_events = [e for e in events if e.computed_status in ("ongoing", "upcoming")]
+    open_events.sort(key=lambda e: (e.computed_status != "ongoing", e.ngay_bat_dau))
+    return open_events
+
+
 @checkin_bp.get("/checkin")
 def index():
-    return render_template("checkin/index.html")
+    # Không còn suy đoán event_id=1 khi thiếu -- nếu chỉ có đúng 1 sự kiện đang
+    # diễn ra/sắp diễn ra thì vào thẳng luôn cho tiện, nếu có nhiều hơn (nhiều
+    # địa điểm/sự kiện cùng lúc) thì bắt buộc chọn để tránh check-in nhầm sự kiện.
+    open_events = _events_open_for_checkin()
+    if len(open_events) == 1:
+        return redirect(url_for("checkin.event_index", event_id=open_events[0].id))
+    return render_template("checkin/select_event.html", events=open_events)
+
+
+@checkin_bp.get("/checkin/<int:event_id>")
+def event_index(event_id):
+    event = Event.query.get_or_404(event_id)
+    return render_template("checkin/index.html", event=event)
 
 
 def _process_checkin_extras(app, base_url, ma_cbsv, event_id, ho_ten, email, thoi_gian_checkin, ten_su_kien):
@@ -103,10 +126,20 @@ def _process_checkin_extras(app, base_url, ma_cbsv, event_id, ho_ten, email, tho
 def checkin():
     payload = request.get_json(silent=True) or request.form
     ma_cbsv = (payload.get("ma_cbsv") or "").strip()
-    event_id = int(payload.get("event_id") or 1)
 
     if not ma_cbsv:
         return jsonify({"success": False, "message": "Vui lòng nhập mã CB/SV."}), 400
+
+    # Không còn mặc định event_id=1 khi thiếu -- trang /checkin/<event_id> luôn
+    # gửi kèm event_id thật, thiếu/sai coi là lỗi thay vì âm thầm check-in nhầm
+    # vào sự kiện #1 (xem checkin/index.html).
+    try:
+        event_id = int(payload.get("event_id"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Thiếu hoặc sai event_id."}), 400
+
+    if not Event.query.get(event_id):
+        return jsonify({"success": False, "message": "Sự kiện không tồn tại."}), 404
 
     user = User.query.filter_by(ma_cbsv=ma_cbsv).first()
     if not user:

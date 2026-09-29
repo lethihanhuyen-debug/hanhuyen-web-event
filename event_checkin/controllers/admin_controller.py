@@ -31,6 +31,7 @@ admin_bp = Blueprint("admin", __name__)
 CERTIFICATE_TEMPLATE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 CERTIFICATE_FONT_EXTENSIONS = {".ttf", ".otf"}
 EVENT_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
 
 
 def admin_required(view):
@@ -75,6 +76,18 @@ def _parse_datetime(value, field_name):
         raise ValueError(f"{field_name} không hợp lệ.") from exc
 
 
+def _parse_capacity(raw_value):
+    """None nếu để trống (không giới hạn); ném ValueError nếu nhập nhưng không
+    phải số nguyên dương -- gọi trong try/except ở nơi dùng."""
+    raw_value = (str(raw_value).strip() if raw_value is not None else "")
+    if not raw_value:
+        return None
+    value = int(raw_value)
+    if value < 1:
+        raise ValueError("so_luong_toi_da phải >= 1")
+    return value
+
+
 def _event_payload(event):
     certificate_layout = json.loads(event.certificate_layout) if event.certificate_layout else {}
     for config in certificate_layout.values():
@@ -87,6 +100,9 @@ def _event_payload(event):
         "hinh_url": url_for("static", filename=event.hinh) if event.hinh else None,
         "mo_ta": event.mo_ta,
         "dia_diem": event.dia_diem,
+        "co_so": event.co_so,
+        "so_luong_toi_da": event.so_luong_toi_da,
+        "registration_count": event.registration_count,
         "ngay_bat_dau": event.ngay_bat_dau.isoformat() if event.ngay_bat_dau else None,
         "ngay_bat_dau_display": _format_vn_datetime(event.ngay_bat_dau),
         "ngay_ket_thuc": event.ngay_ket_thuc.isoformat() if event.ngay_ket_thuc else None,
@@ -164,6 +180,7 @@ def index():
     return render_template(
         "admin/index.html",
         events=[_event_payload(event) for event in events],
+        co_so_choices=CO_SO_CHOICES,
     )
 
 
@@ -505,11 +522,22 @@ def create_event():
     if thoi_gian_dong_dang_ky < now:
         return jsonify({"success": False, "message": "Thời gian đóng đăng ký không được ở trong quá khứ."}), 400
 
+    co_so = (payload.get("co_so") or "").strip() or None
+    if co_so and co_so not in CO_SO_CHOICES:
+        return jsonify({"success": False, "message": "Cơ sở không hợp lệ."}), 400
+
+    try:
+        so_luong_toi_da = _parse_capacity(payload.get("so_luong_toi_da"))
+    except ValueError:
+        return jsonify({"success": False, "message": "Số lượng tham gia phải là số nguyên dương."}), 400
+
     event = Event(
         ten_su_kien=ten_su_kien,
         hinh=(payload.get("hinh") or "").strip() or None,
         mo_ta=(payload.get("mo_ta") or "").strip() or None,
         dia_diem=(payload.get("dia_diem") or "").strip() or None,
+        co_so=co_so,
+        so_luong_toi_da=so_luong_toi_da,
         ngay_bat_dau=ngay_bat_dau,
         ngay_ket_thuc=ngay_ket_thuc,
         thang=ngay_bat_dau.month,
@@ -560,11 +588,22 @@ def update_event(event_id):
     if thoi_gian_dong_dang_ky > ngay_bat_dau:
         return jsonify({"success": False, "message": "Thời gian đóng đăng ký phải trước hoặc bằng lúc sự kiện bắt đầu."}), 400
 
+    co_so = (payload.get("co_so") or "").strip() or None
+    if co_so and co_so not in CO_SO_CHOICES:
+        return jsonify({"success": False, "message": "Cơ sở không hợp lệ."}), 400
+
+    try:
+        so_luong_toi_da = _parse_capacity(payload.get("so_luong_toi_da"))
+    except ValueError:
+        return jsonify({"success": False, "message": "Số lượng tham gia phải là số nguyên dương."}), 400
+
     event.ten_su_kien = ten_su_kien
     if "hinh" in payload:
         event.hinh = (payload.get("hinh") or "").strip() or None
     event.mo_ta = (payload.get("mo_ta") or "").strip() or None
     event.dia_diem = (payload.get("dia_diem") or "").strip() or None
+    event.co_so = co_so
+    event.so_luong_toi_da = so_luong_toi_da
     event.ngay_bat_dau = ngay_bat_dau
     event.ngay_ket_thuc = ngay_ket_thuc
     event.thang = ngay_bat_dau.month
@@ -607,6 +646,11 @@ def upload_event_image(event_id):
         "message": "Đã cập nhật hình sự kiện.",
         "data": _event_payload(event),
     })
+
+
+## Banner slide CRUD (BannerSlide model) đã bị gỡ bỏ -- banner trang đăng ký
+## giờ tự lấy nội dung từ 3 sự kiện mới nhất (xem register_controller._hero_events),
+## không cần admin nhập tay nữa.
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/certificate-template")

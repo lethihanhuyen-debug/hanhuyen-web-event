@@ -1,19 +1,35 @@
 :root {
-  /* Bảng màu học thuật: navy trầm làm màu chính, vàng đồng làm điểm nhấn phụ.
-     --success/--warning/--danger giữ nguyên vì đó là màu trạng thái (thành
-     công/cảnh báo/lỗi), không phải màu thương hiệu, nên không đổi theo theme. */
-  --blue-900: #1257a3;
-  --blue-700: #1f7fff;
-  --blue-100: #e8f2ff;
-  --gold: #0d3b66;
-  --text: #1c2b3a;
-  --muted: #5b6b83;
-  --surface: rgba(255, 255, 255, 0.92);
-  --border: rgba(15, 43, 77, 0.14);
-  --success: #1f7a4d;
-  --warning: #9a6700;
-  --danger: #b42318;
-  --shadow: 0 18px 50px rgba(15, 43, 77, 0.16);
+  /* Bảng màu "Cloud Dancer" (bản rút gọn 6 vai trò) -- Soft Academic / Modern
+     University Library. Cloud Dancer là nền chính, chiếm diện tích lớn nhất.
+     Không dùng xanh dương, xanh lá tươi, vàng sáng, gradient rực rỡ hay đen
+     tuyền (#000) theo yêu cầu thiết kế. */
+  --cloud-dancer: #ece9e1;   /* nền chính */
+  --mist-gray: #ddd8ce;      /* section, border, nền phụ */
+  --linen: #cdbca3;          /* banner / khối nổi bật */
+  --warm-taupe: #146a99;     /* typography -- thử xanh dương tươi theo yêu cầu (ngược nguyên tắc "không xanh dương" ban đầu) */
+  --cocoa-brown: #55402f;    /* điểm nhấn (dùng rất ít) */
+  --sage-gray: #6f7869;      /* button / hành động nhẹ */
+  --sage-gray-hover: #545c4f;
+
+  --card-surface: #fcfbf8;   /* card sáng hơn nền chính */
+  --soft-taupe: #6b6259;     /* secondary text / metadata */
+
+  /* Alias giữ nguyên tên biến cũ (dùng khắp file) nhưng trỏ sang 6 vai trò
+     màu mới, để không phải sửa lại từng selector một. */
+  --blue-900: var(--warm-taupe);
+  --blue-800: var(--sage-gray-hover);
+  --blue-700: var(--sage-gray);
+  --blue-100: var(--linen);
+  --gold: var(--sage-gray);
+  --gold-light: var(--sage-gray);
+  --text: #423d35;
+  --muted: var(--soft-taupe);
+  --surface: var(--card-surface);
+  --border: var(--mist-gray);
+  --success: #465241;
+  --warning: #5c4726;
+  --danger: #7e372c;
+  --shadow: 0 12px 32px rgba(81, 76, 68, 0.08);
 }
 
 * {
@@ -29,15 +45,15 @@ body {
   font-family: 'Roboto', sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(35, 74, 118, 0.18), transparent 36%),
-    radial-gradient(circle at right 20%, rgba(201, 162, 74, 0.13), transparent 28%),
-    linear-gradient(180deg, #f5f7fb 0%, #eef1f6 100%);
+    radial-gradient(circle at top left, rgba(222, 213, 198, 0.35), transparent 40%),
+    radial-gradient(circle at right 20%, rgba(168, 178, 165, 0.16), transparent 32%),
+    var(--cloud-dancer);
 }
 
 body.auth-page {
   min-height: 100vh;
-  color: #1c2b3a;
-  background: #f5f7fb;
+  color: var(--warm-taupe);
+  background: var(--cloud-dancer);
 }
 
 a {
@@ -51,7 +67,8 @@ a {
 }
 
 /* ==========================================================================
-   HEADER — navy trầm + vàng đồng, phong cách học thuật (thay cho .topbar cũ)
+   HEADER — nền Cloud Dancer/card sáng, chữ warm taupe, active deep sage
+   (concept "Cloud Dancer" -- không dùng header màu đậm/xanh dương nữa)
    ========================================================================== */
 .site-header {
   position: sticky;
@@ -60,15 +77,14 @@ a {
   height: 92px;
   display: flex;
   align-items: center;
-  background: var(--blue-700);
-  border-bottom: 1px solid rgba(201, 162, 74, 0.35);
-  transition: height .25s ease, box-shadow .25s ease;
+  background: var(--card-surface);
+  border-bottom: 1px solid var(--mist-gray);
+  transition: box-shadow .25s ease;
 }
 
-/* JS thêm class này khi cuộn trang xuống quá 12px: đổ bóng + thu gọn nhẹ */
+/* JS thêm class này khi cuộn trang xuống quá 12px: chỉ đổ bóng rất nhẹ */
 .site-header.is-scrolled {
-  height: 72px;
-  box-shadow: 0 8px 24px -12px rgba(7, 17, 30, 0.55);
+  box-shadow: 0 8px 20px -14px rgba(81, 76, 68, 0.35);
 }
 
 .header-container {
@@ -93,12 +109,11 @@ a {
   height: 56px;
   width: 56px;
   flex-shrink: 0;
-  transition: height .25s ease, width .25s ease;
+  transition: transform .25s ease;
 }
 
-.site-header.is-scrolled .brand__logo {
-  height: 44px;
-  width: 44px;
+.brand:hover .brand__logo {
+  transform: scale(1.06);
 }
 
 .brand__text {
@@ -114,7 +129,7 @@ a {
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--warm-taupe);
   white-space: nowrap;
 }
 
@@ -123,7 +138,7 @@ a {
   font-weight: 700;
   font-size: 24px;
   line-height: 1.2;
-  color: #fff;
+  color: var(--warm-taupe);
   white-space: nowrap;
 }
 
@@ -154,7 +169,7 @@ a {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #f3efe2;
+  color: var(--soft-taupe);
   cursor: pointer;
   transition: color .25s ease;
 }
@@ -168,7 +183,7 @@ a {
   bottom: 4px;
   width: 0;
   height: 1.5px;
-  background: var(--gold);
+  background: var(--sage-gray);
   transform: translateX(-50%);
   transition: width .25s ease;
 }
@@ -177,7 +192,7 @@ a {
 .primary-nav__list button:hover,
 .primary-nav__list a:focus-visible,
 .primary-nav__list button:focus-visible {
-  color: #e3c477;
+  color: var(--sage-gray);
 }
 
 .primary-nav__list a:hover::after,
@@ -187,7 +202,7 @@ a {
 }
 
 .primary-nav__list a.is-active {
-  color: var(--gold);
+  color: var(--sage-gray);
 }
 
 .nav-toggle {
@@ -200,7 +215,7 @@ a {
   height: 40px;
   padding: 0;
   background: transparent;
-  border: 1px solid rgba(201, 162, 74, 0.35);
+  border: 1px solid var(--mist-gray);
   border-radius: 4px;
   cursor: pointer;
   flex-shrink: 0;
@@ -209,7 +224,7 @@ a {
 .nav-toggle__bar {
   width: 20px;
   height: 2px;
-  background: #f3efe2;
+  background: var(--warm-taupe);
   transition: transform .25s ease, opacity .25s ease;
 }
 
@@ -220,7 +235,7 @@ a {
 .nav-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(7, 17, 30, 0.55);
+  background: rgba(81, 76, 68, 0.45);
   opacity: 0;
   pointer-events: none;
   transition: opacity .25s ease;
@@ -230,7 +245,6 @@ a {
 
 @media (max-width: 860px) {
   .site-header { height: 76px; }
-  .site-header.is-scrolled { height: 64px; }
   .header-container { padding: 0 20px; }
   .brand__eyebrow { display: none; }
   .brand__title { font-size: 15px; white-space: normal; line-height: 1.3; }
@@ -245,9 +259,9 @@ a {
     width: min(78vw, 320px);
     flex-direction: column;
     align-items: stretch;
-    background: var(--blue-700);
-    border-left: 1px solid rgba(201, 162, 74, 0.35);
-    box-shadow: -12px 0 32px -16px rgba(0, 0, 0, 0.5);
+    background: var(--card-surface);
+    border-left: 1px solid var(--mist-gray);
+    box-shadow: -12px 0 28px -16px rgba(81, 76, 68, 0.18);
     padding: 100px 28px 28px;
     transform: translateX(100%);
     transition: transform .25s ease;
@@ -312,7 +326,7 @@ a {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 18px 40px rgba(15, 43, 77, 0.16);
+  box-shadow: 0 18px 40px rgba(105, 95, 82, 0.16);
 }
 
 .admin-settings__item {
@@ -338,7 +352,7 @@ a {
 }
 
 .admin-settings__item--danger:hover {
-  background: rgba(180, 35, 24, 0.12);
+  background: rgba(179, 65, 58, 0.12);
   color: var(--danger);
 }
 
@@ -446,7 +460,7 @@ a {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 18px 40px rgba(15, 43, 77, 0.16);
+  box-shadow: 0 18px 40px rgba(105, 95, 82, 0.16);
   display: grid;
   gap: 2px;
 }
@@ -478,6 +492,12 @@ a {
 
 .page-shell {
   padding: 32px 0 48px;
+  animation: fadeInUp .35s ease both;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .auth-page .site-header {
@@ -504,14 +524,15 @@ a {
   padding: 32px 26px 26px;
   text-align: center;
   background: #fff;
-  border: 1px solid #dbe3ee;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 18px rgba(15, 43, 77, 0.1);
+  box-shadow: 0 8px 18px rgba(105, 95, 82, 0.1);
+  animation: fadeInUp .4s ease both;
 }
 
 .auth-card h1 {
   margin: 0;
-  color: #1c2b3a;
+  color: var(--text);
   font-size: 1.55rem;
   line-height: 1.2;
   font-weight: 900;
@@ -519,7 +540,7 @@ a {
 
 .auth-subtitle {
   margin: 14px 0 26px;
-  color: #5b6b83;
+  color: var(--soft-taupe);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -545,10 +566,10 @@ a {
 
 .auth-field input {
   height: 36px;
-  border: 1px solid #d7dfec;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 12px;
-  color: #1c2b3a;
+  color: var(--text);
   font-size: 0.9rem;
   font-weight: 500;
   box-shadow: inset 0 0 0 1px rgba(219, 227, 238, 0.48);
@@ -560,7 +581,7 @@ a {
 }
 
 .auth-field input::placeholder {
-  color: #7c8aa0;
+  color: var(--soft-taupe);
   font-weight: 700;
   opacity: 1;
 }
@@ -585,7 +606,7 @@ a {
   transform: translateY(-50%);
   border: 0;
   background: transparent;
-  color: #7c8aa0;
+  color: var(--soft-taupe);
   cursor: pointer;
 }
 
@@ -613,7 +634,7 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: #7c8aa0;
+  color: var(--soft-taupe);
 }
 
 .auth-remember input {
@@ -653,7 +674,7 @@ a {
 
 .auth-create {
   margin: 7px 0 0;
-  color: #5b6b83;
+  color: var(--soft-taupe);
   font-size: 0.75rem;
   font-weight: 800;
 }
@@ -674,7 +695,7 @@ a {
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  border-radius: 24px;
+  border-radius: 20px;
 }
 
 .hero-card {
@@ -696,6 +717,35 @@ a {
   text-align: center;
 }
 
+.checkin-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 22px;
+  text-align: left;
+}
+
+.checkin-event-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-surface);
+  transition: border-color .18s ease, transform .18s ease;
+}
+
+.checkin-event-item:hover {
+  border-color: var(--sage-gray);
+  transform: translateY(-1px);
+}
+
+.checkin-event-item strong {
+  font-size: 1.05rem;
+}
+
 .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -703,6 +753,7 @@ a {
   padding: 8px 14px;
   border-radius: 999px;
   background: var(--blue-100);
+  border: 1px solid rgba(143, 156, 145, 0.35);
   color: var(--blue-900);
   font-size: 0.9rem;
   font-weight: 700;
@@ -713,6 +764,10 @@ h1 {
   margin: 0;
   font-size: clamp(2rem, 3vw, 3.2rem);
   line-height: 1.05;
+  background: linear-gradient(100deg, var(--blue-900) 35%, var(--gold) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }
 
 .muted {
@@ -745,7 +800,7 @@ input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid rgba(15, 43, 77, 0.18);
+  border: 1px solid rgba(105, 95, 82, 0.18);
   border-radius: 16px;
   padding: 14px 16px;
   font: inherit;
@@ -762,8 +817,8 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--blue-700);
-  box-shadow: 0 0 0 4px rgba(35, 74, 118, 0.12);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(143, 156, 145, 0.16);
 }
 
 .btn {
@@ -780,19 +835,27 @@ textarea:focus {
   transform: translateY(-1px);
 }
 
+.btn:active {
+  transform: scale(.97);
+}
+
 .btn--primary {
-  background: linear-gradient(135deg, var(--blue-700), var(--blue-900));
-  color: white;
-  box-shadow: 0 12px 28px rgba(15, 43, 77, 0.26);
+  background: var(--sage-gray);
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(81, 76, 68, 0.14);
+}
+
+.btn--primary:hover {
+  background: var(--sage-gray-hover);
 }
 
 .btn--ghost {
-  background: rgba(201, 162, 74, 0.09);
-  color: var(--blue-900);
+  background: #e6e1d8;
+  color: var(--warm-taupe);
 }
 
 .btn--danger {
-  background: rgba(180, 35, 24, 0.08);
+  background: rgba(161, 83, 71, 0.1);
   color: var(--danger);
 }
 
@@ -811,31 +874,39 @@ textarea:focus {
   padding: 14px 16px;
   border-radius: 16px;
   font-weight: 500;
+  animation: fadeInUp .25s ease both;
 }
 
+/* Màu trạng thái theo đúng bảng "STATUS" -- mỗi trạng thái 1 cặp nền/chữ cố
+   định (không suy ra từ rgba(màu, alpha) như trước) để khớp chính xác spec. */
 .message--success,
 .checkin-result--success,
 .badge--success {
-  background: rgba(26, 127, 55, 0.12);
+  background: #dbe4d7;
   color: var(--success);
 }
 
 .message--error,
 .checkin-result--error {
-  background: rgba(180, 35, 24, 0.12);
+  background: #ecd9d2;
   color: var(--danger);
 }
 
 .message--warning,
 .checkin-result--warning,
 .badge--warning {
-  background: rgba(154, 103, 0, 0.12);
+  background: #e6dabf;
   color: var(--warning);
 }
 
+.badge--closed {
+  background: #ecd9d2;
+  color: var(--danger);
+}
+
 .checkin-result--pending {
-  background: rgba(15, 23, 42, 0.06);
-  color: var(--ink-500, #5f6b82);
+  background: rgba(105, 95, 82, 0.06);
+  color: var(--soft-taupe);
 }
 
 .checkin-form {
@@ -860,6 +931,15 @@ textarea:focus {
   place-items: center;
   font-size: 1.08rem;
   font-weight: 700;
+}
+
+.checkin-result:not(:empty) {
+  animation: resultPopIn .3s cubic-bezier(.34, 1.4, .64, 1) both;
+}
+
+@keyframes resultPopIn {
+  from { opacity: 0; transform: scale(.92); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .admin-panel {
@@ -940,7 +1020,8 @@ textarea:focus {
 .designer-modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(7, 20, 37, 0.55);
+  background: rgba(69, 60, 49, 0.55);
+  animation: fadeIn .2s ease both;
 }
 
 .designer-modal__dialog {
@@ -953,9 +1034,10 @@ textarea:focus {
   gap: 18px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: 20px;
   box-shadow: var(--shadow);
   padding: 28px;
+  animation: modalPopIn .22s cubic-bezier(.34, 1.4, .64, 1) both;
 }
 
 .designer-grid {
@@ -1269,6 +1351,10 @@ textarea:focus {
   margin-top: 28px;
 }
 
+.event-load-more[hidden] {
+  display: none;
+}
+
 .event-load-more .btn {
   min-width: 160px;
 }
@@ -1286,12 +1372,12 @@ textarea:focus {
 
 .event-card {
   display: grid;
-  grid-template-columns: 180px 1fr minmax(220px, 300px);
+  grid-template-columns: 200px minmax(140px, 1fr) minmax(320px, 380px);
   gap: 20px;
   padding: 24px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: 20px;
   box-shadow: var(--shadow);
   transition: transform .18s ease, border-color .18s ease;
 }
@@ -1305,7 +1391,7 @@ textarea:focus {
   place-items: center;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: rgba(15, 43, 77, 0.05);
+  background: rgba(105, 95, 82, 0.05);
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 800;
@@ -1319,6 +1405,12 @@ textarea:focus {
   height: 100%;
   display: block;
   object-fit: cover;
+  transition: transform .4s ease;
+}
+
+.event-card:hover .event-card__image img,
+.admin-event-card:hover .admin-event-card__image img {
+  transform: scale(1.06);
 }
 
 .event-detail-image {
@@ -1332,19 +1424,127 @@ textarea:focus {
 
 .event-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(201, 162, 74, 0.42);
+  border-color: rgba(143, 156, 145, 0.42);
+  box-shadow: 0 22px 50px -12px rgba(143, 156, 145, 0.28);
+}
+
+/* Xuất hiện mờ dần + trượt lên khi cuộn tới (xem window.appUtils.observeReveal
+   trong main.js) thay vì chạy animation ngay lúc tải trang -- các thẻ ở dưới
+   màn hình lúc đầu sẽ thật sự "xuất hiện" khi cuộn tới, không bị bỏ lỡ. */
+.event-list .event-card {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity .5s ease, transform .5s ease;
+}
+
+.event-list .event-card.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.event-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .event-card h3 {
-  margin: 14px 0 8px;
+  margin: 10px 0 8px;
   font-size: 1.45rem;
 }
 
-.event-meta {
-  display: grid;
-  align-content: center;
+.event-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.event-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-left: 22px;
+  border-left: 1px solid var(--border);
+}
+
+/* Ô lịch bóc: tháng làm thanh nhấn màu, ngày to ở giữa, thứ/số ngày nhỏ bên dưới --
+   thay cho việc ghi "15/09/2026 - 15/09/2026" bằng chữ, dễ quét mắt hơn. */
+.event-cal {
+  flex-shrink: 0;
+  width: 76px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  text-align: center;
+  background: var(--card-surface);
+}
+
+.event-cal__month {
+  display: block;
+  background: var(--warm-taupe);
+  color: var(--card-surface);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 0;
+}
+
+.event-cal__day {
+  display: block;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.15;
+  padding-top: 5px;
+  color: var(--text);
+}
+
+.event-cal__day--range {
+  font-size: 19px;
+  padding: 10px 0 3px;
+}
+
+.event-cal__wd {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--soft-taupe);
+  padding-bottom: 7px;
+}
+
+.event-meta-list {
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.event-meta-row {
+  display: flex;
+  align-items: baseline;
   gap: 8px;
-  color: var(--muted);
+  white-space: nowrap;
+}
+
+.event-meta-row dt {
+  flex-shrink: 0;
+  color: var(--soft-taupe);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.event-meta-row dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .admin-event-list {
@@ -1361,7 +1561,7 @@ textarea:focus {
   padding: 22px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: 20px;
   box-shadow: var(--shadow);
   cursor: pointer;
   transition: transform .18s ease, border-color .18s ease, background .18s ease;
@@ -1369,8 +1569,20 @@ textarea:focus {
 
 .admin-event-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(201, 162, 74, 0.35);
+  border-color: rgba(143, 156, 145, 0.35);
   background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 22px 50px -12px rgba(143, 156, 145, 0.24);
+}
+
+.admin-event-list .admin-event-card {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity .5s ease, transform .5s ease;
+}
+
+.admin-event-list .admin-event-card.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .admin-event-card__main {
@@ -1429,7 +1641,7 @@ textarea:focus {
   align-items: baseline;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(15, 43, 77, 0.05);
+  background: rgba(105, 95, 82, 0.05);
 }
 
 .admin-event-card__schedule small {
@@ -1444,7 +1656,25 @@ textarea:focus {
 }
 
 .stat-card {
+  position: relative;
   padding: 22px;
+  overflow: hidden;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--blue-700), var(--gold));
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 46px rgba(105, 95, 82, 0.2);
 }
 
 .stat-card span {
@@ -1455,6 +1685,7 @@ textarea:focus {
 
 .stat-card strong {
   font-size: clamp(1.6rem, 2vw, 2.3rem);
+  color: var(--blue-900);
 }
 
 .table-card {
@@ -1475,9 +1706,10 @@ table {
 th, td {
   text-align: left;
   padding: 16px 18px;
-  border-bottom: 1px solid rgba(15, 43, 77, 0.08);
+  border-bottom: 1px solid rgba(105, 95, 82, 0.08);
   vertical-align: middle;
   overflow-wrap: break-word;
+  transition: background .15s ease;
 }
 
 /* STT, Mã CB/SV, Giờ đăng ký, Trạng thái, Chứng nhận, Thao tác never wrap --
@@ -1493,7 +1725,7 @@ th:nth-child(9), td:nth-child(9) {
 }
 
 th {
-  background: rgba(15, 43, 77, 0.06);
+  background: rgba(105, 95, 82, 0.06);
   color: var(--blue-900);
   font-size: 0.92rem;
 }
@@ -1503,16 +1735,42 @@ th {
 }
 
 .event-row:hover td {
-  background: rgba(201, 162, 74, 0.05);
+  background: rgba(143, 156, 145, 0.05);
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
+  gap: 6px;
   padding: 8px 12px;
   border-radius: 999px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* chỉ chấm nhấp nháy ở badge trạng thái sự kiện (card công khai/admin), không áp
+   cho badge--success dùng lại ở bảng check-in (nhấp nháy hàng loạt sẽ rối mắt).
+   Trên card đăng ký, badge--warning = "Đang diễn ra" (trạng thái sống, đáng pulse);
+   badge--success ở đó = "Sắp diễn ra" (tĩnh, không cần pulse). */
+.event-card .badge--warning::before,
+.admin-event-card .badge--success::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: badgePulse 1.8s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(1.3); }
+}
+
+.badge--muted {
+  color: var(--soft-taupe);
+  background: #e2ded4;
 }
 
 .certificate-summary {
@@ -1556,7 +1814,8 @@ th {
 .modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(7, 20, 37, 0.55);
+  background: rgba(69, 60, 49, 0.55);
+  animation: fadeIn .2s ease both;
 }
 
 .modal__dialog {
@@ -1564,6 +1823,17 @@ th {
   z-index: 1;
   width: min(520px, 100%);
   padding: 28px;
+  animation: modalPopIn .22s cubic-bezier(.34, 1.4, .64, 1) both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalPopIn {
+  from { opacity: 0; transform: scale(.95) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .modal__actions {
@@ -1590,6 +1860,23 @@ th {
   }
 
   .event-card {
+    grid-template-columns: 1fr;
+  }
+
+  .event-info {
+    padding-left: 0;
+    padding-top: 16px;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .event-meta-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+  }
+
+  .filter-panel .filter-row {
     grid-template-columns: 1fr;
   }
 
@@ -1620,4 +1907,392 @@ th {
     min-height: 64px;
     font-size: 1rem;
   }
+
+  .filter-panel {
+    padding: 14px;
+  }
+}
+
+/* =========================================================
+   HERO SLIDER — trang đăng ký, 3 slide (Thư viện / Triển lãm
+   bảo tàng / Hội thảo), tự chuyển sau 6s, có dot + mũi tên.
+========================================================= */
+.hero-slider {
+  position: relative;
+  height: 460px;
+  overflow: hidden;
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 28px;
+  background: var(--linen);
+}
+
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .6s ease, visibility .6s ease;
+}
+
+.hero-slide.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.hero-slide__bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+/* ảnh admin tự tải lên (nếu có) phủ lên trên gradient mặc định của slide */
+.hero-slide__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 3 gradient nền xoay vòng theo chỉ số slide (loop.index0 % 3 trong template) --
+   không gắn theo tên slide cụ thể nữa vì số lượng/nội dung slide giờ do admin
+   tự thêm/xoá, không còn cố định 3 slide "library/museum/seminar" như trước. */
+.hero-slide__bg--0 {
+  background-image: linear-gradient(120deg, var(--cloud-dancer) 0%, var(--linen) 55%, var(--sage-gray) 100%);
+}
+
+.hero-slide__bg--1 {
+  background-image: linear-gradient(100deg, var(--linen) 0%, var(--cloud-dancer) 45%, var(--sage-gray) 100%);
+}
+
+.hero-slide__bg--2 {
+  background-image: linear-gradient(135deg, var(--sage-gray) 0%, var(--linen) 55%, var(--cloud-dancer) 100%);
+}
+
+/* overlay nhạt màu cotton/beige để chữ dễ đọc dù slide dùng ảnh admin tự tải,
+   đậm dần về phía có chữ (bên trái), mờ dần để lộ ảnh/gradient bên phải */
+.hero-slide__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(245, 243, 238, 0.88) 0%, rgba(245, 243, 238, 0.55) 55%, rgba(245, 243, 238, 0.12) 100%);
+}
+
+.hero-slide__content {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 680px);
+  height: 100%;
+  padding: 48px 48px 60px 76px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: var(--warm-taupe);
+}
+
+.hero-slide__badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 6px 14px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: var(--card-surface);
+  border: 1px solid var(--sage-gray);
+  color: var(--cocoa-brown);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-slide__title {
+  max-width: 640px;
+  font-size: clamp(28px, 3.6vw, 42px);
+  line-height: 1.16;
+  font-weight: 800;
+  margin-bottom: 12px;
+  /* Slide dùng nền sáng (gradient linen/sage hoặc overlay be nhạt trên ảnh) nên
+     kế thừa nguyên gradient chữ mặc định của h1 (deep-taupe -> muted-sage) --
+     không cần ghi đè màu trắng như bản navy trước đây. */
+}
+
+.hero-slide__cta {
+  width: fit-content;
+  animation: ctaGlow 2.6s ease-in-out infinite;
+}
+
+.hero-slide__cta:hover {
+  animation: none;
+}
+
+@keyframes ctaGlow {
+  0%, 100% { box-shadow: 0 10px 20px rgba(81, 76, 68, 0.14); }
+  50% { box-shadow: 0 10px 26px rgba(81, 76, 68, 0.14), 0 0 0 6px rgba(142, 149, 140, 0.16); }
+}
+
+.hero-slider__arrow {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(105, 95, 82, 0.2);
+  border-radius: 50%;
+  background: rgba(250, 249, 246, 0.75);
+  color: var(--warm-taupe);
+  font-size: 22px;
+  line-height: 1;
+  transition: background .2s ease;
+}
+
+.hero-slider__arrow:hover {
+  background: rgba(250, 249, 246, 0.95);
+}
+
+.hero-slider__arrow--prev { left: 18px; }
+.hero-slider__arrow--next { right: 18px; }
+
+.hero-slider__dots {
+  position: absolute;
+  z-index: 5;
+  left: 48px;
+  bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.hero-slider__dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(105, 95, 82, 0.3);
+  transition: width .2s ease, background .2s ease;
+}
+
+.hero-slider__dot.is-active {
+  width: 26px;
+  border-radius: 999px;
+  background: var(--sage-gray);
+}
+
+/* =========================================================
+   FILTER PANEL — tìm kiếm + lọc trạng thái trên trang đăng ký
+========================================================= */
+.filter-panel {
+  margin-bottom: 28px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 16px);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  animation: fadeInUp .35s ease .05s both;
+}
+
+.search-box {
+  position: relative;
+  min-width: 0;
+}
+
+.search-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(105, 95, 82, 0.18);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.search-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(143, 156, 145, 0.16);
+}
+
+/* 3 ô nằm chung 1 hàng: tìm kiếm (rộng hơn, co giãn) + 2 select nhỏ gọn cố định. */
+.filter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 720px) {
+  .filter-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.filter-select {
+  width: 100%;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid rgba(105, 95, 82, 0.18);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.filter-select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(143, 156, 145, 0.16);
+}
+
+.filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  transition: color .18s ease, background .18s ease, border-color .18s ease;
+}
+
+.filter-tab:hover {
+  border-color: rgba(143, 156, 145, 0.5);
+  color: var(--blue-900);
+}
+
+.filter-tab.is-active {
+  background: var(--blue-900);
+  color: #fff;
+  border-color: var(--blue-900);
+}
+
+/* =========================================================
+   EMPTY STATE — không có sự kiện khớp tìm kiếm/lọc
+========================================================= */
+.empty-state {
+  padding: 60px 20px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg, 24px);
+}
+
+.empty-state__icon {
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+.empty-state h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+/* Overrides mobile cho hero slider — đặt SAU style gốc phía trên để thắng
+   cascade (cùng độ ưu tiên selector, đứng sau nên được áp dụng trên < 640px). */
+@media (max-width: 640px) {
+  .hero-slider {
+    height: auto;
+    min-height: 460px;
+  }
+
+  .hero-slide__content {
+    padding: 30px 24px 44px 46px;
+  }
+
+  .hero-slide__title {
+    font-size: 26px;
+  }
+
+  .hero-slider__arrow {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+
+  .hero-slider__arrow--prev { left: 8px; }
+  .hero-slider__arrow--next { right: 8px; }
+
+  .hero-slider__dots {
+    left: 24px;
+    bottom: 16px;
+  }
+}
+
+/* =========================================================
+   INTRO SPLASH — chào mừng khi vào trang đăng ký lần đầu/phiên,
+   icon quyển sách "tự vẽ" bằng stroke-dash, thuần CSS.
+========================================================= */
+.intro-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--cloud-dancer);
+  color: var(--sage-gray);
+  animation: introFadeOut .6s ease 1.6s forwards;
+}
+
+.intro-splash[hidden] {
+  display: none;
+}
+
+.intro-splash__icon {
+  width: 96px;
+  height: 72px;
+  overflow: visible;
+}
+
+.intro-splash__stroke {
+  stroke-dasharray: 140;
+  stroke-dashoffset: 140;
+  animation: introDraw .9s ease forwards;
+}
+
+.intro-splash__spine {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation-delay: .2s;
+}
+
+.intro-splash__text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--soft-taupe);
+  opacity: 0;
+  animation: fadeInUp .4s ease .6s both;
+}
+
+@keyframes introDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes introFadeOut {
+  to { opacity: 0; visibility: hidden; pointer-events: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-splash { animation-duration: .2s; animation-delay: .3s; }
+  .intro-splash__stroke, .intro-splash__text { animation: none; opacity: 1; stroke-dashoffset: 0; }
 }
