@@ -3,6 +3,8 @@
 
 {% block content %}
 <section class="checkin-stage">
+  {# Quay lại trang trước; href là đường dự phòng khi mở trang trực tiếp -- xem script cuối trang. #}
+  <a id="backButton" class="btn btn--back checkin-back" href="{{ url_for('checkin.index') }}">← Quay lại</a>
   <div class="checkin-card">
     <p class="eyebrow">Check-in sự kiện</p>
     <h1>{{ event.ten_su_kien }}</h1>
@@ -22,41 +24,40 @@
 {% block scripts %}
 <script>
 (function () {
+  const back = document.getElementById('backButton');
+  back.addEventListener('click', (event) => {
+    let sameSite = false;
+    try {
+      sameSite = !!document.referrer && new URL(document.referrer).origin === window.location.origin;
+    } catch (error) {
+      sameSite = false;
+    }
+    if (!sameSite) return; // không biết trang trước -> theo href dự phòng
+    event.preventDefault();
+    // Trang admin mở check-in ở tab mới (target="_blank") nên tab này không có
+    // lịch sử để back -- khi đó đi thẳng về trang đã mở ra nó.
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = document.referrer;
+    }
+  });
+})();
+</script>
+<script>
+(function () {
   const EVENT_ID = {{ event.id }};
   const input = document.getElementById('checkinInput');
   const button = document.getElementById('checkinBtn');
   const result = document.getElementById('checkinResult');
   let submitting = false;
-  // Bumped on every new check-in so a late-arriving poll from an earlier scan
-  // can't overwrite the message for whatever was scanned after it.
+  // Bumped on every new check-in so a late-arriving response from an earlier
+  // scan can't overwrite the message for whatever was scanned after it.
   let latestToken = 0;
 
   function paint(kind, text) {
     result.className = 'checkin-result checkin-result--' + kind;
     result.textContent = text;
-  }
-
-  function pollEmailStatus(token, ma_cbsv, event_id, ho_ten, thoi_gian, email, attemptsLeft) {
-    if (token !== latestToken || attemptsLeft <= 0) return;
-    setTimeout(async () => {
-      if (token !== latestToken) return;
-      try {
-        const response = await fetch(`/api/checkin/email-status/${encodeURIComponent(ma_cbsv)}/${event_id}`);
-        const data = await response.json();
-        if (token !== latestToken) return;
-        if (data.status === 'success') {
-          paint('success', '✅ Cảm ơn ' + ho_ten + ' đã check-in lúc ' + thoi_gian + '. Email xác nhận đã gửi tới ' + (email || 'địa chỉ đã đăng ký') + '.');
-          return;
-        }
-        if (data.status === 'failed') {
-          paint('warning', '⚠️ Cảm ơn ' + ho_ten + ' đã check-in lúc ' + thoi_gian + '. Nhưng gửi email xác nhận thất bại.');
-          return;
-        }
-        pollEmailStatus(token, ma_cbsv, event_id, ho_ten, thoi_gian, email, attemptsLeft - 1);
-      } catch (error) {
-        // Network hiccup while polling -- check-in itself already succeeded, so just stop quietly.
-      }
-    }, 1500);
   }
 
   async function submitCheckin() {
@@ -84,11 +85,8 @@
 
       if (response.status === 404) {
         paint('error', '❌ Mã ' + ma_cbsv + ' chưa đăng ký tham gia chương trình');
-      } else if (data.checked_in) {
-        paint('warning', '⚠️ ' + data.message);
       } else if (data.success) {
-        paint('pending', '✅ Cảm ơn ' + data.ho_ten + ' đã check-in lúc ' + data.thoi_gian + '. Đang gửi email xác nhận...');
-        pollEmailStatus(token, ma_cbsv, EVENT_ID, data.ho_ten, data.thoi_gian, data.email, 8);
+        paint('success', '✅ ' + data.message);
       } else {
         paint('error', data.message || 'Đã xảy ra lỗi.');
       }

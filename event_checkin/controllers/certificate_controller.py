@@ -67,12 +67,6 @@ def view_certificate(certificate_code):
     return send_file(file_path, as_attachment=False)
 
 
-@certificate_bp.get("/api/users/<ma_cbsv>/certificates")
-def list_by_user(ma_cbsv):
-    certificates = Certificate.query.filter_by(ma_cbsv=ma_cbsv).order_by(Certificate.issued_at.desc()).all()
-    return jsonify({"success": True, "data": [item.to_dict() for item in certificates]})
-
-
 @certificate_bp.get("/verify/<certificate_code>")
 def verify(certificate_code):
     certificate = Certificate.query.filter_by(certificate_code=certificate_code).first_or_404()

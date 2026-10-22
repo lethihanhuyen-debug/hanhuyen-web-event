@@ -2,6 +2,7 @@ import csv
 import json
 import re
 import unicodedata
+import zipfile
 from functools import wraps
 from io import BytesIO, StringIO
 from datetime import datetime
@@ -9,22 +10,26 @@ from pathlib import Path
 from urllib.parse import quote
 
 from flask import Blueprint, Response, current_app, jsonify, make_response, redirect, render_template, request, session, url_for
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
 
+from event_checkin.certificates import mailer
+from event_checkin.certificates.generator import CERTIFICATE_FIELDS, effective_layout
+from event_checkin.certificates.service import CertificateError, get_certificate_file_path, render_preview_png
 from event_checkin.models import db
 from event_checkin.models.admin import Admin
 from event_checkin.models.certificate import Certificate
 from event_checkin.models.checkin import CheckIn
+from event_checkin.models.checkin_record import CheckinRecord
 from event_checkin.models.don_vi import DonVi
 from event_checkin.models.email_log import EmailLog
 from event_checkin.models.event import Event
 from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
-from event_checkin.utils.timezone import format_utc_as_vn, now_vn_naive, vn_today_utc_range
+from event_checkin.utils.timezone import format_local, format_utc_as_vn, now_vn_naive, vn_today_range
 
 
 admin_bp = Blueprint("admin", __name__)
@@ -121,13 +126,22 @@ def _event_payload(event):
     }
 
 
+def _today_checkin_map():
+    """(patron_code, event_id) -> lượt check-in sớm nhất hôm nay (giờ VN). Một người
+    quét nhiều lần chỉ tính 1 (bảng checkin_records không chặn quét trùng)."""
+    day_start, day_end = vn_today_range()
+    records = (
+        CheckinRecord.query
+        .filter(CheckinRecord.checkin_at >= day_start, CheckinRecord.checkin_at < day_end)
+        .order_by(CheckinRecord.checkin_at.desc())
+        .all()
+    )
+    return {(item.patron_code, item.event_id): item for item in records}
+
+
 def _dashboard_payload():
-    day_start_utc, day_end_utc = vn_today_utc_range()
     registrations = Registration.query.order_by(Registration.thoi_gian_dang_ky.desc()).all()
-    today_checkins = CheckIn.query.filter(
-        CheckIn.thoi_gian_checkin >= day_start_utc, CheckIn.thoi_gian_checkin < day_end_utc
-    ).all()
-    today_checkin_map = {(item.ma_cbsv, item.event_id): item for item in today_checkins}
+    today_checkin_map = _today_checkin_map()
     certificate_map = {
         (item.ma_cbsv, item.event_id): item
         for item in Certificate.query.order_by(Certificate.issued_at.desc()).all()
@@ -147,7 +161,7 @@ def _dashboard_payload():
             "email": user.email if user else "",
             "thoi_gian_dang_ky": format_utc_as_vn(registration.thoi_gian_dang_ky),
             "trang_thai": "Đã check-in" if checkin_item else "Chưa check-in",
-            "checkin_time": format_utc_as_vn(checkin_item.thoi_gian_checkin) if checkin_item else "",
+            "checkin_time": format_local(checkin_item.checkin_at) if checkin_item else "",
             "certificate_code": certificate.certificate_code if certificate else "",
             "certificate_url": f"/api/certificates/{certificate.certificate_code}" if certificate else "",
             "verify_url": f"/verify/{certificate.certificate_code}" if certificate else "",
@@ -155,7 +169,7 @@ def _dashboard_payload():
         })
 
     total_registrations = len(registrations)
-    total_checkins_today = len(today_checkins)
+    total_checkins_today = len(today_checkin_map)
     total_certificates = Certificate.query.count()
     total_events = Event.query.count()
     pending = max(total_registrations - total_checkins_today, 0)
@@ -194,10 +208,7 @@ def event_detail(event_id):
         .order_by(Registration.thoi_gian_dang_ky.asc())
         .all()
     )
-    checkin_map = {
-        item.ma_cbsv: item
-        for item in CheckIn.query.filter_by(event_id=event_id).all()
-    }
+    checkin_map = mailer.patron_summary(event_id)
     certificate_map = {
         item.ma_cbsv: item
         for item in Certificate.query.filter_by(event_id=event_id).all()
@@ -208,6 +219,7 @@ def event_detail(event_id):
         user = registration.user
         checkin_item = checkin_map.get(registration.ma_cbsv)
         certificate = certificate_map.get(registration.ma_cbsv)
+        primary = checkin_item["primary"] if checkin_item else None
         rows.append({
             "stt": position,
             "ma_cbsv": registration.ma_cbsv,
@@ -217,9 +229,14 @@ def event_detail(event_id):
             "email": user.email if user else "",
             "thoi_gian_dang_ky": format_utc_as_vn(registration.thoi_gian_dang_ky),
             "checked_in": bool(checkin_item),
-            "checkin_time": format_utc_as_vn(checkin_item.thoi_gian_checkin) if checkin_item else "",
+            "checkin_time": format_local(checkin_item["first_checkin_at"]) if checkin_item else "",
+            "scans": checkin_item["scans"] if checkin_item else 0,
             "certificate_code": certificate.certificate_code if certificate else "",
             "certificate_url": f"/api/certificates/{certificate.certificate_code}" if certificate else "",
+            "cert_status": primary.cert_status if primary else "",
+            "cert_error": (primary.error_msg or "") if primary else "",
+            "cert_sent_at": format_local(primary.cert_sent_at) if primary and primary.cert_sent_at else "",
+            "send_count": primary.send_count if primary else 0,
         })
 
     return render_template(
@@ -230,14 +247,682 @@ def event_detail(event_id):
             "registrations": len(rows),
             "checkins": len(checkin_map),
             "pending": max(len(rows) - len(checkin_map), 0),
+            "emails_sent": sum(1 for info in checkin_map.values() if info["primary"].cert_status == "sent"),
         },
+    )
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/send-certificates")
+@admin_required
+def send_certificates(event_id):
+    """Bắt đầu 1 đợt gửi chứng chỉ chạy nền, trả về ngay.
+    Body: ids -- chỉ gửi các dòng đang chọn (bỏ trống = mọi dòng 'pending');
+    dry_run=true -- chỉ đếm số người sẽ gửi để hiện hộp xác nhận, không gửi."""
+    event = Event.query.get_or_404(event_id)
+    payload = request.get_json(silent=True) or {}
+    record_ids = None
+    if payload.get("ids") is not None:
+        try:
+            record_ids = [int(value) for value in payload.get("ids")]
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "message": "Danh sách dòng không hợp lệ."}), 400
+
+    if payload.get("dry_run"):
+        return jsonify({
+            "success": True,
+            "count": len(mailer.select_targets(event_id, record_ids)),
+            "running": mailer.is_running(event_id),
+        })
+
+    try:
+        job = mailer.start_job(current_app._get_current_object(), request.host_url, event_id, record_ids=record_ids)
+    except mailer.CertificateJobError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+    return jsonify({
+        "success": True,
+        "message": f"Đã bắt đầu gửi chứng chỉ cho {job['total']} người.",
+        "job": job,
+    })
+
+
+@admin_bp.get("/api/admin/events/<int:event_id>/send-certificates/status")
+@admin_required
+def send_certificates_status(event_id):
+    return jsonify({"success": True, "job": mailer.get_job(event_id)})
+
+
+# ---------------------------------------------------------------------------
+# Trang quản lý danh sách check-in (bảng checkin_records, mỗi lượt quét 1 dòng).
+# Mọi thời gian ở đây là giờ Việt Nam đã lưu sẵn -> format_local, không đổi múi giờ.
+# ---------------------------------------------------------------------------
+CHECKIN_STATUS_LABELS = {
+    "pending": "Chưa gửi",
+    "sent": "Đã gửi",
+    "failed": "Lỗi",
+    "duplicate": "Trùng",
+}
+CHECKIN_TIME_FORMAT = "%d/%m/%Y %H:%M:%S"
+
+
+def _checkin_rows(event_id, status=None):
+    query = CheckinRecord.query.filter_by(event_id=event_id)
+    if status:
+        query = query.filter_by(cert_status=status)
+    records = query.order_by(CheckinRecord.checkin_at.asc(), CheckinRecord.id.asc()).all()
+    # Họ tên/email chỉ được điền vào dòng check-in lúc gửi chứng chỉ; trước đó
+    # hiển thị tạm theo dữ liệu đăng ký (registered=True để giao diện làm mờ).
+    users = {
+        user.ma_cbsv: user
+        for user in User.query.filter(User.ma_cbsv.in_({item.patron_code for item in records})).all()
+    } if records else {}
+    rows = []
+    for position, item in enumerate(records, start=1):
+        user = users.get(item.patron_code)
+        rows.append({
+            "id": item.id,
+            "stt": position,
+            "patron_code": item.patron_code,
+            "checkin_at": format_local(item.checkin_at, CHECKIN_TIME_FORMAT),
+            "patron_name": item.patron_name or (user.ho_ten if user else ""),
+            "patron_email": item.patron_email or (user.email if user else ""),
+            "patron_unit": (user.ten_don_vi if user else "") or "",
+            "from_registration": not item.patron_name and bool(user),
+            "cert_display_name": item.cert_display_name or "",
+            "email_override": item.email_override or "",
+            "cert_status": item.cert_status,
+            "cert_status_label": CHECKIN_STATUS_LABELS.get(item.cert_status, item.cert_status),
+            "send_count": item.send_count or 0,
+            "error_msg": item.error_msg or "",
+        })
+    return rows
+
+
+def _checkin_counts(event_id):
+    counts = dict(
+        db.session.query(CheckinRecord.cert_status, db.func.count(CheckinRecord.id))
+        .filter_by(event_id=event_id)
+        .group_by(CheckinRecord.cert_status)
+        .all()
+    )
+    checked_in = (
+        db.session.query(db.func.count(db.distinct(CheckinRecord.patron_code)))
+        .filter_by(event_id=event_id)
+        .scalar()
+    )
+    return {
+        "checked_in": checked_in or 0,
+        "pending": counts.get("pending", 0),
+        "sent": counts.get("sent", 0),
+        "failed": counts.get("failed", 0),
+        "duplicate": counts.get("duplicate", 0),
+    }
+
+
+def _status_filter_arg():
+    status = (request.args.get("status") or "").strip()
+    return status if status in CHECKIN_STATUS_LABELS else None
+
+
+def _saved_layout(event):
+    try:
+        layout = json.loads(event.certificate_layout) if event.certificate_layout else {}
+    except json.JSONDecodeError:
+        layout = {}
+    return layout if isinstance(layout, dict) else {}
+
+
+@admin_bp.get("/admin/events/<int:event_id>/checkins")
+@admin_required
+def checkins_page(event_id):
+    """Trang Danh sách check-in riêng của 1 sự kiện (mỗi sự kiện 1 trang, không có
+    ô chọn sự kiện). Nút Quay lại về trang trước; mở link trực tiếp thì về trang
+    chi tiết sự kiện."""
+    event = Event.query.get_or_404(event_id)
+    return render_template(
+        "admin/checkins.html",
+        event=event,
+        back_url=url_for("admin.event_detail", event_id=event.id),
+        cert_layout=effective_layout(_saved_layout(event)),
+        cert_template_url=(
+            url_for("static", filename=event.certificate_template)
+            if event.certificate_enabled and event.certificate_template else None
+        ),
+        status_labels=CHECKIN_STATUS_LABELS,
+        now_value=now_vn_naive().strftime("%Y-%m-%dT%H:%M:%S"),
+    )
+
+
+@admin_bp.get("/admin/checkins")
+@admin_required
+def checkins_page_legacy():
+    """Link cũ /admin/checkins?event_id=... -> trang riêng của sự kiện đó."""
+    event_id = request.args.get("event_id", type=int)
+    if event_id and Event.query.get(event_id):
+        return redirect(url_for("admin.checkins_page", event_id=event_id))
+    return redirect(url_for("admin.index"))
+
+
+@admin_bp.get("/api/admin/events/<int:event_id>/checkins")
+@admin_required
+def list_checkins(event_id):
+    Event.query.get_or_404(event_id)
+    return jsonify({
+        "success": True,
+        "rows": _checkin_rows(event_id, _status_filter_arg()),
+        "counts": _checkin_counts(event_id),
+    })
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/checkins/dedupe")
+@admin_required
+def dedupe_checkins(event_id):
+    """Mỗi mã xuất hiện nhiều lần: giữ dòng checkin_at sớm nhất, các dòng còn lại
+    chuyển 'duplicate' (không xoá cứng). Nếu một dòng sẽ bị đánh dấu trùng đã gửi
+    chứng chỉ rồi thì chuyển thông tin gửi sang dòng được giữ để không mất."""
+    event = Event.query.get_or_404(event_id)
+    groups = {}
+    for item in (
+        CheckinRecord.query.filter_by(event_id=event_id)
+        .order_by(CheckinRecord.checkin_at.asc(), CheckinRecord.id.asc())
+        .all()
+    ):
+        groups.setdefault(item.patron_code, []).append(item)
+
+    marked = 0
+    for records in groups.values():
+        keep, others = records[0], records[1:]
+        sent = next((item for item in records if item.cert_status == "sent"), None)
+        if sent and sent is not keep:
+            keep.cert_status = "sent"
+            keep.cert_sent_at = sent.cert_sent_at
+            keep.send_count = sent.send_count
+            keep.patron_name = keep.patron_name or sent.patron_name
+            keep.patron_email = keep.patron_email or sent.patron_email
+            keep.error_msg = sent.error_msg
+        elif keep.cert_status == "duplicate":
+            keep.cert_status = "pending"
+        if not keep.cert_display_name:
+            keep.cert_display_name = next((item.cert_display_name for item in others if item.cert_display_name), None)
+        for item in others:
+            if item.cert_status != "duplicate":
+                item.cert_status = "duplicate"
+                marked += 1
+    db.session.commit()
+    return jsonify({"success": True, "marked": marked, "message": f"Đã đánh dấu {marked} dòng trùng."})
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/checkins")
+@admin_required
+def add_checkin_manually(event_id):
+    event = Event.query.get_or_404(event_id)
+    payload = request.get_json(silent=True) or {}
+    patron_code = (payload.get("patron_code") or "").strip()
+    if not patron_code:
+        return jsonify({"success": False, "message": "Vui lòng nhập mã CB/SV."}), 400
+
+    raw_time = (payload.get("checkin_at") or "").strip()
+    if raw_time:
+        try:
+            # datetime-local gửi lên giờ Việt Nam admin nhập, lưu nguyên (không đổi múi giờ)
+            checkin_at = datetime.fromisoformat(raw_time).replace(microsecond=0)
+        except ValueError:
+            return jsonify({"success": False, "message": "Thời gian check-in không hợp lệ."}), 400
+        if checkin_at > now_vn_naive():
+            return jsonify({"success": False, "message": "Thời gian check-in không được ở tương lai."}), 400
+    else:
+        checkin_at = now_vn_naive()
+
+    # Giống check-in thường: vẫn bắt buộc đã đăng ký (chưa có Sierra để lấy họ tên/email)
+    if not Registration.query.filter_by(ma_cbsv=patron_code, event_id=event_id).first():
+        return jsonify({"success": False, "message": f"Mã {patron_code} chưa đăng ký sự kiện này."}), 404
+
+    db.session.add(CheckinRecord(
+        event_id=event_id,
+        patron_code=patron_code,
+        checkin_at=checkin_at,
+        cert_status="pending",
+    ))
+    db.session.commit()
+    return jsonify({"success": True, "message": f"Đã thêm check-in cho mã {patron_code}."})
+
+
+IMPORT_MAX_BYTES = 5 * 1024 * 1024
+IMPORT_MAX_ROWS = 5000
+IMPORT_MAX_FILES = 20
+IMPORT_TIME_FORMATS = ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M")
+
+
+def _import_cell_code(value):
+    """Mã SV/CB trong ô Excel: ô kiểu số (vd. 2456090063 -> 2456090063.0) đổi lại
+    thành chuỗi số nguyên. Lưu ý: ô kiểu số sẽ mất số 0 ở đầu mã -- file mẫu đã
+    định dạng cột mã là Text để tránh việc này."""
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return str(value).strip()
+
+
+def _import_cell_time(value, now):
+    """(datetime giờ VN, None) hoặc (None, lý do lỗi). Ô trống = `now` (giờ lúc nhập,
+    dùng chung 1 mốc cho cả file để không bị coi nhầm là "ở tương lai")."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return now, None
+    if isinstance(value, datetime):
+        return value.replace(microsecond=0), None
+    text = str(value).strip()
+    for fmt in IMPORT_TIME_FORMATS:
+        try:
+            return datetime.strptime(text, fmt), None
+        except ValueError:
+            continue
+    return None, f"Thời gian \"{text}\" không đúng định dạng dd/MM/yyyy HH:mm"
+
+
+def _parse_checkin_import(file_storage, registered, now):
+    """Đọc 1 file Excel danh sách check-in. Trả (rows hợp lệ, lỗi) -- KHÔNG ghi DB.
+    Cột được nhận theo tiêu đề dòng 1: cột có chữ "mã" và cột có chữ "thời gian"/"giờ"
+    (không có tiêu đề nhận ra được thì cột A là mã, cột B là thời gian)."""
+    file_name = file_storage.filename
+    data = file_storage.read(IMPORT_MAX_BYTES + 1)
+    if len(data) > IMPORT_MAX_BYTES:
+        raise ValueError(f"File {file_name} quá lớn (tối đa 5MB mỗi file).")
+    try:
+        sheet = load_workbook(BytesIO(data), read_only=True, data_only=True).active
+    except Exception as exc:
+        raise ValueError(f"Không đọc được file {file_name}. Hãy dùng file Excel .xlsx (có thể tải file mẫu).") from exc
+
+    all_rows = list(sheet.iter_rows(values_only=True))
+    if not all_rows:
+        return [], [{"file": file_name, "row": "", "code": "", "reason": "File không có dữ liệu"}]
+    header = [str(cell or "").strip().lower() for cell in all_rows[0]]
+    code_col = next((i for i, name in enumerate(header) if "mã" in name or "ma " in f"{name} "), None)
+    time_col = next((i for i, name in enumerate(header) if "thời gian" in name or "giờ" in name or "time" in name), None)
+    has_header = code_col is not None
+    data_rows = all_rows[1:] if has_header else all_rows
+    if not has_header:
+        code_col, time_col = 0, 1
+
+    rows, errors = [], []
+    for offset, row in enumerate(data_rows):
+        row_no = offset + (2 if has_header else 1)
+        cells = list(row) + [None, None]
+        code = _import_cell_code(cells[code_col])
+        raw_time = cells[time_col] if time_col is not None else None
+        if not code and (raw_time is None or str(raw_time).strip() == ""):
+            continue  # bỏ qua dòng trống
+
+        def error(reason):
+            errors.append({"file": file_name, "row": row_no, "code": code, "reason": reason})
+
+        if not code:
+            error("Thiếu mã CB/SV")
+            continue
+        checkin_at, time_error = _import_cell_time(raw_time, now)
+        if time_error:
+            error(time_error)
+        elif checkin_at > now:
+            error("Thời gian check-in ở tương lai")
+        elif code not in registered:
+            error("Chưa đăng ký sự kiện này")
+        else:
+            rows.append({"file": file_name, "row": row_no, "code": code, "checkin_at": checkin_at})
+    return rows, errors
+
+
+def _parse_checkin_imports(files, event_id):
+    """Đọc nhiều file cùng lúc. Trả (rows hợp lệ của mọi file, lỗi, ghi chú).
+    Mã lặp lại -- trong 1 file, giữa các file, hoặc đã check-in trước -- vẫn được
+    nhập (giống quét trùng), chỉ ghi chú nhắc bấm Lọc trùng."""
+    registered = {row[0] for row in db.session.query(Registration.ma_cbsv).filter_by(event_id=event_id)}
+    already = {
+        row[0] for row in db.session.query(CheckinRecord.patron_code).filter_by(event_id=event_id).distinct()
+    }
+    now = now_vn_naive().replace(microsecond=0)
+    rows, errors = [], []
+    for file_storage in files:
+        file_rows, file_errors = _parse_checkin_import(file_storage, registered, now)
+        rows.extend(file_rows)
+        errors.extend(file_errors)
+    if len(rows) + len(errors) > IMPORT_MAX_ROWS:
+        raise ValueError(f"Tổng cộng {len(rows) + len(errors)} dòng, tối đa {IMPORT_MAX_ROWS} dòng mỗi lần.")
+
+    seen, repeated, already_checked_in = set(), set(), set()
+    for item in rows:
+        if item["code"] in seen:
+            repeated.add(item["code"])
+        elif item["code"] in already:
+            already_checked_in.add(item["code"])
+        seen.add(item["code"])
+    notes = []
+    if repeated:
+        notes.append(f"{len(repeated)} mã xuất hiện nhiều lần trong file ({', '.join(sorted(repeated)[:10])}).")
+    if already_checked_in:
+        notes.append(f"{len(already_checked_in)} mã đã check-in trước đó ({', '.join(sorted(already_checked_in)[:10])}).")
+    if notes:
+        notes.append("Vẫn được nhập; bấm Lọc trùng để giữ lần check-in sớm nhất.")
+    return rows, errors, notes
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/checkins/import")
+@admin_required
+def import_checkins(event_id):
+    """Nhập danh sách check-in từ 1 hoặc nhiều file Excel (trường "file", gửi lặp lại).
+    dry_run=1: chỉ kiểm tra và báo số dòng hợp lệ/lỗi, không ghi gì. Không có dry_run:
+    ghi các dòng hợp lệ (dòng lỗi bị bỏ qua).
+    Chỉ đưa vào danh sách ('pending') -- KHÔNG gửi email; admin lọc trùng rồi bấm Gửi."""
+    event = Event.query.get_or_404(event_id)
+    files = [item for item in request.files.getlist("file") if item and item.filename]
+    if not files:
+        return jsonify({"success": False, "message": "Vui lòng chọn file Excel."}), 400
+    if len(files) > IMPORT_MAX_FILES:
+        return jsonify({"success": False, "message": f"Tối đa {IMPORT_MAX_FILES} file mỗi lần."}), 400
+    wrong = [item.filename for item in files if Path(item.filename).suffix.lower() != ".xlsx"]
+    if wrong:
+        return jsonify({"success": False, "message": f"Chỉ nhận file Excel .xlsx: {', '.join(wrong)} (file .xls cũ hãy mở bằng Excel rồi lưu lại dạng .xlsx)."}), 400
+    try:
+        rows, errors, notes = _parse_checkin_imports(files, event_id)
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+
+    summary = {"valid": len(rows), "errors": errors, "notes": notes, "files": len(files)}
+    if request.form.get("dry_run") in ("1", "true"):
+        return jsonify({"success": True, "dry_run": True, **summary})
+    if not rows:
+        return jsonify({"success": False, "message": "Không có dòng hợp lệ nào để nhập.", **summary}), 400
+
+    for item in rows:
+        db.session.add(CheckinRecord(
+            event_id=event_id,
+            patron_code=item["code"],
+            checkin_at=item["checkin_at"],
+            cert_status="pending",
+        ))
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "message": f"Đã nhập {len(rows)} lượt check-in từ {len(files)} file vào danh sách (chưa gửi email)."
+                   + (f" Bỏ qua {len(errors)} dòng lỗi." if errors else ""),
+        **summary,
+    })
+
+
+@admin_bp.get("/api/admin/checkins/import-template")
+@admin_required
+def checkin_import_template():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Danh sach check-in"
+    sheet.append(["Mã CB/SV", "Thời gian check-in"])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+    sheet.append(["2456090063", "05/10/2026 08:30"])
+    sheet.append(["2456090064", ""])
+    sheet["D1"] = "Hướng dẫn:"
+    sheet["D1"].font = Font(bold=True)
+    sheet["D2"] = "- Cột Mã CB/SV: bắt buộc, để định dạng Text để không mất số 0 ở đầu."
+    sheet["D3"] = "- Cột Thời gian: giờ Việt Nam, dạng dd/MM/yyyy HH:mm. Để trống = giờ lúc nhập."
+    sheet["D4"] = "- Mã phải đã đăng ký sự kiện. Xóa 2 dòng ví dụ trước khi nhập."
+    for row in range(2, 1001):
+        sheet.cell(row=row, column=1).number_format = "@"  # cột mã dạng Text
+    sheet.column_dimensions["A"].width = 18
+    sheet.column_dimensions["B"].width = 22
+    sheet.column_dimensions["D"].width = 70
+    return _xlsx_response(workbook, "Mau_nhap_checkin.xlsx", "Mau_nhap_checkin.xlsx")
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/checkins/delete")
+@admin_required
+def delete_checkin_rows(event_id):
+    event = Event.query.get_or_404(event_id)
+    payload = request.get_json(silent=True) or {}
+    try:
+        ids = {int(value) for value in payload.get("ids") or []}
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Danh sách dòng không hợp lệ."}), 400
+    if not ids:
+        return jsonify({"success": False, "message": "Chưa chọn dòng nào."}), 400
+
+    # Chỉ xoá dòng thuộc đúng sự kiện đang chọn, phòng id lạc sang sự kiện khác
+    records = CheckinRecord.query.filter(CheckinRecord.event_id == event_id, CheckinRecord.id.in_(ids)).all()
+    affected_codes = {item.patron_code for item in records}
+    for item in records:
+        db.session.delete(item)
+    db.session.flush()
+
+    # Nếu xoá trúng dòng được giữ của 1 người, các dòng còn lại của người đó đều đang
+    # là 'duplicate' -> đưa dòng sớm nhất còn lại về 'pending' để người đó vẫn được gửi.
+    for code in affected_codes:
+        remaining = (
+            CheckinRecord.query.filter_by(event_id=event_id, patron_code=code)
+            .order_by(CheckinRecord.checkin_at.asc(), CheckinRecord.id.asc())
+            .all()
+        )
+        if remaining and all(item.cert_status == "duplicate" for item in remaining):
+            remaining[0].cert_status = "pending"
+    db.session.commit()
+    return jsonify({"success": True, "deleted": len(records), "message": f"Đã xoá {len(records)} dòng check-in."})
+
+
+MAX_DISPLAY_NAME_LENGTH = 100
+
+
+def _clean_display_name(value):
+    """Họ tên in trên chứng chỉ: bỏ ký tự điều khiển, gộp khoảng trắng thừa."""
+    text = "".join(ch for ch in str(value or "") if ch.isprintable() or ch.isspace())
+    return " ".join(text.split())
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/certificate-preview")
+@admin_required
+def certificate_preview(event_id):
+    """Ảnh PNG xem trước chứng chỉ (vẽ trong bộ nhớ, không lưu, không tốn mã).
+    Body (đều tuỳ chọn): patron_code -- xem cho 1 người (bỏ trống = dữ liệu mẫu);
+    display_name -- thử tên chưa lưu; layout/base_width/base_height -- thử cấu hình
+    chưa lưu từ trình thiết kế (kiểm tra y như khi Lưu)."""
+    event = Event.query.get_or_404(event_id)
+    payload = request.get_json(silent=True) or {}
+    layout = None
+    if payload.get("layout") is not None:
+        layout, error = _build_layout(event, payload)
+        if error:
+            return jsonify(error[0]), error[1]
+    patron_code = (payload.get("patron_code") or "").strip() or None
+    display_name = _clean_display_name(payload.get("display_name"))[:MAX_DISPLAY_NAME_LENGTH] or None
+    try:
+        png = render_preview_png(event, patron_code=patron_code, display_name=display_name, layout=layout)
+    except CertificateError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+    except Exception:
+        current_app.logger.exception("Lỗi khi vẽ chứng chỉ xem trước (sự kiện %s)", event_id)
+        return jsonify({"success": False, "message": "Không thể vẽ chứng chỉ xem trước, vui lòng thử lại."}), 500
+    response = Response(png, mimetype="image/png")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@admin_bp.put("/api/admin/events/<int:event_id>/checkins/<patron_code>/display-name")
+@admin_required
+def save_display_name(event_id, patron_code):
+    """Lưu họ tên in trên chứng chỉ cho 1 người (ghi trên dòng chính của người đó).
+    display_name rỗng = Khôi phục mặc định (dùng lại tên Sierra/đăng ký)."""
+    event = Event.query.get_or_404(event_id)
+    records = (
+        CheckinRecord.query.filter_by(event_id=event_id, patron_code=patron_code)
+        .order_by(CheckinRecord.checkin_at.asc(), CheckinRecord.id.asc())
+        .all()
+    )
+    if not records:
+        return jsonify({"success": False, "message": f"Mã {patron_code} chưa check-in sự kiện này."}), 404
+    payload = request.get_json(silent=True) or {}
+    display_name = _clean_display_name(payload.get("display_name"))
+    if len(display_name) > MAX_DISPLAY_NAME_LENGTH:
+        return jsonify({"success": False, "message": f"Họ tên tối đa {MAX_DISPLAY_NAME_LENGTH} ký tự."}), 400
+
+    primary = mailer.primary_record(records)
+    for item in records:
+        item.cert_display_name = None
+    primary.cert_display_name = display_name or None
+    db.session.commit()
+    message = f"Đã lưu tên in trên chứng chỉ: {display_name}." if display_name else "Đã khôi phục tên mặc định."
+    return jsonify({"success": True, "message": message, "display_name": display_name})
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/checkins/<int:record_id>/resend")
+@admin_required
+def fix_and_resend_checkin(event_id, record_id):
+    """Dòng gửi lỗi: admin sửa mã SV/CB (quét/nhập sai) và/hoặc nhập email tay,
+    rồi gửi lại riêng dòng đó (chạy nền như một đợt 1 người)."""
+    event = Event.query.get_or_404(event_id)
+    record = CheckinRecord.query.filter_by(id=record_id, event_id=event_id).first_or_404()
+    old_code, old_email = record.patron_code, record.email_override
+    if record.cert_status == "duplicate":
+        return jsonify({"success": False, "message": "Đây là dòng trùng, không gửi riêng dòng này."}), 400
+    payload = request.get_json(silent=True) or {}
+    patron_code = (payload.get("patron_code") or record.patron_code).strip()
+    email = (payload.get("email") or "").strip()
+    if not patron_code:
+        return jsonify({"success": False, "message": "Mã CB/SV không được để trống."}), 400
+    if email and not mailer.EMAIL_PATTERN.match(email):
+        return jsonify({"success": False, "message": "Email không hợp lệ."}), 400
+    if mailer.is_running(event_id):
+        return jsonify({"success": False, "message": "Đang gửi chứng chỉ cho sự kiện này, vui lòng chờ đợt hiện tại xong."}), 409
+
+    record.patron_code = patron_code
+    record.email_override = email or None
+    db.session.commit()
+    try:
+        job = mailer.start_job(current_app._get_current_object(), request.host_url, event_id, record_ids=[record.id])
+    except mailer.CertificateJobError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+    return jsonify({"success": True, "message": f"Đang gửi lại cho mã {patron_code}.", "job": job})
+
+
+def _certificate_files(event_id):
+    """[(Certificate, Path)] của các chứng chỉ sự kiện còn file trên server.
+    Chỉ nhận file nằm trong thư mục static/certificates/generated (an toàn khi xoá)."""
+    root = (Path(current_app.static_folder) / "certificates" / "generated").resolve()
+    found = []
+    for certificate in Certificate.query.filter_by(event_id=event_id).order_by(Certificate.id).all():
+        path = get_certificate_file_path(certificate)
+        if not path or not path.is_file():
+            continue
+        try:
+            path.resolve().relative_to(root)
+        except ValueError:
+            continue
+        found.append((certificate, path))
+    return found
+
+
+def _size_label(size):
+    if size >= 1024 * 1024:
+        return f"{size / 1024 / 1024:.1f} MB"
+    return f"{max(1, round(size / 1024))} KB" if size else "0 KB"
+
+
+@admin_bp.get("/api/admin/events/<int:event_id>/certificates/storage")
+@admin_required
+def certificate_storage(event_id):
+    """Số file chứng chỉ của sự kiện đang nằm trên server và dung lượng của chúng."""
+    Event.query.get_or_404(event_id)
+    files = _certificate_files(event_id)
+    total = sum(path.stat().st_size for _, path in files)
+    return jsonify({"success": True, "count": len(files), "bytes": total, "size_label": _size_label(total)})
+
+
+@admin_bp.get("/api/admin/events/<int:event_id>/certificates/archive")
+@admin_required
+def certificate_archive(event_id):
+    """Tải về 1 file ZIP gồm các chứng chỉ của sự kiện đang có trên server."""
+    event = Event.query.get_or_404(event_id)
+    files = _certificate_files(event_id)
+    if not files:
+        return jsonify({"success": False, "message": "Sự kiện này chưa có file chứng chỉ nào trên server để tải."}), 404
+
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for certificate, path in files:
+            safe_code = re.sub(r"[^A-Za-z0-9._-]", "_", certificate.ma_cbsv or "khong-ma")
+            archive.write(path, f"{safe_code}_{certificate.certificate_code}{path.suffix.lower()}")
+    buffer.seek(0)
+
+    today = now_vn_naive().strftime("%d-%m-%Y")
+    utf8_name = f"{event.ten_su_kien}_chungchi_{today}.zip"
+    ascii_name = f"chungchi_su-kien-{event.id}_{today}.zip"
+    response = Response(buffer.getvalue(), mimetype="application/zip")
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(utf8_name)}"
+    )
+    return response
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/certificates/purge")
+@admin_required
+def certificate_purge(event_id):
+    """Xoá các file chứng chỉ của sự kiện khỏi server cho nhẹ. Chỉ xoá FILE: thông tin
+    chứng chỉ trong cơ sở dữ liệu giữ nguyên, và khi có người mở / tải lại thì hệ thống
+    tự vẽ lại file (xem certificate_controller). Bắt buộc gửi confirm=true."""
+    Event.query.get_or_404(event_id)
+    payload = request.get_json(silent=True) or {}
+    if payload.get("confirm") is not True:
+        return jsonify({"success": False, "message": "Cần xác nhận trước khi xoá file."}), 400
+    files = _certificate_files(event_id)
+    deleted, freed = 0, 0
+    for _, path in files:
+        try:
+            size = path.stat().st_size
+            path.unlink()
+            deleted += 1
+            freed += size
+        except OSError:
+            current_app.logger.exception("Không xoá được file chứng chỉ %s", path)
+    message = (
+        f"Đã xoá {deleted} file chứng chỉ, giải phóng {_size_label(freed)}."
+        if deleted else "Không có file nào để xoá."
+    )
+    return jsonify({"success": True, "deleted": deleted, "freed_label": _size_label(freed), "message": message})
+
+
+@admin_bp.get("/api/admin/events/<int:event_id>/checkins/export")
+@admin_required
+def export_checkins(event_id):
+    event = Event.query.get_or_404(event_id)
+    rows = _checkin_rows(event_id, _status_filter_arg())
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Danh sach check-in"
+    sheet.append(["STT", "Mã CB/SV", "Thời gian check-in", "Họ tên", "Email", "Trạng thái", "Số lần gửi", "Ghi chú lỗi"])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+    for row in rows:
+        sheet.append([
+            row["stt"],
+            row["patron_code"],
+            row["checkin_at"],
+            row["patron_name"],
+            row["patron_email"],
+            row["cert_status_label"],
+            row["send_count"],
+            row["error_msg"],
+        ])
+    for index, width in enumerate([6, 16, 22, 26, 28, 12, 11, 36], start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+
+    today = now_vn_naive().strftime("%d-%m-%Y")
+    return _xlsx_response(
+        workbook,
+        f"{event.ten_su_kien}_checkin_{today}.xlsx",
+        f"{_ascii_filename_component(event.ten_su_kien)}_checkin_{today}.xlsx",
     )
 
 
 def _ascii_filename_component(text):
     # Chuyển tên sự kiện có dấu tiếng Việt thành phần ASCII an toàn, dùng làm
     # fallback filename= cho các client HTTP cũ không hiểu filename*=UTF-8''...
-    normalized = unicodedata.normalize("NFKD", text or "")
+    # Đ/đ không tách dấu được qua NFKD nên phải đổi tay, nếu không sẽ bị bỏ mất.
+    normalized = unicodedata.normalize("NFKD", (text or "").replace("Đ", "D").replace("đ", "d"))
     ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
     ascii_only = re.sub(r"[^A-Za-z0-9]+", "_", ascii_only).strip("_")
     return ascii_only or "SuKien"
@@ -256,7 +941,9 @@ def export_event_registrations(event_id):
     if not registrations:
         return jsonify({"success": False, "message": "Chưa có người đăng ký tham gia sự kiện này."}), 400
 
-    checkin_map = {item.ma_cbsv: item for item in CheckIn.query.filter_by(event_id=event_id).all()}
+    checked_in_codes = {
+        row[0] for row in db.session.query(CheckinRecord.patron_code).filter_by(event_id=event_id).distinct()
+    }
 
     workbook = Workbook()
     sheet = workbook.active
@@ -269,7 +956,6 @@ def export_event_registrations(event_id):
 
     for position, registration in enumerate(registrations, start=1):
         user = registration.user
-        checkin_item = checkin_map.get(registration.ma_cbsv)
         sheet.append([
             position,
             registration.ma_cbsv,
@@ -278,20 +964,25 @@ def export_event_registrations(event_id):
             user.so_dien_thoai if user else "",
             user.ten_don_vi if user else "",
             format_utc_as_vn(registration.thoi_gian_dang_ky),
-            "Đã check-in" if checkin_item else "Chưa check-in",
+            "Đã check-in" if registration.ma_cbsv in checked_in_codes else "Chưa check-in",
         ])
 
     column_widths = [6, 16, 26, 28, 16, 24, 20, 16]
     for index, width in enumerate(column_widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
 
+    today = now_vn_naive().strftime("%d-%m-%Y")
+    return _xlsx_response(
+        workbook,
+        f"DanhSachDangKy_{event.ten_su_kien}_{today}.xlsx",
+        f"DanhSachDangKy_{_ascii_filename_component(event.ten_su_kien)}_{today}.xlsx",
+    )
+
+
+def _xlsx_response(workbook, utf8_filename, ascii_filename):
     buffer = BytesIO()
     workbook.save(buffer)
     buffer.seek(0)
-
-    today = now_vn_naive().strftime("%d-%m-%Y")
-    utf8_filename = f"DanhSachDangKy_{event.ten_su_kien}_{today}.xlsx"
-    ascii_filename = f"DanhSachDangKy_{_ascii_filename_component(event.ten_su_kien)}_{today}.xlsx"
 
     response = Response(
         buffer.getvalue(),
@@ -612,7 +1303,6 @@ def update_event(event_id):
     event.thoi_gian_dong_dang_ky = thoi_gian_dong_dang_ky
     # Recomputed from the new schedule (see Event.computed_status) -- not admin-picked.
     event.trang_thai = event.computed_status
-    event.updated_by = session["admin_id"]
     event.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify({"success": True, "message": "Đã cập nhật sự kiện.", "data": _event_payload(event)})
@@ -637,7 +1327,6 @@ def upload_event_image(event_id):
     file.save(file_path)
 
     event.hinh = f"events/{filename}"
-    event.updated_by = session["admin_id"]
     event.updated_at = datetime.utcnow()
     db.session.commit()
 
@@ -673,7 +1362,6 @@ def upload_certificate_template(event_id):
 
     event.certificate_template = f"certificates/templates/{filename}"
     event.certificate_enabled = True
-    event.updated_by = session["admin_id"]
     event.updated_at = datetime.utcnow()
     db.session.commit()
 
@@ -728,21 +1416,26 @@ def _validate_layout_field(field, config):
         errors.append("bold phải là true hoặc false.")
     if _normalize_align(config.get("align")) not in {"left", "center", "right"}:
         errors.append("align phải là left, center, hoặc right.")
+    if config.get("max_width") not in (None, ""):
+        try:
+            if not 20 <= int(config.get("max_width")) <= 10000:
+                errors.append("max_width phải trong khoảng 20-10000.")
+        except (TypeError, ValueError):
+            errors.append("max_width phải là số nguyên.")
     if errors:
         return False, f"{field}: {' '.join(errors)}"
     return True, None
 
 
-@admin_bp.post("/api/admin/events/<int:event_id>/certificate-layout")
-@admin_required
-def save_certificate_layout(event_id):
-    event = Event.query.get_or_404(event_id)
-    payload = request.get_json(silent=True) or {}
+def _build_layout(event, payload):
+    """Ghép layout admin gửi lên (từ trình thiết kế) vào layout đã lưu của sự kiện.
+    Trả (layout, None) nếu hợp lệ, hoặc (None, (json, status)) nếu lỗi. Dùng chung
+    cho nút Lưu và cho xem trước cấu hình chưa lưu, để hai bên luôn khớp nhau."""
     layout_payload = payload.get("layout")
     if not isinstance(layout_payload, dict):
-        return jsonify({"success": False, "message": "Payload layout phải là object."}), 400
+        return None, ({"success": False, "message": "Payload layout phải là object."}, 400)
 
-    allowed_fields = {"student_name", "ma_cbsv", "don_vi", "issue_date", "certificate_code"}
+    allowed_fields = set(CERTIFICATE_FIELDS)
     layout = json.loads(event.certificate_layout) if event.certificate_layout else {}
     if not isinstance(layout, dict):
         layout = {}
@@ -756,7 +1449,7 @@ def save_certificate_layout(event_id):
         }
     if meta is not None:
         if not isinstance(meta, dict):
-            return jsonify({"success": False, "message": "_meta phải là object."}), 400
+            return None, ({"success": False, "message": "_meta phải là object."}, 400)
         try:
             width = int(meta.get("width"))
             height = int(meta.get("height"))
@@ -764,7 +1457,7 @@ def save_certificate_layout(event_id):
                 raise ValueError()
             layout["_meta"] = {"width": width, "height": height}
         except (TypeError, ValueError):
-            return jsonify({"success": False, "message": "_meta.width và _meta.height phải là số nguyên dương."}), 400
+            return None, ({"success": False, "message": "_meta.width và _meta.height phải là số nguyên dương."}, 400)
 
     for field in allowed_fields:
         if field not in layout_payload:
@@ -786,6 +1479,8 @@ def save_certificate_layout(event_id):
             "color": config.get("color").strip(),
             "bold": bool(config.get("bold")),
         }
+        if config.get("max_width") not in (None, ""):
+            field_layout["max_width"] = int(config.get("max_width"))
         if "font_file" in config and config["font_file"] is not None:
             field_layout["font_file"] = str(config.get("font_file"))
         if "font_name" in config and config["font_name"] is not None:
@@ -793,6 +1488,8 @@ def save_certificate_layout(event_id):
         # merge field partial updates without removing missing optional font props
         existing_config = layout.get(field, {}) if isinstance(layout.get(field), dict) else {}
         existing_config.update(field_layout)
+        if "max_width" not in field_layout:
+            existing_config.pop("max_width", None)  # bỏ trống ô = không giới hạn bề rộng
         if "font_file" in config and config.get("font_file") is None:
             existing_config.pop("font_file", None)
         if "font_name" in config and config.get("font_name") is None:
@@ -800,10 +1497,19 @@ def save_certificate_layout(event_id):
         layout[field] = existing_config
 
     if errors:
-        return jsonify({"success": False, "message": "Lỗi dữ liệu layout.", "errors": errors}), 400
+        return None, ({"success": False, "message": "Lỗi dữ liệu layout.", "errors": errors}, 400)
+    return layout, None
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/certificate-layout")
+@admin_required
+def save_certificate_layout(event_id):
+    event = Event.query.get_or_404(event_id)
+    layout, error = _build_layout(event, request.get_json(silent=True) or {})
+    if error:
+        return jsonify(error[0]), error[1]
 
     event.certificate_layout = json.dumps(layout, ensure_ascii=False)
-    event.updated_by = session["admin_id"]
     event.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify({"success": True, "message": "Đã lưu layout chứng chỉ.", "data": _event_payload(event)})
@@ -814,7 +1520,7 @@ def save_certificate_layout(event_id):
 def upload_certificate_font(event_id):
     event = Event.query.get_or_404(event_id)
     field = (request.form.get("field") or "").strip()
-    allowed_fields = {"student_name", "ma_cbsv", "don_vi", "issue_date", "certificate_code"}
+    allowed_fields = set(CERTIFICATE_FIELDS)
     if field not in allowed_fields:
         return jsonify({"success": False, "message": "Trường font không hợp lệ."}), 400
 
@@ -844,7 +1550,6 @@ def upload_certificate_font(event_id):
     layout[field] = field_config
 
     event.certificate_layout = json.dumps(layout, ensure_ascii=False)
-    event.updated_by = session["admin_id"]
     event.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify({"success": True, "message": "Đã cập nhật font cho trường.", "data": _event_payload(event)})
@@ -854,7 +1559,7 @@ def upload_certificate_font(event_id):
 @admin_required
 def delete_certificate_font(event_id, field):
     event = Event.query.get_or_404(event_id)
-    allowed_fields = {"student_name", "ma_cbsv", "don_vi", "issue_date", "certificate_code"}
+    allowed_fields = set(CERTIFICATE_FIELDS)
     if field not in allowed_fields:
         return jsonify({"success": False, "message": "Trường font không hợp lệ."}), 400
 
@@ -872,7 +1577,6 @@ def delete_certificate_font(event_id, field):
     layout[field] = field_config
 
     event.certificate_layout = json.dumps(layout, ensure_ascii=False)
-    event.updated_by = session["admin_id"]
     event.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify({"success": True, "message": "Đã xóa font của trường.", "data": _event_payload(event)})
@@ -901,7 +1605,8 @@ def delete_event(event_id):
     # reference Registration/CheckIn's (ma_cbsv, event_id) pair indirectly.
     EmailLog.query.filter_by(event_id=event_id).delete()
     Certificate.query.filter_by(event_id=event_id).delete()
-    CheckIn.query.filter_by(event_id=event_id).delete()
+    CheckinRecord.query.filter_by(event_id=event_id).delete()
+    CheckIn.query.filter_by(event_id=event_id).delete()  # bảng cũ (dự phòng) vẫn có khoá ngoại sang events
     Registration.query.filter_by(event_id=event_id).delete()
     db.session.delete(event)
     db.session.commit()
@@ -916,9 +1621,9 @@ def delete_event(event_id):
 @admin_bp.delete("/api/admin/events/<int:event_id>/checkins/<ma_cbsv>")
 @admin_required
 def delete_event_checkin(event_id, ma_cbsv):
-    Event.query.get_or_404(event_id)
-    checkin = CheckIn.query.filter_by(event_id=event_id, ma_cbsv=ma_cbsv).first()
-    if not checkin:
+    event = Event.query.get_or_404(event_id)
+    records = CheckinRecord.query.filter_by(event_id=event_id, patron_code=ma_cbsv).all()
+    if not records:
         return jsonify({"success": False, "message": "Người dùng này chưa check-in sự kiện."}), 404
 
     certificate = Certificate.query.filter_by(event_id=event_id, ma_cbsv=ma_cbsv).first()
@@ -940,7 +1645,11 @@ def delete_event_checkin(event_id, ma_cbsv):
         })
         db.session.delete(certificate)
 
-    db.session.delete(checkin)
+    # Xoá mọi lượt quét của người này. Xoá luôn dòng ở bảng cũ (nếu có) để script
+    # chuyển dữ liệu chạy lại không đưa check-in đã xoá quay về.
+    for item in records:
+        db.session.delete(item)
+    CheckIn.query.filter_by(event_id=event_id, ma_cbsv=ma_cbsv).delete()
     db.session.commit()
 
     if certificate_path and certificate_path.exists():
@@ -952,12 +1661,8 @@ def delete_event_checkin(event_id, ma_cbsv):
 @admin_bp.get("/admin/export/csv")
 @admin_required
 def export_csv():
-    day_start_utc, day_end_utc = vn_today_utc_range()
     registrations = Registration.query.order_by(Registration.thoi_gian_dang_ky.asc()).all()
-    today_checkins = CheckIn.query.filter(
-        CheckIn.thoi_gian_checkin >= day_start_utc, CheckIn.thoi_gian_checkin < day_end_utc
-    ).all()
-    today_checkin_map = {(item.ma_cbsv, item.event_id): item for item in today_checkins}
+    today_checkin_map = _today_checkin_map()
 
     buffer = StringIO()
     writer = csv.writer(buffer)
@@ -991,6 +1696,7 @@ def reset_data():
 
     db.session.query(EmailLog).delete()
     db.session.query(Certificate).delete()
+    db.session.query(CheckinRecord).delete()
     db.session.query(CheckIn).delete()
     db.session.query(Registration).delete()
     db.session.commit()

@@ -101,9 +101,6 @@
         <p class="muted">
           Đã đăng ký: {{ selected_event.registration_count }} / {{ selected_event.so_luong_toi_da or 'Không giới hạn' }}
         </p>
-      {% else %}
-        <h1>Chọn sự kiện để đăng ký</h1>
-        <p class="muted">Bấm vào sự kiện bạn muốn tham gia, sau đó điền thông tin CB/SV để gửi đăng ký.</p>
       {% endif %}
     </div>
     {% if selected_event %}
@@ -418,10 +415,8 @@
         donViInput.add(new Option(data.don_vi || 'Đơn vị đã lưu', donViId));
       }
       donViInput.value = donViId;
-      chucVuInput.value = data.chuc_vu || '';
-      sdtInput.value = data.so_dien_thoai || '';
-      emailInput.value = data.email || '';
-      showMessage('Đã tự động điền thông tin từ danh sách CB/SV.', 'success');
+      // API tra mã chỉ trả họ tên + đơn vị (không lộ email/SĐT) -> người dùng tự nhập phần còn lại
+      showMessage('Đã tự động điền họ tên và đơn vị. Vui lòng nhập email để nhận chứng chỉ.', 'success');
     } catch (error) {
       showMessage('Không thể tra cứu dữ liệu.', 'error');
     }

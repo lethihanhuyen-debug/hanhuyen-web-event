@@ -26,7 +26,6 @@ class Event(db.Model):
     certificate_layout = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey("admins.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    updated_by = db.Column(db.Integer, db.ForeignKey("admins.id"))
     updated_at = db.Column(db.DateTime)
 
     @property

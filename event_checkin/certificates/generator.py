@@ -96,103 +96,77 @@ def save_svg_certificate(output_path, student_name, ma_cbsv, don_vi, certificate
     return output_path
 
 
-def save_png_certificate(output_path, student_name, ma_cbsv, don_vi, certificate_code, issued_at=None, template_path=None, layout=None):
-    try:
-        from PIL import Image, ImageDraw, ImageFont
-    except ImportError:
-        return None
+# Các trường có thể đặt lên chứng chỉ (khoá trong events.certificate_layout).
+CERTIFICATE_FIELDS = ("student_name", "ma_cbsv", "don_vi", "issue_date", "certificate_code", "event_name")
 
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    if not template_path or not Path(template_path).exists():
-        # Không tự tạo nền trắng hoặc đồ họa mẫu nếu không có ảnh nền do người dùng tải lên.
-        return None
+# Vị trí mặc định -- CHỈ dùng cho sự kiện chưa từng lưu cấu hình trường nào (giữ
+# nguyên cách in cũ). Sự kiện đã lưu cấu hình thì chỉ in đúng các trường có trong
+# cấu hình: trường admin đã xoá trong trình thiết kế sẽ không bị in ra nữa.
+FALLBACK_LAYOUT = {
+    "student_name": {"x": 930, "y": 560, "size": 78, "color": BLUE, "bold": True, "align": "left"},
+    "ma_cbsv": {"x": 1065, "y": 670, "size": 78, "color": BLUE, "bold": True, "align": "left"},
+    "don_vi": {"x": 680, "y": 780, "size": 78, "color": BLUE, "bold": True, "align": "left"},
+    "issue_date": {"x": 1120, "y": 1115, "size": 50, "color": BLUE, "bold": True, "align": "left"},
+    "certificate_code": {"x": 760, "y": 1405, "size": 18, "color": "#7c97b8", "bold": False, "align": "left"},
+}
+DEFAULT_FIELD_STYLE = {"size": 48, "color": BLUE, "bold": True, "align": "left"}
+ANCHOR_MAP = {"left": "lt", "center": "mt", "right": "rt"}
+MIN_FONT_SIZE = 10
 
-    image = Image.open(template_path).convert("RGBA")
-    draw = ImageDraw.Draw(image)
 
-    def font(size, bold=False, serif=False, condensed=False, font_path=None):
-        return resolve_font(size, bold=bold, font_path=font_path, static_folder=current_app.static_folder)
-
-    def text_bbox(text, selected_font):
-        return draw.textbbox((0, 0), text, font=selected_font)
-
-    def fit_font(text, size, max_width, bold=False, serif=False, condensed=False, font_path=None):
-        selected_size = size
-        while selected_size > 20:
-            selected_font = font(selected_size, bold=bold, serif=serif, condensed=condensed, font_path=font_path)
-            bbox = text_bbox(text, selected_font)
-            if bbox[2] - bbox[0] <= max_width:
-                return selected_font
-            selected_size -= 2
-        return font(selected_size, bold=bold, serif=serif, condensed=condensed, font_path=font_path)
-
-    def draw_template_fields(values, layout_config, image_width, image_height):
-        layout_meta = layout_config.get("_meta") if isinstance(layout_config, dict) else None
-        base_width = int(layout_meta.get("width")) if isinstance(layout_config, dict) and layout_meta.get("width") else CERTIFICATE_WIDTH
-        base_height = int(layout_meta.get("height")) if isinstance(layout_config, dict) and layout_meta.get("height") else CERTIFICATE_HEIGHT
-        scale_x = image_width / max(base_width, 1)
-        scale_y = image_height / max(base_height, 1)
-
-        default_style = {"size": 48, "color": BLUE, "bold": True, "align": "left"}
-        anchor_map = {"left": "lt", "center": "mt", "right": "rt"}
-
-        for field, text_value in values.items():
-            saved_config = layout_config.get(field)
-            if not isinstance(saved_config, dict):
-                continue
-            if saved_config.get("x") is None or saved_config.get("y") is None:
-                continue
-
-            field_config = {**default_style, **saved_config}
-            align = str(field_config.get("align", "left")).lower()
-            if align not in anchor_map:
-                align = "left"
-
-            x = 900
-            y = 680
-            size = max(20, int(round(field_config.get("size", default_style["size"]) * min(scale_x, scale_y))))
-            fill = field_config.get("color", default_style["color"])
-            bold_flag = bool(field_config.get("bold", default_style["bold"]))
-            font_path = field_config.get("font_path") or field_config.get("font_file")
-
-            selected_font = resolve_font(size, bold=bold_flag, font_path=font_path, static_folder=current_app.static_folder)
-            anchor = anchor_map[align]
-            draw.text((x, y), text_value, fill=fill, font=selected_font, anchor=anchor)
-
-    # issued_at is UTC (datetime.utcnow()) -- convert to Vietnam time before it's
-    # formatted into the printed issue_date text below.
+def certificate_values(student_name, ma_cbsv, don_vi, certificate_code, issued_at=None, event_name=None):
+    """Nội dung chữ của từng trường. issued_at là UTC (datetime.utcnow()) -- đổi sang
+    giờ Việt Nam trước khi in ngày cấp."""
     issued_at = utc_to_vn(issued_at or datetime.utcnow())
-    values = {
+    return {
         "student_name": student_name or "",
         "ma_cbsv": str(ma_cbsv or ""),
         "don_vi": don_vi or "",
         "issue_date": f"TP. Hồ Chí Minh, ngày {issued_at.day} tháng {issued_at.month} năm {issued_at.year}",
         "certificate_code": f"Mã chứng nhận: {certificate_code}",
+        "event_name": event_name or "",
     }
-    try:
-        draw_template_fields(values, layout or {}, image.width, image.height)
-    except RuntimeError as exc:
-        current_app.logger.error('Không thể render chứng chỉ với template font: %s', exc, exc_info=True)
-        return None
-
-    image.convert("RGB").save(output_path)
-    return output_path
 
 
-def save_pdf_certificate(output_path, student_name, ma_cbsv, don_vi, certificate_code, issued_at=None, template_path=None, layout=None):
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    # issued_at is UTC (datetime.utcnow()) -- convert to Vietnam time before it's
-    # formatted into the printed issue_date text below.
-    issued_at = utc_to_vn(issued_at or datetime.utcnow())
+def _fields_to_draw(layout):
+    layout = layout if isinstance(layout, dict) else {}
+    saved = {
+        field: config for field, config in layout.items()
+        if field in CERTIFICATE_FIELDS and isinstance(config, dict)
+        and config.get("x") is not None and config.get("y") is not None
+    }
+    if saved:
+        return saved
+    return {field: dict(config) for field, config in FALLBACK_LAYOUT.items()}
 
+
+def effective_layout(layout):
+    """Cấu hình đang được dùng để in (trình xem trước ở trang check-in cần biết cả khi
+    sự kiện chưa lưu trường nào): các trường + khung gốc (rộng, cao) của toạ độ."""
+    meta = layout.get("_meta") if isinstance(layout, dict) else None
+    width = height = None
+    if isinstance(meta, dict):
+        try:
+            width, height = int(meta.get("width")), int(meta.get("height"))
+        except (TypeError, ValueError):
+            width = height = None
+    fields = {}
+    for field, config in _fields_to_draw(layout).items():
+        merged = {**DEFAULT_FIELD_STYLE, **config}
+        fields[field] = {key: merged[key] for key in ("x", "y", "size", "color", "bold", "align", "max_width", "font_file", "font_name") if merged.get(key) is not None}
+    return {"fields": fields, "width": width or CERTIFICATE_WIDTH, "height": height or CERTIFICATE_HEIGHT}
+
+
+def render_certificate_image(template_path, values, layout=None):
+    """Hàm vẽ DUY NHẤT cho mọi chứng chỉ: bản PDF/PNG gửi đi và ảnh xem trước của
+    admin đều gọi hàm này, nên xem trước giống hệt bản gửi thật. Trả về ảnh Pillow
+    (RGB), hoặc None nếu thiếu Pillow / ảnh nền / font."""
     try:
         from PIL import Image, ImageDraw
     except ImportError:
         return None
-
     if not template_path or not Path(template_path).exists():
+        # Không tự tạo nền trắng hoặc đồ họa mẫu nếu không có ảnh nền do người dùng tải lên.
         return None
 
     image = Image.open(template_path).convert("RGB")
@@ -204,42 +178,54 @@ def save_pdf_certificate(output_path, student_name, ma_cbsv, don_vi, certificate
     scale_y = image.height / max(base_height, 1)
     scale_font = min(scale_x, scale_y)
 
-    fallback_layout = {
-        "student_name": {"x": 930, "y": 560, "size": 78, "color": BLUE, "bold": True, "align": "left"},
-        "ma_cbsv": {"x": 1065, "y": 670, "size": 78, "color": BLUE, "bold": True, "align": "left"},
-        "don_vi": {"x": 680, "y": 780, "size": 78, "color": BLUE, "bold": True, "align": "left"},
-        "issue_date": {"x": 1120, "y": 1115, "size": 50, "color": BLUE, "bold": True, "align": "left"},
-        "certificate_code": {"x": 760, "y": 1405, "size": 18, "color": "#7c97b8", "bold": False, "align": "left"},
-    }
-    anchor_map = {"left": "lt", "center": "mt", "right": "rt"}
-
-    values = {
-        "student_name": student_name or "",
-        "ma_cbsv": str(ma_cbsv or ""),
-        "don_vi": don_vi or "",
-        "issue_date": f"TP. Hồ Chí Minh, ngày {issued_at.day} tháng {issued_at.month} năm {issued_at.year}",
-        "certificate_code": f"Mã chứng nhận: {certificate_code}",
-    }
-
-    for field, text_value in values.items():
-        config = fallback_layout[field].copy()
-        if isinstance(layout, dict) and isinstance(layout.get(field), dict):
-            config.update(layout.get(field))
-        align = str(config.get("align", "left")).lower()
-        if align not in anchor_map:
+    for field, saved_config in _fields_to_draw(layout).items():
+        text_value = values.get(field) or ""
+        if not text_value:
+            continue
+        config = {**DEFAULT_FIELD_STYLE, **saved_config}
+        align = str(config.get("align") or "left").lower()
+        if align not in ANCHOR_MAP:
             align = "left"
-        x = int(config.get("x", fallback_layout[field]["x"]) * scale_x)
-        y = int(config.get("y", fallback_layout[field]["y"]) * scale_y)
-        size = max(10, int(round(config.get("size", fallback_layout[field]["size"]) * scale_font)))
-        fill = config.get("color", fallback_layout[field]["color"])
-        bold_flag = bool(config.get("bold", fallback_layout[field]["bold"]))
+        x = int(config["x"] * scale_x)
+        y = int(config["y"] * scale_y)
+        size = max(MIN_FONT_SIZE, int(round(config["size"] * scale_font)))
+        bold_flag = bool(config.get("bold"))
         font_path = config.get("font_path") or config.get("font_file")
+        max_width = config.get("max_width")
+        max_width = int(max_width * scale_x) if max_width else None
         try:
             selected_font = resolve_font(size, bold=bold_flag, font_path=font_path, static_folder=current_app.static_folder)
-        except RuntimeError:
+            # max_width: tự thu nhỏ chữ (vd. họ tên quá dài) cho vừa bề rộng tối đa
+            while max_width and size > MIN_FONT_SIZE:
+                left, _, right, _ = draw.textbbox((0, 0), text_value, font=selected_font)
+                if right - left <= max_width:
+                    break
+                size -= 2
+                selected_font = resolve_font(size, bold=bold_flag, font_path=font_path, static_folder=current_app.static_folder)
+        except RuntimeError as exc:
+            current_app.logger.error("Không thể tải font khi vẽ chứng chỉ: %s", exc)
             return None
-        anchor = anchor_map[align]
-        draw.text((x, y), text_value, fill=fill, font=selected_font, anchor=anchor)
+        draw.text((x, y), text_value, fill=config.get("color") or BLUE, font=selected_font, anchor=ANCHOR_MAP[align])
+    return image
 
+
+def save_png_certificate(output_path, student_name, ma_cbsv, don_vi, certificate_code, issued_at=None, template_path=None, layout=None, event_name=None):
+    values = certificate_values(student_name, ma_cbsv, don_vi, certificate_code, issued_at, event_name)
+    image = render_certificate_image(template_path, values, layout)
+    if image is None:
+        return None
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(output_path)
+    return output_path
+
+
+def save_pdf_certificate(output_path, student_name, ma_cbsv, don_vi, certificate_code, issued_at=None, template_path=None, layout=None, event_name=None):
+    values = certificate_values(student_name, ma_cbsv, don_vi, certificate_code, issued_at, event_name)
+    image = render_certificate_image(template_path, values, layout)
+    if image is None:
+        return None
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     image.save(output_path, "PDF", resolution=72.0, quality=95, optimize=True)
     return output_path

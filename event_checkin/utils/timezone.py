@@ -51,3 +51,11 @@ def vn_today_utc_range():
     vn_today_start = now_vn_naive().replace(hour=0, minute=0, second=0, microsecond=0)
     vn_tomorrow_start = vn_today_start + timedelta(days=1)
     return vn_today_start - timedelta(hours=7), vn_tomorrow_start - timedelta(hours=7)
+
+
+def vn_today_range():
+    """Khoảng [đầu ngày hôm nay, đầu ngày mai) theo giờ Việt Nam, dạng naive --
+    dùng cho cột đã lưu sẵn giờ VN (vd. checkin_records.checkin_at). Cột lưu UTC
+    thì dùng vn_today_utc_range() ở trên."""
+    vn_today_start = now_vn_naive().replace(hour=0, minute=0, second=0, microsecond=0)
+    return vn_today_start, vn_today_start + timedelta(days=1)

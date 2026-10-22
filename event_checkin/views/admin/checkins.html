@@ -1,0 +1,1207 @@
+{% extends 'base.html' %}
+{% block title %}Check-in: {{ event.ten_su_kien }} | Quản trị sự kiện{% endblock %}
+
+{% block content %}
+<section class="admin-panel admin-panel--wide">
+  <div class="panel-head panel-head--top">
+    <div>
+      <p class="eyebrow">Danh sách check-in</p>
+      <h1>{{ event.ten_su_kien }}</h1>
+    </div>
+    <div class="panel-head__side">
+      {# Quay lại trang trước (vd. trang chi tiết sự kiện). href là đường dự phòng khi mở
+         trang trực tiếp, không có trang trước trong cùng web -- xem script cuối trang. #}
+      <a id="backButton" class="btn btn--back" href="{{ back_url }}">← Quay lại</a>
+        <div class="panel-actions panel-actions--row">
+          <button id="exportButton" class="btn btn--ghost" type="button">Tải file về</button>
+          <button id="zipButton" class="btn btn--ghost" type="button" title="Tải về 1 file ZIP gồm các chứng chỉ của sự kiện đang lưu trên server">Tải ZIP chứng chỉ</button>
+          <button id="purgeButton" class="btn btn--danger" type="button" title="Xóa các file chứng chỉ khỏi server cho nhẹ (nên tải ZIP về trước)" disabled>Xóa file trên server</button>
+        </div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><span>Đã check-in</span><strong id="countCheckedIn">0</strong></div>
+    <div class="stat-card"><span>Chưa gửi</span><strong id="countPending">0</strong></div>
+    <div class="stat-card"><span>Đã gửi</span><strong id="countSent">0</strong></div>
+    <div class="stat-card"><span>Lỗi</span><strong id="countFailed">0</strong></div>
+  </div>
+
+  <div id="pageMessage" class="message" hidden></div>
+
+  <div id="sendPanel" class="form-card send-panel" hidden>
+    <div class="send-panel__head">
+      <strong id="sendProgressText">Đã gửi 0 / 0 — Lỗi: 0</strong>
+      <span id="sendStateText" class="muted"></span>
+    </div>
+    <div class="send-progress" role="progressbar" aria-label="Tiến độ gửi chứng chỉ">
+      <div id="sendProgressBar" class="send-progress__bar"></div>
+    </div>
+    <p id="sendCurrent" class="send-current" hidden></p>
+    <div id="sendSummary" class="message" hidden></div>
+    <p id="sendLast" class="send-current" hidden></p>
+  </div>
+
+  <div id="failedPanel" class="form-card failed-panel" hidden>
+    <details>
+      <summary class="failed-panel__summary">
+        <strong>Có <span id="failedCount">0</span> email gửi lỗi</strong>
+        <span class="muted">— bấm để xem và xử lý</span>
+      </summary>
+      <div class="failed-panel__body">
+        <p class="muted">Sửa mã CB/SV (nếu quét/nhập sai) hoặc nhập email tay, rồi bấm "Lưu &amp; gửi lại" cho từng dòng.</p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th>Mã CB/SV</th><th>Họ tên</th><th>Email</th><th>Lý do lỗi</th><th></th></tr>
+            </thead>
+            <tbody id="failedRows"></tbody>
+          </table>
+        </div>
+        <div class="btn-row">
+          <button id="exportFailed" class="btn btn--yellow btn--sm" type="button">Tải danh sách lỗi</button>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <dialog id="khung" class="manual-dialog">
+   <div class="manual-card">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Check-in thủ công</p>
+        <h2>Thêm người check-in</h2>
+      </div>
+      <button class="btn btn--ghost" type="button" onclick="document.getElementById('khung').close()" aria-label="Đóng">✕</button>
+    </div>
+    <div class="manual-card__section">
+      <strong>Thêm từng mã</strong>
+      <form id="manualForm" class="checkin-form">
+        <input id="manualCode" placeholder="Mã CB/SV" autocomplete="off" required>
+        <input id="manualTime" type="datetime-local" step="1" value="{{ now_value }}" title="Thời gian check-in (giờ Việt Nam)">
+        <button class="btn btn--primary" type="submit">Lưu</button>
+      </form>
+    </div>
+
+    <div class="manual-card__section">
+      <strong>Nhập cả danh sách từ file Excel</strong>
+      <p class="muted">
+        Chuẩn bị file Excel có cột <b>Mã CB/SV</b>. Nếu muốn ghi giờ check-in thì thêm cột <b>Thời gian check-in</b>, để trống thì hệ thống lấy giờ lúc nhập.
+        <a href="{{ url_for('admin.checkin_import_template') }}">Tải file mẫu</a>
+      </p>
+      <div class="btn-row">
+        <label class="file-upload-button btn btn--ghost" title="Chọn được nhiều file một lúc; bấm lại để thêm file">
+          <span>+ Chọn file Excel</span>
+          <input id="importFile" type="file" multiple accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        </label>
+        <button id="importCheck" class="btn btn--ghost" type="button" disabled>Kiểm tra file</button>
+        <button id="importConfirm" class="btn btn--green" type="button" hidden>Nhập</button>
+      </div>
+      <ul id="importFileList" class="import-file-list" hidden></ul>
+      <div id="importResult" class="import-result" hidden></div>
+    </div>
+   </div>
+  </dialog>
+
+  <div class="filter-tabs" id="statusTabs" style="margin: 12px 0">
+    <button type="button" class="filter-tab is-active" data-status="">Tất cả</button>
+    {% for value, label in status_labels.items() %}
+      <button type="button" class="filter-tab" data-status="{{ value }}">{{ label }} (<span data-count="{{ value }}">0</span>)</button>
+    {% endfor %}
+    <button id="quickAddCheckin" class="btn-plus" type="button" onclick="document.getElementById('khung').showModal()" title="Thêm check-in thủ công" aria-label="Thêm check-in thủ công">+</button>
+    <button id="deleteSelected" class="btn btn--danger filter-tabs__end" type="button" disabled>Xóa</button>
+    <button id="dedupeButton" class="btn btn--ghost" type="button">Lọc trùng</button>
+    <button id="sendCertificates" class="btn btn--primary" type="button">Gửi chứng chỉ</button>
+  </div>
+
+  <div id="checkinsLayout" class="checkins-layout">
+  <div class="table-card">
+    <div class="table-scroll">
+      <table class="checkins-table">
+        <thead>
+          <tr>
+            <th><input id="selectAll" type="checkbox" aria-label="Chọn tất cả"></th>
+            <th>STT</th>
+            <th>Mã CB/SV</th>
+            <th>Thời gian check-in</th>
+            <th>Họ tên</th>
+            <th>Email</th>
+            <th>Trạng thái</th>
+            <th>Ghi chú lỗi</th>
+            <th>Chứng chỉ</th>
+          </tr>
+        </thead>
+        <tbody id="checkinRows">
+          <tr><td colspan="9">Đang tải...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div id="resendModal" class="designer-modal" hidden>
+    <div class="designer-modal__backdrop" data-close-resend></div>
+    <div class="designer-modal__dialog">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Gửi lại chứng chỉ</p>
+          <h2 id="resendTitle">Gửi lại</h2>
+        </div>
+      </div>
+      <p id="resendQuestion" class="resend-question"></p>
+      <label class="resend-email">
+        <span>Email nhận (sửa nếu sinh viên báo email khác)</span>
+        <input id="resendEmail" type="email" autocomplete="off">
+      </label>
+      <div class="btn-row">
+        <button id="resendConfirm" class="btn btn--primary" type="button">Gửi lại</button>
+        <button class="btn btn--ghost" type="button" data-close-resend>Hủy</button>
+      </div>
+    </div>
+  </div>
+  <aside id="previewPanel" class="form-card preview-panel" aria-live="polite" hidden>
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow" id="previewEyebrow">Xem trước chứng chỉ</p>
+        <h2 id="previewTitle">Chứng chỉ</h2>
+      </div>
+      <button id="previewClose" class="btn btn--ghost btn--sm" type="button" aria-label="Đóng">✕</button>
+    </div>
+    <div id="previewNav" class="preview-nav">
+      <button id="previewPrev" class="btn btn--ghost btn--sm" type="button">← Trước</button>
+      <span id="previewCounter" class="muted"></span>
+      <button id="previewNext" class="btn btn--ghost btn--sm" type="button">Sau →</button>
+    </div>
+    <div id="previewSentWarning" class="message message--error" hidden>
+      Chứng chỉ này đã gửi. Đổi vị trí / cỡ chữ sẽ không thay đổi file đã gửi qua email.
+    </div>
+    <div id="previewMessage" class="message" hidden></div>
+    <div id="previewContent" class="template-preview-wrap">
+      <div id="certStage" class="cert-stage" hidden>
+        <img id="certImg" alt="Mẫu chứng chỉ">
+        <div id="sizeBar" class="cert-sizebar" hidden>
+          <button id="sizeMinus" type="button" aria-label="Giảm cỡ chữ">−</button>
+          <input id="sizeInput" type="number" min="10" max="200" step="1" aria-label="Cỡ chữ">
+          <button id="sizePlus" type="button" aria-label="Tăng cỡ chữ">+</button>
+        </div>
+      </div>
+    </div>
+    <div id="layoutEditor" class="layout-editor">
+      <div class="btn-row">
+        <button id="layoutSave" class="btn btn--primary" type="button">Lưu vị trí &amp; cỡ chữ</button>
+        <button id="layoutReset" class="btn btn--ghost" type="button" title="Bỏ các thay đổi chưa lưu">Hoàn tác</button>
+      </div>
+    </div>
+  </aside>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  // Có trang trước thuộc cùng web (vd. vào từ trang chi tiết sự kiện) thì quay về đúng
+  // trang đó; mở trực tiếp (gõ link, tab mới) thì đi theo href dự phòng.
+  const backButton = document.getElementById('backButton');
+  backButton.addEventListener('click', (event) => {
+    let sameSite = false;
+    try {
+      sameSite = !!document.referrer && new URL(document.referrer).origin === window.location.origin;
+    } catch (error) {
+      sameSite = false;
+    }
+    if (sameSite && window.history.length > 1) {
+      event.preventDefault();
+      window.history.back();
+    }
+  });
+})();
+</script>
+<script>
+(function () {
+  // Trang riêng của 1 sự kiện (/admin/events/<id>/checkins), không có ô chọn sự kiện
+  const EVENT_ID = {{ event.id }};
+  const EVENT_NAME = {{ event.ten_su_kien|tojson }};
+  const tbody = document.getElementById('checkinRows');
+  const selectAll = document.getElementById('selectAll');
+  const deleteButton = document.getElementById('deleteSelected');
+  const message = document.getElementById('pageMessage');
+  const sendButton = document.getElementById('sendCertificates');
+  const BADGES = { pending: 'badge--muted', sent: 'badge--success', failed: 'badge--warning', duplicate: 'badge--closed' };
+  let currentStatus = '';
+
+  function eventId() { return EVENT_ID; }
+
+  function showMessage(type, text) {
+    message.className = `message message--${type}`;
+    message.textContent = text;
+    message.hidden = false;
+  }
+
+  function cell(text, className) {
+    const td = document.createElement('td');
+    td.textContent = text;
+    if (className) td.className = className;
+    return td;
+  }
+
+  function selectedIds() {
+    return Array.from(tbody.querySelectorAll('.js-row-check:checked')).map((box) => Number(box.value));
+  }
+
+  function syncSelection() {
+    const boxes = tbody.querySelectorAll('.js-row-check');
+    const checked = selectedIds().length;
+    deleteButton.disabled = checked === 0;
+    deleteButton.textContent = checked ? `Xóa (${checked})` : 'Xóa';
+    sendButton.textContent = checked ? `Gửi lại các dòng đã chọn (${checked})` : 'Gửi chứng chỉ';
+    selectAll.checked = boxes.length > 0 && checked === boxes.length;
+    selectAll.indeterminate = checked > 0 && checked < boxes.length;
+  }
+
+  async function api(url, options) {
+    const response = await fetch(url, options);
+    const data = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
+    if (response.status === 401) {
+      window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+    }
+    return data;
+  }
+
+  function postJson(url, body) {
+    return api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  }
+
+  // Xem chứng chỉ của 1 dòng: mở panel nếu đang đóng, nếu đang mở thì chỉ đổi người
+  function showRow(row) {
+    if (previewPanel.hidden) openPreview(row);
+    else { previewRow = row; previewNotice('', ''); fillPreviewHeader(); markActiveRow(); updatePreviewNav(); renderPreview(); }
+  }
+
+  async function load() {
+    const query = currentStatus ? `?status=${encodeURIComponent(currentStatus)}` : '';
+    const data = await api(`/api/admin/events/${eventId()}/checkins${query}`);
+    if (!data.success) {
+      showMessage('error', data.message || 'Không tải được danh sách check-in.');
+      return;
+    }
+    const counts = data.counts;
+    document.getElementById('countCheckedIn').textContent = counts.checked_in;
+    document.getElementById('countPending').textContent = counts.pending;
+    document.getElementById('countSent').textContent = counts.sent;
+    document.getElementById('countFailed').textContent = counts.failed;
+    document.querySelectorAll('[data-count]').forEach((el) => { el.textContent = counts[el.dataset.count] ?? 0; });
+
+    tbody.replaceChildren();
+    if (!data.rows.length) {
+      const tr = document.createElement('tr');
+      const td = cell('Không có lượt check-in nào.');
+      td.colSpan = 9;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+    currentRows = data.rows;
+    data.rows.forEach((row) => {
+      const tr = document.createElement('tr');
+      tr.dataset.rowId = row.id;
+      tr.className = 'js-clickable-row';
+      const checkTd = document.createElement('td');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.className = 'js-row-check';
+      box.value = row.id;
+      box.setAttribute('aria-label', `Chọn dòng ${row.stt}`);
+      checkTd.appendChild(box);
+      tr.appendChild(checkTd);
+      tr.appendChild(cell(row.stt));
+      const codeTd = cell(row.patron_code);
+      tr.appendChild(codeTd);
+      tr.appendChild(cell(row.checkin_at));
+      const nameTd = cell(row.patron_name, row.from_registration ? 'muted' : '');
+      const emailTd = cell(row.patron_email, row.from_registration ? 'muted' : '');
+      if (row.from_registration) {
+        nameTd.title = emailTd.title = 'Tạm lấy theo dữ liệu đăng ký, sẽ được ghi chính thức khi gửi chứng chỉ';
+      }
+      if (row.cert_display_name) {
+        const printed = document.createElement('div');
+        printed.style.fontSize = '12px';
+        printed.textContent = `In: ${row.cert_display_name}`;
+        printed.title = 'Họ tên đã sửa tay để in trên chứng chỉ';
+        nameTd.appendChild(printed);
+      }
+      tr.appendChild(nameTd);
+      tr.appendChild(emailTd);
+      const statusTd = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = `badge ${BADGES[row.cert_status] || 'badge--muted'}`;
+      badge.textContent = row.cert_status_label;
+      statusTd.appendChild(badge);
+      tr.appendChild(statusTd);
+      tr.appendChild(cell(row.error_msg));
+      const actionTd = document.createElement('td');
+      const previewBtn = document.createElement('button');
+      previewBtn.type = 'button';
+      previewBtn.className = 'btn btn--ghost btn--sm';
+      previewBtn.textContent = 'Xem chứng chỉ';
+      previewBtn.addEventListener('click', () => showRow(row));
+      actionTd.appendChild(previewBtn);
+      if (row.cert_status !== 'duplicate') {
+        const resendRowBtn = document.createElement('button');
+        resendRowBtn.type = 'button';
+        resendRowBtn.className = 'btn btn--ghost btn--sm';
+        resendRowBtn.textContent = row.cert_status === 'pending' ? 'Gửi' : 'Gửi lại';
+        resendRowBtn.addEventListener('click', () => openResend(row));
+        actionTd.appendChild(resendRowBtn);
+      }
+      tr.appendChild(actionTd);
+      tbody.appendChild(tr);
+    });
+    syncSelection();
+    syncPreviewWithRows();
+    loadFailed();
+  }
+
+  document.querySelectorAll('#statusTabs .filter-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('#statusTabs .filter-tab').forEach((t) => t.classList.toggle('is-active', t === tab));
+      currentStatus = tab.dataset.status;
+      load();
+    });
+  });
+
+  selectAll.addEventListener('change', () => {
+    tbody.querySelectorAll('.js-row-check').forEach((box) => { box.checked = selectAll.checked; });
+    syncSelection();
+  });
+  tbody.addEventListener('change', (event) => {
+    if (event.target.classList.contains('js-row-check')) syncSelection();
+  });
+
+  document.getElementById('dedupeButton').addEventListener('click', async () => {
+    const name = EVENT_NAME;
+    if (!confirm(`Lọc trùng cho sự kiện "${name}"?\nMỗi mã chỉ giữ lần check-in sớm nhất, các lần còn lại chuyển sang "Trùng" (không xóa).`)) return;
+    const data = await postJson(`/api/admin/events/${eventId()}/checkins/dedupe`);
+    showMessage(data.success ? 'success' : 'error', data.message || 'Không thể lọc trùng.');
+    load();
+  });
+
+  const manualDialog = document.getElementById('khung');
+  manualDialog.addEventListener('click', (event) => {
+    if (event.target === manualDialog) manualDialog.close();
+  });
+
+  // ---- Nhập danh sách từ Excel (1 hoặc nhiều file): bước 1 kiểm tra (không ghi gì),
+  // bước 2 bấm Nhập mới lưu. Chỉ đưa vào danh sách, KHÔNG gửi email.
+  const importFile = document.getElementById('importFile');
+  const importCheck = document.getElementById('importCheck');
+  const importConfirm = document.getElementById('importConfirm');
+  const importResult = document.getElementById('importResult');
+  const importFileList = document.getElementById('importFileList');
+  const MAX_IMPORT_FILES = 20;
+  let importFiles = [];  // các file đang chọn; bấm ✕ để bỏ file chọn nhầm
+
+  function resetImport() {
+    importConfirm.hidden = true;
+    importResult.hidden = true;
+    importResult.replaceChildren();
+  }
+
+  function formatSize(bytes) {
+    return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  function renderImportFiles() {
+    importFileList.replaceChildren();
+    importFileList.hidden = importFiles.length === 0;
+    importCheck.disabled = importFiles.length === 0;
+    importCheck.textContent = importFiles.length > 1 ? `Kiểm tra ${importFiles.length} file` : 'Kiểm tra file';
+    importFiles.forEach((file, index) => {
+      const li = document.createElement('li');
+      const name = document.createElement('span');
+      name.textContent = `${file.name} (${formatSize(file.size)})`;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'import-file-remove';
+      remove.textContent = '✕';
+      remove.title = `Bỏ file ${file.name}`;
+      remove.setAttribute('aria-label', `Bỏ file ${file.name}`);
+      remove.addEventListener('click', () => {
+        importFiles.splice(index, 1);
+        resetImport();
+        renderImportFiles();
+      });
+      li.append(name, remove);
+      importFileList.appendChild(li);
+    });
+  }
+
+  function clearImportFiles() {
+    importFiles = [];
+    importFile.value = '';
+    resetImport();
+    renderImportFiles();
+  }
+
+  importFile.addEventListener('change', () => {
+    // Chọn thêm thì cộng dồn vào danh sách; chọn lại đúng file đã có thì bỏ qua
+    Array.from(importFile.files).forEach((file) => {
+      const exists = importFiles.some((item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified);
+      if (!exists) importFiles.push(file);
+    });
+    importFile.value = '';  // cho phép chọn lại cùng file sau khi đã bấm ✕
+    if (importFiles.length > MAX_IMPORT_FILES) {
+      importFiles = importFiles.slice(0, MAX_IMPORT_FILES);
+      showMessage('warning', `Tối đa ${MAX_IMPORT_FILES} file mỗi lần, các file sau đã bị bỏ qua.`);
+    }
+    resetImport();
+    renderImportFiles();
+  });
+
+  async function uploadImport(dryRun) {
+    const form = new FormData();
+    importFiles.forEach((file) => form.append('file', file));
+    if (dryRun) form.append('dry_run', '1');
+    return api(`/api/admin/events/${eventId()}/checkins/import`, { method: 'POST', body: form });
+  }
+
+  function renderImport(data, title) {
+    importResult.hidden = false;
+    importResult.replaceChildren();
+    const head = document.createElement('p');
+    head.className = `message message--${data.errors && data.errors.length ? 'warning' : 'success'}`;
+    head.textContent = title;
+    importResult.appendChild(head);
+    (data.notes || []).forEach((note) => {
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.textContent = note;
+      importResult.appendChild(p);
+    });
+    if (data.errors && data.errors.length) {
+      const table = document.createElement('table');
+      const thead = document.createElement('tr');
+      ['File', 'Dòng', 'Mã CB/SV', 'Lý do bỏ qua'].forEach((label) => {
+        const th = document.createElement('th');
+        th.textContent = label;
+        thead.appendChild(th);
+      });
+      table.appendChild(thead);
+      data.errors.forEach((err) => {
+        const tr = document.createElement('tr');
+        tr.appendChild(cell(err.file));
+        tr.appendChild(cell(err.row));
+        tr.appendChild(cell(err.code));
+        tr.appendChild(cell(err.reason, 'send-fail'));
+        table.appendChild(tr);
+      });
+      const wrap = document.createElement('div');
+      wrap.className = 'table-scroll import-errors';
+      wrap.appendChild(table);
+      importResult.appendChild(wrap);
+    }
+  }
+
+  importCheck.addEventListener('click', async () => {
+    if (!importFiles.length) return;
+    importCheck.disabled = true;
+    resetImport();
+    try {
+      const data = await uploadImport(true);
+      if (!data.success) {
+        renderImport({ errors: [] }, data.message || 'Không kiểm tra được file.');
+        importResult.firstChild.className = 'message message--error';
+        return;
+      }
+      renderImport(data, `${data.files} file — Hợp lệ: ${data.valid} dòng — Lỗi (sẽ bỏ qua): ${data.errors.length} dòng.`);
+      importConfirm.hidden = data.valid === 0;
+      importConfirm.textContent = `Nhập ${data.valid} dòng`;
+    } finally {
+      importCheck.disabled = false;
+    }
+  });
+
+  importConfirm.addEventListener('click', async () => {
+    const name = EVENT_NAME;
+    if (!confirm(`Nhập các dòng hợp lệ từ ${importFiles.length} file vào danh sách check-in của sự kiện "${name}"?\n(Chỉ thêm vào danh sách, chưa gửi email.)`)) return;
+    importConfirm.disabled = true;
+    try {
+      const data = await uploadImport(false);
+      showMessage(data.success ? 'success' : 'error', data.message || 'Không nhập được file.');
+      if (data.success) {
+        clearImportFiles();
+        load();
+      }
+    } finally {
+      importConfirm.disabled = false;
+    }
+  });
+  document.getElementById('manualForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const code = document.getElementById('manualCode').value.trim();
+    if (!code) return;
+    const data = await postJson(`/api/admin/events/${eventId()}/checkins`, {
+      patron_code: code,
+      checkin_at: document.getElementById('manualTime').value,
+    });
+    showMessage(data.success ? 'success' : 'error', data.message || 'Không thể thêm check-in.');
+    if (data.success) {
+      document.getElementById('manualCode').value = '';
+      load();
+    }
+  });
+
+  deleteButton.addEventListener('click', async () => {
+    const ids = selectedIds();
+    if (!ids.length) return;
+    if (!confirm(`Xóa ${ids.length} dòng check-in đã chọn? Không thể hoàn tác.`)) return;
+    const data = await postJson(`/api/admin/events/${eventId()}/checkins/delete`, { ids });
+    showMessage(data.success ? 'success' : 'error', data.message || 'Không thể xóa.');
+    load();
+  });
+
+  // Tải đúng danh sách đang hiển thị (theo bộ lọc trạng thái hiện tại)
+  document.getElementById('exportButton').addEventListener('click', () => {
+    const query = currentStatus ? `?status=${encodeURIComponent(currentStatus)}` : '';
+    window.location.href = `/api/admin/events/${eventId()}/checkins/export${query}`;
+  });
+
+  // ---- Gửi chứng chỉ: server gửi nền, trang này chỉ theo dõi (polling 1,5 giây/lần).
+  // Đóng tab thì server vẫn gửi tiếp; mở lại trang thì watchJob() hiện lại tiến độ.
+  const sendPanel = document.getElementById('sendPanel');
+  const sendLast = document.getElementById('sendLast');
+  const sendSummary = document.getElementById('sendSummary');
+  const sendCurrent = document.getElementById('sendCurrent');
+  const POLL_MS = 1500;
+  let pollTimer = null;
+  let jobRunning = false;
+  let watchToken = 0;  // đổi sự kiện thì bỏ các lượt polling của sự kiện cũ
+
+  function setRunning(running) {
+    jobRunning = running;
+    sendButton.disabled = running;  // khoá nút Gửi trong lúc đang gửi
+  }
+
+  function renderJob(job) {
+    sendPanel.hidden = false;
+    const done = job.state === 'done';
+    document.getElementById('sendProgressText').textContent = `Đã gửi ${job.sent} / ${job.total} — Lỗi: ${job.failed}`;
+    document.getElementById('sendStateText').textContent = done
+      ? `Bắt đầu ${job.started_at} · xong ${job.finished_at}`
+      : (job.state === 'queued' ? 'Đang chờ đến lượt...' : `Bắt đầu ${job.started_at}`);
+    document.getElementById('sendProgressBar').style.width = `${job.total ? Math.round((job.processed / job.total) * 100) : 0}%`;
+
+    sendCurrent.hidden = done || !job.current;
+    if (job.current) {
+      sendCurrent.textContent = `Đang gửi tới: ${job.current.code}${job.current.name ? ' — ' + job.current.name : ''}`;
+    }
+
+    sendSummary.hidden = !done;
+    if (done) {
+      sendSummary.className = `message message--${job.failed ? 'warning' : 'success'}`;
+      sendSummary.textContent = `Đã xong đợt gửi: ${job.sent} thành công, ${job.failed} lỗi.`;
+    }
+
+    // Chỉ báo người vừa gửi xong gần nhất, không hiện cả nhật ký
+    const last = job.log.length ? job.log[job.log.length - 1] : null;
+    sendLast.hidden = !last;
+    if (last) {
+      const who = `${last.code}${last.name ? ' — ' + last.name : ''}`;
+      sendLast.className = `send-current ${last.ok ? 'send-ok' : 'send-fail'}`;
+      sendLast.textContent = last.ok
+        ? `✓ Đã gửi đến: ${who}${last.email ? ' (' + last.email + ')' : ''}`
+        : `✗ Không gửi được cho ${who}: ${last.reason}`;
+    }
+  }
+
+  async function pollJob(token, reloadWhenDone) {
+    if (token !== watchToken) return;
+    let data;
+    try {
+      data = await api(`/api/admin/events/${eventId()}/send-certificates/status`);
+    } catch (error) {
+      pollTimer = window.setTimeout(() => pollJob(token, reloadWhenDone), POLL_MS * 2);
+      return;
+    }
+    if (token !== watchToken) return;
+    const job = data.job;
+    if (!job) {
+      sendPanel.hidden = true;
+      setRunning(false);
+      return;
+    }
+    renderJob(job);
+    const running = job.state === 'queued' || job.state === 'running';
+    setRunning(running);
+    if (running) {
+      pollTimer = window.setTimeout(() => pollJob(token, true), POLL_MS);
+    } else if (reloadWhenDone) {
+      load();  // cập nhật bảng chính + bảng cần xử lý thủ công
+      loadStorage();  // số file chứng chỉ vừa tạo trên server
+    }
+  }
+
+  function watchJob() {
+    window.clearTimeout(pollTimer);
+    pollJob(++watchToken, false);
+  }
+
+  async function startSend(ids) {
+    // Đếm trước để hỏi xác nhận đúng số người sẽ gửi (mỗi mã chỉ tính 1 lần)
+    const body = ids ? { ids } : {};
+    const preview = await postJson(`/api/admin/events/${eventId()}/send-certificates`, { ...body, dry_run: true });
+    if (!preview.success) {
+      showMessage('error', preview.message || 'Không thể gửi chứng chỉ.');
+      return false;
+    }
+    if (preview.running) {
+      showMessage('warning', 'Đang có đợt gửi cho sự kiện này, vui lòng chờ xong.');
+      watchJob();
+      return false;
+    }
+    if (!preview.count) {
+      showMessage('warning', ids
+        ? 'Các dòng đã chọn không có ai để gửi (dòng trùng được bỏ qua).'
+        : "Không còn ai ở trạng thái 'Chưa gửi'. Muốn gửi lại dòng lỗi, hãy chọn dòng đó rồi bấm Gửi chứng chỉ.");
+      return false;
+    }
+    if (!confirm(`Sẽ gửi chứng chỉ cho ${preview.count} người. Tiếp tục?`)) return false;
+
+    setRunning(true);
+    const data = await postJson(`/api/admin/events/${eventId()}/send-certificates`, body);
+    if (!data.success) {
+      setRunning(false);
+      showMessage('error', data.message || 'Không thể gửi chứng chỉ.');
+      return false;
+    }
+    message.hidden = true;
+    renderJob(data.job);
+    window.clearTimeout(pollTimer);
+    const token = ++watchToken;
+    pollTimer = window.setTimeout(() => pollJob(token, true), POLL_MS);
+    return true;
+  }
+
+  sendButton.addEventListener('click', () => {
+    if (jobRunning) return;
+    const ids = selectedIds();
+    startSend(ids.length ? ids : null);
+  });
+
+  // ---- Gửi lại 1 dòng (cả dòng đã 'sent'): cùng cơ chế gửi nền tuần tự của đợt gửi.
+  // Gửi lên email chỉ khi khác email tra được (đã có email nhập tay từ trước thì giữ
+  // nguyên giá trị đang hiện). Xoá trống ô email = bỏ email nhập tay.
+  async function resendRow(row, code, email) {
+    const lookedUpEmail = row.email_override ? '' : (row.patron_email || '');
+    const emailOverride = email && email !== lookedUpEmail ? email : '';
+    const data = await postJson(`/api/admin/events/${eventId()}/checkins/${row.id}/resend`, { patron_code: code, email: emailOverride });
+    if (!data.success) {
+      showMessage('error', data.message || 'Không thể gửi lại.');
+      return false;
+    }
+    setRunning(true);
+    renderJob(data.job);
+    window.clearTimeout(pollTimer);
+    const token = ++watchToken;
+    pollTimer = window.setTimeout(() => pollJob(token, true), POLL_MS);
+    return true;
+  }
+
+  const resendModal = document.getElementById('resendModal');
+  const resendEmail = document.getElementById('resendEmail');
+  const resendConfirm = document.getElementById('resendConfirm');
+  let resendTarget = null;
+
+  function openResend(row) {
+    if (jobRunning) {
+      showMessage('warning', 'Đang có đợt gửi, vui lòng chờ xong rồi gửi lại.');
+      return;
+    }
+    resendTarget = row;
+    document.getElementById('resendTitle').textContent = `${row.patron_code}${row.patron_name ? ' — ' + row.patron_name : ''}`;
+    document.getElementById('resendQuestion').textContent = row.send_count
+      ? `Người này đã được gửi ${row.send_count} lần, gửi lại?`
+      : 'Người này chưa được gửi lần nào, gửi ngay?';
+    resendEmail.value = row.email_override || row.patron_email || '';
+    resendConfirm.disabled = false;
+    resendModal.hidden = false;
+    resendEmail.focus();
+  }
+
+  resendConfirm.addEventListener('click', async () => {
+    if (!resendTarget) return;
+    resendConfirm.disabled = true;
+    if (await resendRow(resendTarget, resendTarget.patron_code, resendEmail.value.trim())) {
+      resendModal.hidden = true;
+    } else {
+      resendConfirm.disabled = false;
+    }
+  });
+  document.querySelectorAll('[data-close-resend]').forEach((el) => el.addEventListener('click', () => { resendModal.hidden = true; }));
+
+  // ---- Bảng CẦN XỬ LÝ THỦ CÔNG: chỉ các dòng 'failed' (đã gửi thành công thì không hiện)
+  const failedPanel = document.getElementById('failedPanel');
+  const failedRows = document.getElementById('failedRows');
+
+  async function loadFailed() {
+    const data = await api(`/api/admin/events/${eventId()}/checkins?status=failed`);
+    if (!data.success) return;
+    document.getElementById('failedCount').textContent = data.rows.length;
+    failedPanel.hidden = data.rows.length === 0;
+    failedRows.replaceChildren();
+    data.rows.forEach((row) => {
+      const tr = document.createElement('tr');
+      const codeTd = document.createElement('td');
+      const codeInput = document.createElement('input');
+      codeInput.value = row.patron_code;
+      codeInput.setAttribute('aria-label', 'Mã CB/SV');
+      codeTd.appendChild(codeInput);
+      tr.appendChild(codeTd);
+      tr.appendChild(cell(row.cert_display_name || row.patron_name));
+      const emailTd = document.createElement('td');
+      const emailInput = document.createElement('input');
+      emailInput.type = 'email';
+      emailInput.placeholder = 'Nhập email tay';
+      emailInput.value = row.email_override || row.patron_email || '';
+      emailInput.setAttribute('aria-label', 'Email');
+      emailTd.appendChild(emailInput);
+      tr.appendChild(emailTd);
+      tr.appendChild(cell(row.error_msg, 'send-fail'));
+      const actionTd = document.createElement('td');
+      const resendBtn = document.createElement('button');
+      resendBtn.type = 'button';
+      resendBtn.className = 'btn btn--primary btn--sm';
+      resendBtn.textContent = 'Lưu & gửi lại';
+      resendBtn.addEventListener('click', async () => {
+        if (jobRunning) {
+          showMessage('warning', 'Đang có đợt gửi, vui lòng chờ xong rồi gửi lại.');
+          return;
+        }
+        const code = codeInput.value.trim();
+        const email = emailInput.value.trim();
+        if (!confirm(`Sẽ gửi chứng chỉ cho 1 người (mã ${code}${email ? ', email ' + email : ''}). Tiếp tục?`)) return;
+        resendBtn.disabled = true;
+        if (!(await resendRow(row, code, email))) resendBtn.disabled = false;
+      });
+      actionTd.appendChild(resendBtn);
+      tr.appendChild(actionTd);
+      failedRows.appendChild(tr);
+    });
+  }
+
+  document.getElementById('exportFailed').addEventListener('click', () => {
+    window.location.href = `/api/admin/events/${eventId()}/checkins/export?status=failed`;
+  });
+
+  // ---- Xem trước chứng chỉ: panel cạnh bảng. Chữ được dựng ngay trên ảnh mẫu (kéo thả như
+  // trình thiết kế chứng chỉ); "Xem bản thật" nhờ server vẽ bằng CÙNG hàm với bản gửi qua email.
+  const CERT_LAYOUT = {{ cert_layout|tojson }};            // {fields, width, height}
+  const TEMPLATE_URL = {{ cert_template_url|tojson }};     // null = chưa có mẫu / chưa bật
+  const SAMPLE = { student_name: 'Nguyễn Văn A', ma_cbsv: '2456090063', don_vi: 'Công tác xã hội - Nhân học' };
+  const FIELD_LABELS = {
+    student_name: 'Họ tên', ma_cbsv: 'Mã CB/SV', don_vi: 'Đơn vị',
+    issue_date: 'Ngày cấp', certificate_code: 'Mã chứng chỉ', event_name: 'Tên sự kiện',
+  };
+  const LAYOUT_KEYS = ['x', 'y', 'size', 'color', 'bold', 'align', 'max_width', 'font_file', 'font_name'];
+  const clone = (value) => JSON.parse(JSON.stringify(value));
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+  const layoutEl = document.getElementById('checkinsLayout');
+  const previewPanel = document.getElementById('previewPanel');
+  const previewMessage = document.getElementById('previewMessage');
+  const sentWarning = document.getElementById('previewSentWarning');
+  const certStage = document.getElementById('certStage');
+  const certImg = document.getElementById('certImg');
+  const sizeBar = document.getElementById('sizeBar');
+  const sizeInput = document.getElementById('sizeInput');
+  let currentRows = [];       // các dòng đang hiển thị, để duyệt Trước / Sau
+  let previewRow = null;      // null = dữ liệu mẫu
+  let savedFields = clone(CERT_LAYOUT.fields);   // bản đã lưu trên server
+  let design = clone(CERT_LAYOUT.fields);        // bản đang chỉnh (chưa lưu)
+  const baseW = CERT_LAYOUT.width;
+  const baseH = CERT_LAYOUT.height;
+  let selectedField = null;   // chưa chọn trường nào: không hiện khung
+  let dirty = false;
+
+  function previewNotice(type, text) {
+    previewMessage.className = `message message--${type}`;
+    previewMessage.textContent = text;
+    previewMessage.hidden = !text;
+  }
+
+  function layoutPayload() {
+    const out = {};
+    Object.entries(design).forEach(([field, config]) => {
+      out[field] = {};
+      LAYOUT_KEYS.forEach((key) => { if (config[key] !== undefined) out[field][key] = config[key]; });
+    });
+    return out;
+  }
+
+  // ---- chữ dựng trên ảnh mẫu ----
+  function scaleNow() {
+    return certStage.clientWidth / baseW;
+  }
+
+  function textFor(field) {
+    const row = previewRow;
+    const today = new Date();
+    switch (field) {
+      case 'student_name': return row ? (row.cert_display_name || row.patron_name || row.patron_code) : SAMPLE.student_name;
+      case 'ma_cbsv': return row ? row.patron_code : SAMPLE.ma_cbsv;
+      case 'don_vi': return row ? (row.patron_unit || '') : SAMPLE.don_vi;
+      case 'issue_date': return `TP. Hồ Chí Minh, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`;
+      case 'certificate_code': return `Mã chứng nhận: USSH-${today.getFullYear()}-EVENT${String(EVENT_ID).padStart(3, '0')}-XXXXXX`;
+      case 'event_name': return EVENT_NAME;
+      default: return field;
+    }
+  }
+
+  function positionField(el, config) {
+    const scale = scaleNow();
+    const align = config.align || 'left';
+    el.style.left = `${config.x * scale}px`;
+    el.style.top = `${config.y * scale}px`;
+    el.style.transform = align === 'center' ? 'translateX(-50%)' : (align === 'right' ? 'translateX(-100%)' : 'none');
+    el.style.textAlign = align;
+    el.style.fontSize = `${(config.size || 48) * scale}px`;
+    el.style.color = config.color || '#0646c8';
+    el.style.fontWeight = config.bold === false ? '400' : '700';
+    el.style.fontFamily = `"${config.__family || 'Arial'}", Arial, sans-serif`;
+    el.style.width = config.max_width ? `${config.max_width * scale}px` : '';
+  }
+
+  function renderTexts() {
+    certStage.querySelectorAll('.cert-field').forEach((el) => el.remove());
+    Object.keys(design).forEach((field) => {
+      const config = design[field];
+      const el = document.createElement('div');
+      el.className = 'cert-field';
+      el.dataset.field = field;
+      el.textContent = textFor(field);
+      el.title = FIELD_LABELS[field] || field;
+      positionField(el, config);
+      if (field === selectedField) {
+        el.classList.add('selected');
+        const handle = document.createElement('span');
+        handle.className = 'resize-handle';
+        handle.addEventListener('pointerdown', (event) => startResize(event, field));
+        el.appendChild(handle);
+      }
+      el.addEventListener('pointerdown', (event) => startMove(event, field));
+      el.addEventListener('keydown', (event) => nudge(event, field));
+      el.tabIndex = 0;
+      certStage.appendChild(el);
+    });
+    positionSizeBar();
+  }
+
+  function restyleField(field) {
+    const el = certStage.querySelector(`.cert-field[data-field="${field}"]`);
+    if (el) positionField(el, design[field]);
+  }
+
+  // Tải font riêng của từng trường (nếu có) để chữ trên ảnh giống bản in
+  const loadedFamilies = new Map();
+  function loadFieldFonts() {
+    Object.entries(design).forEach(([field, config]) => {
+      if (!config.font_file || config.__family) return;
+      const url = `/static/${config.font_file}`;
+      if (loadedFamilies.has(url)) { config.__family = loadedFamilies.get(url); return; }
+      const family = `certfont_${loadedFamilies.size}`;
+      new FontFace(family, `url(${url})`).load().then((face) => {
+        document.fonts.add(face);
+        loadedFamilies.set(url, family);
+        config.__family = family;
+        restyleField(field);
+      }).catch(() => {});
+    });
+  }
+
+  // ---- kéo thả ----
+  function selectField(field) {
+    if (selectedField === field) return;
+    selectedField = field;
+    renderTexts();
+  }
+
+  // Thanh tăng / giảm cỡ chữ: hiện cạnh chữ đang chọn, ẩn khi không chọn gì
+  function positionSizeBar() {
+    const el = selectedField && certStage.querySelector(`.cert-field[data-field="${selectedField}"]`);
+    if (!el) { sizeBar.hidden = true; return; }
+    if (document.activeElement !== sizeInput) sizeInput.value = design[selectedField].size;
+    sizeBar.hidden = false;
+    const stageRect = certStage.getBoundingClientRect();
+    const rect = el.getBoundingClientRect();
+    let top = rect.top - stageRect.top - sizeBar.offsetHeight - 12;
+    if (top < 0) top = rect.bottom - stageRect.top + 12;
+    const left = clamp(rect.left - stageRect.left, 0, Math.max(0, stageRect.width - sizeBar.offsetWidth));
+    sizeBar.style.left = `${left}px`;
+    sizeBar.style.top = `${top}px`;
+  }
+
+  function changeField(field, patch) {
+    Object.assign(design[field], patch);
+    dirty = true;
+    restyleField(field);
+    syncControls();
+    positionSizeBar();
+  }
+
+  function startMove(event, field) {
+    if (event.target.classList.contains('resize-handle')) return;
+    event.preventDefault();
+    selectField(field);
+    const el = certStage.querySelector(`.cert-field[data-field="${field}"]`);
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const origin = { x: design[field].x, y: design[field].y };
+    const scale = scaleNow();
+    el.setPointerCapture(event.pointerId);
+    const onMove = (moveEvent) => {
+      changeField(field, {
+        x: clamp(Math.round(origin.x + (moveEvent.clientX - startX) / scale), 0, baseW),
+        y: clamp(Math.round(origin.y + (moveEvent.clientY - startY) / scale), 0, baseH),
+      });
+    };
+    const onUp = () => {
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+    };
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+  }
+
+  function startResize(event, field) {
+    event.preventDefault();
+    event.stopPropagation();
+    const handle = event.currentTarget;
+    const startX = event.clientX;
+    const startSize = design[field].size || 48;
+    const scale = scaleNow();
+    handle.setPointerCapture(event.pointerId);
+    const onMove = (moveEvent) => {
+      changeField(field, { size: clamp(Math.round(startSize + ((moveEvent.clientX - startX) / scale) * 0.8), 10, 200) });
+    };
+    const onUp = () => {
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onUp);
+    };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
+  }
+
+  function nudge(event, field) {
+    const step = event.shiftKey ? 10 : 2;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    const move = moves[event.key];
+    if (!move) return;
+    event.preventDefault();
+    changeField(field, {
+      x: clamp(design[field].x + move[0], 0, baseW),
+      y: clamp(design[field].y + move[1], 0, baseH),
+    });
+  }
+
+  // ---- các ô nhập số bên dưới ----
+  function syncControls() {
+    document.getElementById('layoutSave').disabled = !dirty;
+    document.getElementById('layoutReset').disabled = !dirty;
+  }
+
+  function buildEditor() {
+    if (!design[selectedField]) selectedField = null;
+    loadFieldFonts();
+    renderTexts();
+    syncControls();
+  }
+
+  // ---- lưu / hoàn tác ----
+  document.getElementById('layoutSave').addEventListener('click', async () => {
+    if (Number(document.getElementById('countSent').textContent) > 0 &&
+        !confirm('Vị trí / cỡ chữ mới áp dụng cho các chứng chỉ gửi từ giờ. Chứng chỉ đã gửi qua email sẽ không đổi. Vẫn lưu?')) return;
+    const data = await postJson(`/api/admin/events/${eventId()}/certificate-layout`, {
+      layout: layoutPayload(), base_width: baseW, base_height: baseH,
+    });
+    previewNotice(data.success ? 'success' : 'error', data.message || 'Không thể lưu vị trí chữ.');
+    if (!data.success) return;
+    savedFields = clone(design);
+    dirty = false;
+    syncControls();
+  });
+  document.getElementById('layoutReset').addEventListener('click', () => {
+    design = clone(savedFields);
+    dirty = false;
+    previewNotice('', '');
+    buildEditor();
+  });
+
+  // ---- chỉnh cỡ chữ bằng thanh nổi + bỏ chọn khi bấm ra ngoài chữ ----
+  sizeInput.addEventListener('input', () => {
+    const value = Math.round(Number(sizeInput.value));
+    if (selectedField && sizeInput.value !== '' && Number.isFinite(value)) {
+      changeField(selectedField, { size: clamp(value, 10, 200) });
+    }
+  });
+  document.getElementById('sizeMinus').addEventListener('click', () => {
+    if (selectedField) changeField(selectedField, { size: clamp(design[selectedField].size - 2, 10, 200) });
+  });
+  document.getElementById('sizePlus').addEventListener('click', () => {
+    if (selectedField) changeField(selectedField, { size: clamp(design[selectedField].size + 2, 10, 200) });
+  });
+  certStage.addEventListener('pointerdown', (event) => {
+    if (event.target === certStage && selectedField) {
+      selectedField = null;
+      renderTexts();
+    }
+  });
+
+  // ---- mở / đóng / duyệt ----
+  function markActiveRow() {
+    tbody.querySelectorAll('tr[data-row-id]').forEach((tr) => {
+      tr.classList.toggle('is-active', !!previewRow && Number(tr.dataset.rowId) === previewRow.id);
+    });
+  }
+
+  function updatePreviewNav() {
+    const index = previewRow ? currentRows.findIndex((item) => item.id === previewRow.id) : -1;
+    document.getElementById('previewNav').hidden = index < 0;
+    document.getElementById('previewCounter').textContent = index >= 0 ? `${index + 1} / ${currentRows.length}` : '';
+    document.getElementById('previewPrev').disabled = index <= 0;
+    document.getElementById('previewNext').disabled = index < 0 || index >= currentRows.length - 1;
+  }
+
+  function fillPreviewHeader() {
+    const row = previewRow;
+    document.getElementById('previewEyebrow').textContent = row ? `Mã ${row.patron_code}` : 'Xem trước mẫu (dữ liệu mẫu)';
+    document.getElementById('previewTitle').textContent = row ? (row.cert_display_name || row.patron_name || row.patron_code) : EVENT_NAME;
+    sentWarning.hidden = !row || row.cert_status !== 'sent';
+  }
+
+  // Đổi người đang xem mà giữ nguyên cấu hình đang chỉnh
+  function setRow(row) {
+    previewRow = row;
+    previewNotice('', '');
+    fillPreviewHeader();
+    markActiveRow();
+    updatePreviewNav();
+    renderTexts();
+  }
+
+  function openPreview(row) {
+    previewPanel.hidden = false;
+    layoutEl.classList.add('has-preview');
+    if (!TEMPLATE_URL) {
+      // Chưa có mẫu / chưa bật chứng chỉ: hướng dẫn thay vì để trống
+      previewRow = row;
+      fillPreviewHeader();
+      certStage.hidden = true;
+      document.getElementById('layoutEditor').hidden = true;
+      previewNotice('error', 'Sự kiện này chưa có mẫu giấy chứng nhận (hoặc chưa bật chứng chỉ). Vui lòng vào trang quản trị sự kiện để tải mẫu lên.');
+      markActiveRow();
+      updatePreviewNav();
+      return;
+    }
+    if (!certImg.getAttribute('src')) certImg.src = TEMPLATE_URL;
+    certStage.hidden = false;
+    setRow(row);
+    buildEditor();
+  }
+
+  function closePreview() {
+    if (dirty && !confirm('Có thay đổi vị trí / cỡ chữ chưa lưu. Đóng và bỏ các thay đổi này?')) return;
+    design = clone(savedFields);
+    dirty = false;
+    previewPanel.hidden = true;
+    layoutEl.classList.remove('has-preview');
+    previewRow = null;
+    markActiveRow();
+  }
+
+  function showRow(row) {
+    if (previewPanel.hidden) openPreview(row);
+    else if (TEMPLATE_URL) setRow(row);
+    else { previewRow = row; fillPreviewHeader(); markActiveRow(); updatePreviewNav(); }
+  }
+
+  function stepPreview(delta) {
+    const index = currentRows.findIndex((item) => item.id === previewRow.id);
+    const next = currentRows[index + delta];
+    if (next) showRow(next);
+  }
+
+  // Sau mỗi lần tải lại bảng: đồng bộ dữ liệu dòng đang xem, hoặc đóng nếu dòng đã bị xoá
+  function syncPreviewWithRows() {
+    if (previewPanel.hidden || !previewRow) { updatePreviewNav(); return; }
+    const fresh = currentRows.find((item) => item.id === previewRow.id);
+    if (!fresh) { dirty = false; closePreview(); return; }
+    previewRow = fresh;
+    fillPreviewHeader();
+    markActiveRow();
+    updatePreviewNav();
+  }
+
+  document.getElementById('previewPrev').addEventListener('click', () => stepPreview(-1));
+  document.getElementById('previewNext').addEventListener('click', () => stepPreview(1));
+  document.getElementById('previewClose').addEventListener('click', closePreview);
+  // Bấm vào dòng (không phải ô chọn / nút) để xem chứng chỉ của người đó
+  tbody.addEventListener('click', (event) => {
+    if (event.target.closest('input, button, a')) return;
+    const tr = event.target.closest('tr[data-row-id]');
+    if (!tr) return;
+    const row = currentRows.find((item) => item.id === Number(tr.dataset.rowId));
+    if (row) showRow(row);
+  });
+
+  // Ảnh tải xong hoặc khung đổi kích thước (mở panel, thu cửa sổ) thì dựng lại cỡ chữ
+  certImg.addEventListener('load', () => { if (!previewPanel.hidden) renderTexts(); });
+  if (window.ResizeObserver) {
+    let lastWidth = 0;
+    new ResizeObserver(() => {
+      if (certStage.hidden || certStage.clientWidth === lastWidth) return;
+      lastWidth = certStage.clientWidth;
+      renderTexts();
+    }).observe(certStage);
+  }
+
+  // ---- Lưu trữ chứng chỉ: tải ZIP về máy rồi mới dọn file trên server ----
+  const zipButton = document.getElementById('zipButton');
+  const purgeButton = document.getElementById('purgeButton');
+  let storedCount = 0;
+  let storedLabel = '';
+  let zipDownloaded = false;   // đã bấm Tải ZIP trong lần mở trang này
+
+  async function loadStorage() {
+    const data = await api(`/api/admin/events/${eventId()}/certificates/storage`);
+    if (!data.success) return;
+    storedCount = data.count;
+    storedLabel = data.size_label;
+    zipButton.disabled = storedCount === 0;
+    purgeButton.disabled = storedCount === 0;
+    purgeButton.textContent = storedCount ? `Xóa file trên server (${storedCount} file, ${storedLabel})` : 'Xóa file trên server';
+  }
+
+  zipButton.addEventListener('click', () => {
+    zipDownloaded = true;
+    window.location.href = `/api/admin/events/${eventId()}/certificates/archive`;
+  });
+
+  purgeButton.addEventListener('click', async () => {
+    const warning = zipDownloaded
+      ? ''
+      : '\n\nLƯU Ý: bạn CHƯA bấm "Tải ZIP chứng chỉ" trong lần mở trang này. Nên tải về máy trước khi xóa.';
+    if (!confirm(`Xóa ${storedCount} file chứng chỉ (${storedLabel}) của sự kiện này khỏi server?\n\n` +
+        'Chứng chỉ sinh viên đã nhận qua email không bị ảnh hưởng. Thông tin chứng chỉ vẫn được giữ; ' +
+        'khi có người mở lại, hệ thống sẽ tự vẽ lại theo mẫu hiện tại.' + warning)) return;
+    const data = await postJson(`/api/admin/events/${eventId()}/certificates/purge`, { confirm: true });
+    showMessage(data.success ? 'success' : 'error', data.message || 'Không thể xóa file.');
+    loadStorage();
+  });
+
+  load();
+  loadStorage();
+  watchJob();
+})();
+</script>
+{% endblock %}

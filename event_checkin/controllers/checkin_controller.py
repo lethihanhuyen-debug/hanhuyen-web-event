@@ -1,52 +1,15 @@
-import os
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
-from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for
-from sqlalchemy.exc import IntegrityError
-from event_checkin.certificates.service import (
-    CertificateError,
-    generate_certificate,
-    get_certificate_file_path,
-)
 from event_checkin.models import db
-from event_checkin.models.checkin import CheckIn
-from event_checkin.models.email_log import EmailLog
+from event_checkin.models.checkin_record import CheckinRecord
 from event_checkin.models.event import Event
 from event_checkin.models.registration import Registration
-from event_checkin.models.user import User
-from event_checkin.utils.email_service import send_checkin_email
-from event_checkin.utils.timezone import format_utc_as_vn
+from event_checkin.utils.timezone import now_vn_naive
 
+
+CHECKIN_SUCCESS_MESSAGE = "Check-in thành công! Chứng chỉ sẽ được gửi qua email sau sự kiện."
 
 checkin_bp = Blueprint("checkin", __name__)
-
-# Certificate rendering (Pillow, CPU-bound) + the live SMTP round-trip both
-# happen off the request thread (see _process_checkin_extras). A bounded pool
-# instead of one raw thread per check-in caps how many run at once, so a burst
-# of simultaneous check-ins (e.g. everyone arriving at once) queues extra work
-# instead of spawning hundreds of threads that fight each other for CPU/Gmail.
-_checkin_extras_executor = ThreadPoolExecutor(
-    max_workers=int(os.getenv("CHECKIN_WORKER_THREADS", "6")),
-    thread_name_prefix="checkin-extras",
-)
-
-
-def _format_vn_datetime(dt):
-    # thoi_gian_checkin is stored via datetime.utcnow() (see below), so it must be
-    # converted to Vietnam local time before display -- formatting it as-is showed
-    # the UTC hour (7 hours behind actual Vietnam wall-clock time).
-    return format_utc_as_vn(dt, "%H:%M ngay %d/%m/%Y")
-
-
-def _already_checked_in_response(user, existing_checkin):
-    return jsonify({
-        "success": False,
-        "checked_in": True,
-        "message": f"{user.ho_ten} đã check-in lúc {_format_vn_datetime(existing_checkin.thoi_gian_checkin)}.",
-        "ho_ten": user.ho_ten,
-        "thoi_gian": _format_vn_datetime(existing_checkin.thoi_gian_checkin),
-    }), 200
 
 
 def _events_open_for_checkin():
@@ -76,52 +39,6 @@ def event_index(event_id):
     return render_template("checkin/index.html", event=event)
 
 
-def _process_checkin_extras(app, base_url, ma_cbsv, event_id, ho_ten, email, thoi_gian_checkin, ten_su_kien):
-    # Runs in a background thread so the check-in request doesn't block on PDF
-    # rendering + a live SMTP round-trip to Gmail (the two slow steps). Needs a
-    # request context (not just an app context) because generate_certificate()
-    # and url_for(..., _external=True) call url_for() internally, which requires
-    # one -- test_request_context() gives a valid, cheap one outside a real request.
-    with app.test_request_context(base_url=base_url):
-        certificate = None
-        certificate_path = None
-        try:
-            certificate, _ = generate_certificate(ma_cbsv, event_id=event_id, file_type="pdf")
-            certificate_path = get_certificate_file_path(certificate)
-        except CertificateError:
-            certificate = None
-            certificate_path = None
-
-        verify_url = None
-        if certificate:
-            verify_url = url_for("certificates.verify", certificate_code=certificate.certificate_code, _external=True)
-
-        email_sent, email_error = send_checkin_email(
-            ho_ten,
-            email,
-            thoi_gian_checkin,
-            ten_su_kien=ten_su_kien,
-            certificate_path=certificate_path,
-            certificate_code=certificate.certificate_code if certificate else None,
-            verify_url=verify_url,
-            return_error=True,
-        )
-
-        db.session.add(EmailLog(
-            ma_cbsv=ma_cbsv,
-            event_id=event_id,
-            email_to=email or "",
-            email_type="checkin_certificate",
-            subject="Xác nhận tham gia sự kiện",
-            certificate_code=certificate.certificate_code if certificate else None,
-            attachment_path=str(certificate_path) if certificate_path else None,
-            trang_thai="success" if email_sent else "failed",
-            error_message=email_error,
-            sent_at=datetime.utcnow(),
-        ))
-        db.session.commit()
-
-
 @checkin_bp.post("/api/checkin")
 def checkin():
     payload = request.get_json(silent=True) or request.form
@@ -141,10 +58,8 @@ def checkin():
     if not Event.query.get(event_id):
         return jsonify({"success": False, "message": "Sự kiện không tồn tại."}), 404
 
-    user = User.query.filter_by(ma_cbsv=ma_cbsv).first()
-    if not user:
-        return jsonify({"success": False, "message": f"Mã {ma_cbsv} không tồn tại trong hệ thống."}), 404
-
+    # Vẫn bắt buộc đã đăng ký sự kiện (1 truy vấn theo UNIQUE index, rất nhanh) vì
+    # chưa tích hợp Sierra: họ tên/email để gửi chứng chỉ lấy từ dữ liệu đăng ký.
     registration = Registration.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
     if not registration:
         return jsonify({"success": False, "message": f"Mã {ma_cbsv} chưa đăng ký sự kiện này."}), 404
@@ -155,65 +70,16 @@ def checkin():
     if event_status == "ended":
         return jsonify({"success": False, "message": "Sự kiện đã kết thúc, không thể check-in."}), 400
 
-    existing_checkin = CheckIn.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
-
-    if existing_checkin:
-        return _already_checked_in_response(user, existing_checkin)
-
-    checkin_record = CheckIn(
-        ma_cbsv=ma_cbsv,
+    # Chỉ INSERT 1 dòng: không kiểm tra quét trùng (dòng trùng được đánh dấu
+    # 'duplicate' lúc gửi chứng chỉ), không tra cứu, không tạo chứng chỉ, không
+    # gửi email -- việc đó do admin bấm "Gửi chứng chỉ" (certificates/mailer.py).
+    # Giờ check-in luôn do server tạo theo giờ Việt Nam, không nhận từ client.
+    db.session.add(CheckinRecord(
         event_id=event_id,
-        thoi_gian_checkin=datetime.utcnow(),
-    )
-    db.session.add(checkin_record)
-    try:
-        db.session.commit()
-    except IntegrityError:
-        # Two requests for the same ma_cbsv landed at (almost) the same time
-        # (e.g. a double-tap on the check-in button). The unique constraint
-        # on (ma_cbsv, event_id) rejects the second insert; treat it as an
-        # already-checked-in response instead of a 500.
-        db.session.rollback()
-        existing_checkin = CheckIn.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
-        return _already_checked_in_response(user, existing_checkin)
+        patron_code=ma_cbsv,
+        checkin_at=now_vn_naive(),
+        cert_status="pending",
+    ))
+    db.session.commit()
 
-    # Certificate rendering + email delivery happen off the request thread (see
-    # _process_checkin_extras) -- the client polls /api/checkin/email-status for
-    # the real outcome instead of waiting for it here.
-    _checkin_extras_executor.submit(
-        _process_checkin_extras,
-        current_app._get_current_object(),
-        request.host_url,
-        ma_cbsv,
-        event_id,
-        user.ho_ten,
-        user.email,
-        checkin_record.thoi_gian_checkin,
-        registration.event.ten_su_kien if registration.event else "",
-    )
-
-    return jsonify({
-        "success": True,
-        "message": f"Cảm ơn {user.ho_ten} đã check-in.",
-        "ho_ten": user.ho_ten,
-        "thoi_gian": _format_vn_datetime(checkin_record.thoi_gian_checkin),
-        "email_pending": True,
-        "email": user.email,
-    })
-
-
-@checkin_bp.get("/api/checkin/email-status/<ma_cbsv>/<int:event_id>")
-def checkin_email_status(ma_cbsv, event_id):
-    log = (
-        EmailLog.query
-        .filter_by(ma_cbsv=ma_cbsv, event_id=event_id, email_type="checkin_certificate")
-        .order_by(EmailLog.sent_at.desc())
-        .first()
-    )
-    if not log:
-        return jsonify({"success": True, "status": "pending"})
-    return jsonify({
-        "success": True,
-        "status": log.trang_thai,
-        "certificate_code": log.certificate_code,
-    })
+    return jsonify({"success": True, "message": CHECKIN_SUCCESS_MESSAGE})

@@ -7,3 +7,7 @@ logs/
 flask_stdout.log
 flask_stderr.log
 database/
+
+# SQLite xem thử ở máy (dữ liệu thử, không đưa lên repo)
+instance/
+*.db

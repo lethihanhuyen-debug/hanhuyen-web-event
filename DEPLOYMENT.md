@@ -281,5 +281,13 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 
 - **Log ứng dụng**: `C:\apps\eventcheckin\logs\app.log` (tự xoay vòng, tối đa 5 file x 5MB, cấu hình trong `app.py`). Log service (stdout/stderr) tại `C:\apps\eventcheckin\logs\service-*.log`.
 - **Cập nhật code**: `git pull` trong `C:\apps\eventcheckin`, `pip install -r requirements.txt` nếu có thư viện mới, rồi `Restart-Service EventCheckinApp`. App tự chạy `ensure_schema_upgrades()`/`db.create_all()` mỗi lần khởi động nên các thay đổi schema nhỏ (thêm cột/index) tự áp dụng, không cần chạy migration thủ công.
+- **Ngoại lệ — bản cập nhật check-in/gửi chứng chỉ (10/2026)**: thêm bảng/cột mà `db.create_all()` không tự thêm vào bảng đã có. Sao lưu database, chép code mới, `Restart-Service EventCheckinApp`, rồi chạy **ngay** theo thứ tự (chạy lại nhiều lần vẫn an toàn):
+  ```powershell
+  .venv\Scripts\python -m event_checkin.migrations.m001_checkin_records --dry-run   # xem trước
+  .venv\Scripts\python -m event_checkin.migrations.m001_checkin_records             # tạo bảng checkin_records + chuyển check-in cũ
+  .venv\Scripts\python -m event_checkin.migrations.m002_cert_display_name
+  .venv\Scripts\python -m event_checkin.migrations.m003_email_override
+  ```
+  Thiếu m002/m003 thì mọi trang dùng check-in sẽ lỗi. Hướng dẫn sử dụng cho admin: `HUONG_DAN_ADMIN.md`.
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.

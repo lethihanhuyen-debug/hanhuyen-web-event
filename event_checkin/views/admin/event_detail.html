@@ -2,8 +2,8 @@
 {% block title %}{{ event.ten_su_kien }} | Quản trị sự kiện{% endblock %}
 
 {% block content %}
-<section class="admin-panel">
-  <div class="panel-head">
+<section class="admin-panel admin-panel--wide">
+  <div class="panel-head panel-head--top">
     <div>
       <p class="eyebrow">Sự kiện</p>
       <h1>{{ event.ten_su_kien }}</h1>
@@ -12,14 +12,15 @@
         {{ event.ngay_bat_dau_display or '' }}{% if event.ngay_ket_thuc_display %} - {{ event.ngay_ket_thuc_display }}{% endif %}
       </p>
     </div>
-    <div class="panel-actions">
-      {% if event.certificate_template_url %}
-        <button id="openTemplatePreview" class="btn btn--ghost" type="button">Xem mẫu chứng chỉ</button>
-      {% endif %}
-      <button id="openEventCheckinForm" class="btn btn--primary" type="button">Check-in</button>
-      <a class="btn btn--ghost" href="{{ url_for('checkin.event_index', event_id=event.id) }}" target="_blank" rel="noopener">Trang check-in công khai</a>
-      <button id="exportRegistrations" class="btn btn--ghost" type="button" data-event-id="{{ event.id }}">Xuất danh sách đăng ký</button>
-      <a class="btn btn--ghost" href="{{ url_for('admin.index') }}">Quay lại</a>
+    <div class="panel-head__side">
+      <a class="btn btn--back" href="{{ url_for('admin.index') }}">← Quay lại</a>
+      <div class="panel-actions panel-actions--row">
+        {% if event.certificate_template_url %}
+          <button id="openTemplatePreview" class="btn btn--ghost" type="button">Xem mẫu chứng chỉ</button>
+        {% endif %}
+        <a class="btn btn--green" href="{{ url_for('checkin.event_index', event_id=event.id) }}" target="_blank" rel="noopener">Check-in</a>
+        <a class="btn btn--green" href="{{ url_for('admin.checkins_page', event_id=event.id) }}">Danh sách check-in</a>
+      </div>
     </div>
   </div>
 
@@ -40,31 +41,26 @@
       <span>Chưa check-in</span>
       <strong>{{ totals.pending }}</strong>
     </div>
+    <div class="stat-card">
+      <span>Đã gửi chứng chỉ</span>
+      <strong>{{ totals.emails_sent }}/{{ totals.checkins }}</strong>
+    </div>
   </div>
 
   <div id="eventCheckinMessage" class="message" hidden></div>
 
-  <div id="eventCheckinFormCard" class="form-card" hidden>
-    <form id="eventCheckinForm" class="checkin-form">
-      <input id="eventCheckinCode" name="ma_cbsv" placeholder="Nhập mã CB/SV" autocomplete="off" required>
-      <button class="btn btn--primary" type="submit">Check-in</button>
-    </form>
+  <div class="filter-bar">
+    <div class="filter-tabs" id="checkinFilterTabs">
+      <button type="button" class="filter-tab is-active" data-filter="all">Tất cả ({{ totals.registrations }})</button>
+      <button type="button" class="filter-tab" data-filter="checked-in">Đã check-in ({{ totals.checkins }})</button>
+      <button type="button" class="filter-tab" data-filter="pending">Chưa check-in ({{ totals.pending }})</button>
+    </div>
+    <button id="exportRegistrations" class="btn btn--yellow" type="button" data-event-id="{{ event.id }}">Xuất danh sách đăng ký</button>
   </div>
 
   <div class="table-card">
     <div class="table-scroll">
-      <table>
-        <colgroup>
-          <col style="width: 60px">
-          <col style="width: 120px">
-          <col style="width: 180px">
-          <col style="width: 150px">
-          <col style="width: 240px">
-          <col style="width: 130px">
-          <col style="width: 140px">
-          <col style="width: 100px">
-          <col style="width: 140px">
-        </colgroup>
+      <table class="fit-table">
         <thead>
           <tr>
             <th>STT</th>
@@ -80,7 +76,7 @@
         </thead>
         <tbody>
           {% for row in rows %}
-          <tr>
+          <tr data-checked-in="{{ 'true' if row.checked_in else 'false' }}">
             <td>{{ row.stt }}</td>
             <td>{{ row.ma_cbsv }}</td>
             <td>{{ row.ho_ten }}</td>
@@ -90,6 +86,9 @@
             <td>
               {% if row.checked_in %}
                 <span class="badge badge--success">Đã check-in</span>
+                <div class="muted" style="font-size: 12px; margin-top: 4px">
+                  {{ row.checkin_time }}{% if row.scans > 1 %} · quét {{ row.scans }} lần{% endif %}
+                </div>
               {% else %}
                 <span class="badge badge--warning">Chưa check-in</span>
               {% endif %}
@@ -97,8 +96,17 @@
             <td>
               {% if row.certificate_url %}
                 <button class="btn btn--ghost btn--sm js-open-certificate" type="button" data-certificate-code="{{ row.certificate_code }}">Xem</button>
-              {% else %}
-                <span class="muted">Chưa có</span>
+              {% endif %}
+              {% if True %}
+                <div{% if row.certificate_url %} style="margin-top: 4px"{% endif %}>
+                  {% if row.cert_status == 'sent' %}
+                    <span class="badge badge--success" title="Gửi lúc {{ row.cert_sent_at }} · đã gửi {{ row.send_count }} lần{% if row.cert_error %} · lần gửi lại gần nhất lỗi: {{ row.cert_error }}{% endif %}">Đã gửi email</span>
+                  {% elif row.cert_status == 'failed' %}
+                    <span class="badge badge--warning" title="{{ row.cert_error }}">Gửi lỗi</span>
+                  {% else %}
+                    <span class="badge badge--muted">Chưa gửi</span>
+                  {% endif %}
+                </div>
               {% endif %}
             </td>
             <td>
@@ -110,13 +118,6 @@
                   data-ma-cbsv="{{ row.ma_cbsv }}"
                   data-name="{{ row.ho_ten }}"
                 >Xóa check-in</button>
-              {% else %}
-                <button
-                  class="btn btn--primary btn--sm js-event-checkin"
-                  type="button"
-                  data-event-id="{{ row.event_id }}"
-                  data-ma-cbsv="{{ row.ma_cbsv }}"
-                >Check-in</button>
               {% endif %}
             </td>
           </tr>
@@ -128,6 +129,10 @@
         </tbody>
       </table>
     </div>
+  </div>
+
+  <div class="back-to-top-row">
+    <button id="backToTop" class="btn btn--ghost" type="button">↑ Quay lại đầu trang</button>
   </div>
 
   {% if event.certificate_template_url %}
@@ -173,11 +178,6 @@
 <script>
 (function () {
   const message = document.getElementById('eventCheckinMessage');
-  const formCard = document.getElementById('eventCheckinFormCard');
-  const openFormButton = document.getElementById('openEventCheckinForm');
-  const checkinForm = document.getElementById('eventCheckinForm');
-  const checkinCode = document.getElementById('eventCheckinCode');
-  const currentEventId = {{ event.id }};
   const openTemplatePreview = document.getElementById('openTemplatePreview');
   const templatePreviewModal = document.getElementById('templatePreviewModal');
   const closeTemplatePreview = document.getElementById('closeTemplatePreview');
@@ -244,50 +244,6 @@
     });
   }
 
-  async function submitCheckin(maCbsv, eventId, button) {
-    if (button) {
-      button.disabled = true;
-      button.textContent = 'Đang check-in...';
-    }
-    message.hidden = true;
-
-    try {
-      const response = await fetch('/api/checkin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ma_cbsv: maCbsv, event_id: eventId }),
-      });
-      const data = await response.json();
-      if (data.success || data.checked_in) {
-        showMessage('success', data.message || 'Đã check-in.');
-        window.setTimeout(() => window.location.reload(), 700);
-        return;
-      }
-      showMessage('error', data.message || 'Không thể check-in.');
-    } catch (error) {
-      showMessage('error', 'Không thể kết nối máy chủ.');
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = 'Check-in';
-      }
-    }
-  }
-
-  openFormButton.addEventListener('click', () => {
-    formCard.hidden = !formCard.hidden;
-    if (!formCard.hidden) {
-      checkinCode.focus();
-    }
-  });
-
-  checkinForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const maCbsv = checkinCode.value.trim();
-    if (!maCbsv) return;
-    await submitCheckin(maCbsv, currentEventId, checkinForm.querySelector('button'));
-  });
-
   if (openTemplatePreview && templatePreviewModal) {
     openTemplatePreview.addEventListener('click', () => {
       templatePreviewModal.hidden = false;
@@ -303,14 +259,6 @@
   document.querySelectorAll('[data-close-template-preview]').forEach((element) => {
     element.addEventListener('click', () => {
       templatePreviewModal.hidden = true;
-    });
-  });
-
-  document.querySelectorAll('.js-event-checkin').forEach((button) => {
-    button.addEventListener('click', async () => {
-      const maCbsv = button.dataset.maCbsv;
-      const eventId = Number(button.dataset.eventId);
-      await submitCheckin(maCbsv, eventId, button);
     });
   });
 
@@ -343,6 +291,22 @@
         button.textContent = 'Xóa check-in';
       }
     });
+  });
+
+  // Lọc danh sách theo trạng thái check-in (lọc phía trình duyệt, không tải lại trang)
+  document.querySelectorAll('#checkinFilterTabs .filter-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('#checkinFilterTabs .filter-tab').forEach((t) => t.classList.toggle('is-active', t === tab));
+      const filter = tab.dataset.filter;
+      document.querySelectorAll('tbody tr[data-checked-in]').forEach((row) => {
+        const checkedIn = row.dataset.checkedIn === 'true';
+        row.hidden = (filter === 'checked-in' && !checkedIn) || (filter === 'pending' && checkedIn);
+      });
+    });
+  });
+
+  document.getElementById('backToTop').addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
   // Certificate preview

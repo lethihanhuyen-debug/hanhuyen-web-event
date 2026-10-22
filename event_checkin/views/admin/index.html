@@ -160,13 +160,15 @@
               <button type="button" class="layout-field-button" data-field="don_vi">Đơn vị / Khoa</button>
               <button type="button" class="layout-field-button" data-field="issue_date">Ngày cấp</button>
               <button type="button" class="layout-field-button" data-field="certificate_code">Mã chứng nhận</button>
+              <button type="button" class="layout-field-button" data-field="event_name">Tên sự kiện</button>
             </div>
             <p class="muted">Bấm để thêm vào giữa khung, sau đó kéo để chỉnh vị trí. Bấm lại một trường đã thêm để chọn và chỉnh sửa.</p>
           </div>
           <div class="btn-row">
-            <button id="saveLayout" class="btn btn--primary" type="button">Lưu vị trí</button>
-            <button id="resetLayout" class="btn btn--ghost" type="button">Hủy thay đổi</button>
+            <button id="saveLayout" class="btn btn--primary" type="button">Lưu</button>
+            <button id="resetLayout" class="btn btn--ghost" type="button" title="Bỏ các thay đổi chưa lưu, quay về lần lưu gần nhất">Khôi phục mặc định</button>
           </div>
+          <button id="realPreviewButton" class="btn btn--ghost" type="button" title="Server vẽ chứng chỉ bằng đúng cấu hình đang chỉnh (chưa cần lưu), giống hệt bản gửi qua email">Xem trước bản thật</button>
         </aside>
 
         <div class="designer-canvas-wrap">
@@ -183,6 +185,7 @@
               <button type="button" class="field-toolbar__btn" data-align="right" title="Căn phải">◨</button>
             </div>
             <button id="toolbarBold" type="button" class="field-toolbar__btn" title="Đậm"><strong>B</strong></button>
+            <input id="toolbarMaxWidth" type="number" min="20" max="10000" placeholder="Rộng tối đa" title="Bề rộng tối đa (px trên ảnh gốc). Chữ dài hơn sẽ tự thu nhỏ. Để trống = không giới hạn">
             <label id="toolbarFontLabel" class="file-upload-button field-toolbar__font" title="Tải font riêng cho trường này">
               <span>Font mặc định</span>
               <input id="toolbarFontUpload" type="file" accept=".ttf,.otf">
@@ -191,6 +194,20 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="realPreviewModal" class="designer-modal" hidden>
+    <div class="designer-modal__backdrop" data-close-real-preview></div>
+    <div class="designer-modal__dialog designer-modal__dialog--wide">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Xem trước bản thật (dữ liệu mẫu)</p>
+          <h2>Chứng chỉ như khi gửi qua email</h2>
+        </div>
+        <button class="btn btn--ghost" type="button" data-close-real-preview>Đóng</button>
+      </div>
+      <div id="realPreviewContent" class="template-preview-wrap"></div>
     </div>
   </div>
 
@@ -246,6 +263,7 @@
   const toolbarFontUpload = document.getElementById('toolbarFontUpload');
   const toolbarFontLabel = document.getElementById('toolbarFontLabel');
   const toolbarFontRemove = document.getElementById('toolbarFontRemove');
+  const toolbarMaxWidth = document.getElementById('toolbarMaxWidth');
   let editingEventId = null;
   let editingEventData = null;
   let designingEventId = null;
@@ -423,7 +441,7 @@
     });
   });
 
-  const FIELD_ORDER = ['student_name', 'ma_cbsv', 'don_vi', 'issue_date', 'certificate_code'];
+  const FIELD_ORDER = ['student_name', 'ma_cbsv', 'don_vi', 'issue_date', 'certificate_code', 'event_name'];
   // Keep in sync with `.cert-field .field-delete { top: -16px }` in style.css — that's how
   // far above the field's own box the delete badge sits, so the toolbar needs to clear at
   // least that much (plus a little breathing room) to avoid covering it.
@@ -437,6 +455,7 @@
       don_vi: 'Công tác xã hội - Nhân học',
       issue_date: 'TP. Hồ Chí Minh, ngày 18 tháng 5 năm 2026',
       certificate_code: 'Mã chứng nhận: USSH-2026-EVENT001-000001',
+      event_name: (editingEventData && editingEventData.ten_su_kien) || 'Tên sự kiện',
     }[field] || field;
   }
 
@@ -499,6 +518,9 @@
     el.style.color = config.color || '#6f1d1b';
     el.style.fontWeight = config.bold === false ? '400' : '700';
     el.style.fontFamily = `"${config.__loaded_family || config.font_family || 'Arial'}", Arial, sans-serif`;
+    // Khung nét đứt cho bề rộng tối đa (chữ dài hơn sẽ được server tự thu nhỏ khi vẽ)
+    el.style.width = config.max_width ? `${config.max_width * scale}px` : '';
+    el.style.outline = config.max_width ? '1px dashed rgba(0, 0, 0, 0.35)' : '';
   }
 
   function updateSidebarState() {
@@ -531,6 +553,9 @@
     fieldToolbar.querySelectorAll('[data-align]').forEach((btn) => {
       btn.classList.toggle('active', (config.align || 'left') === btn.dataset.align);
     });
+    if (document.activeElement !== toolbarMaxWidth) {
+      toolbarMaxWidth.value = config.max_width || '';
+    }
     toolbarFontLabel.querySelector('span').textContent = config.font_name || 'Font mặc định';
     toolbarFontRemove.hidden = !config.font_file;
 
@@ -607,14 +632,15 @@
       // y is stored as the TOP of the text (matches the top-anchored rendering used when
       // the certificate is actually generated), so offset by half a line height to make a
       // freshly-added field look vertically centered on the image, not just horizontally.
+      // Mặc định căn trái: x là mép trái của chữ, đặt lệch trái giữa khung một chút
       certificateLayout[field] = {
         ...(certificateLayout[field] || {}),
-        x: Math.round(naturalWidth / 2),
+        x: Math.round(naturalWidth * 0.3),
         y: Math.round(naturalHeight / 2 - defaultSize * 0.6),
         size: defaultSize,
         color: '#6f1d1b',
         bold: true,
-        align: 'center',
+        align: 'left',
       };
     }
     selectedField = field;
@@ -714,6 +740,17 @@
     if (!selectedField) return;
     const config = certificateLayout[selectedField];
     config.bold = config.bold === false;
+    updateFieldElement(selectedField);
+  });
+
+  toolbarMaxWidth.addEventListener('input', () => {
+    if (!selectedField) return;
+    const value = parseInt(toolbarMaxWidth.value, 10);
+    if (Number.isFinite(value) && value >= 20) {
+      certificateLayout[selectedField].max_width = value;
+    } else {
+      delete certificateLayout[selectedField].max_width;
+    }
     updateFieldElement(selectedField);
   });
 
@@ -939,6 +976,63 @@
       renderFields();
       setTemplateStatus('Đã khôi phục layout đã lưu.', 2000);
     });
+  }
+
+  // Xem trước bản thật: server vẽ bằng CÙNG hàm với chứng chỉ gửi qua email, dùng cấu
+  // hình đang chỉnh (chưa cần bấm Lưu) và dữ liệu mẫu.
+  const realPreviewButton = document.getElementById('realPreviewButton');
+  const realPreviewModal = document.getElementById('realPreviewModal');
+  const realPreviewContent = document.getElementById('realPreviewContent');
+  let realPreviewUrl = null;
+
+  function closeRealPreview() {
+    realPreviewModal.hidden = true;
+    if (realPreviewUrl) URL.revokeObjectURL(realPreviewUrl);
+    realPreviewUrl = null;
+  }
+
+  realPreviewButton.addEventListener('click', async () => {
+    if (!designingEventId) return;
+    if (pendingTemplateFile) {
+      setTemplateStatus('Hãy bấm Lưu ảnh nền mới trước khi xem trước bản thật.', 3000);
+      return;
+    }
+    realPreviewModal.hidden = false;
+    realPreviewContent.textContent = 'Đang vẽ chứng chỉ...';
+    realPreviewButton.disabled = true;
+    try {
+      const response = await fetch(`/api/admin/events/${designingEventId}/certificate-preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layout: certificateLayout, base_width: naturalWidth, base_height: naturalHeight }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        const details = data && data.errors ? ` ${data.errors.join(' ')}` : '';
+        realPreviewContent.textContent = ((data && data.message) || 'Không thể vẽ chứng chỉ xem trước.') + details;
+        return;
+      }
+      if (realPreviewUrl) URL.revokeObjectURL(realPreviewUrl);
+      realPreviewUrl = URL.createObjectURL(await response.blob());
+      const img = document.createElement('img');
+      img.src = realPreviewUrl;
+      img.alt = 'Chứng chỉ xem trước';
+      img.style.maxWidth = '100%';
+      realPreviewContent.replaceChildren(img);
+    } catch (error) {
+      realPreviewContent.textContent = 'Không thể kết nối máy chủ.';
+    } finally {
+      realPreviewButton.disabled = false;
+    }
+  });
+  document.querySelectorAll('[data-close-real-preview]').forEach((el) => el.addEventListener('click', closeRealPreview));
+
+  // Mở thẳng trình thiết kế khi vào từ trang Danh sách check-in (/admin?design=<event_id>)
+  const designParam = new URLSearchParams(window.location.search).get('design');
+  if (designParam) {
+    const designButton = Array.from(document.querySelectorAll('.js-certificate-event'))
+      .find((button) => String(JSON.parse(button.dataset.event).id) === designParam);
+    if (designButton) designButton.click();
   }
 
   // Background image: show a local preview as soon as a file is chosen (nothing is sent to

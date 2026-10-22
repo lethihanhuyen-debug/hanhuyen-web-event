@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 
 from flask import Blueprint, jsonify, render_template, request, url_for
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 
 from event_checkin.models import db
@@ -220,7 +220,14 @@ def lookup(ma_cbsv):
     user = User.query.filter_by(ma_cbsv=ma_cbsv).first()
     if not user:
         return jsonify({"success": False, "message": f"Không tìm thấy mã {ma_cbsv}."}), 404
-    return jsonify({"success": True, "data": user.to_dict()})
+    # API công khai (không cần đăng nhập): chỉ trả họ tên + đơn vị để tự điền form
+    # đăng ký. KHÔNG trả email/số điện thoại/chức vụ -- nếu không, ai cũng có thể dò
+    # lần lượt mã SV để thu thập thông tin liên lạc của sinh viên.
+    return jsonify({"success": True, "data": {
+        "ho_ten": user.ho_ten,
+        "don_vi_id": user.don_vi_id,
+        "don_vi": user.ten_don_vi,
+    }})
 
 
 @register_bp.get("/api/events")
@@ -321,6 +328,24 @@ def register():
         if don_vi:
             user.don_vi_id = don_vi.id
         user.updated_at = now
+
+    if event.so_luong_toi_da:
+        # Khoá dòng sự kiện (SELECT ... FOR UPDATE) để các request đăng ký cùng
+        # sự kiện xếp hàng lần lượt, rồi đếm lại khi đang giữ khoá -- nếu không,
+        # 2 người đăng ký gần như cùng lúc vào chỗ cuối đều đọc được count cũ và
+        # cùng lọt qua, vượt so_luong_toi_da. Phép đếm cũng phải là locking read
+        # (FOR UPDATE): với REPEATABLE READ của InnoDB, SELECT thường vẫn đọc
+        # snapshot cũ đã tạo từ đầu transaction, không thấy đăng ký vừa commit.
+        db.session.query(Event.id).filter(Event.id == event_id).with_for_update().one()
+        current_count = (
+            db.session.query(func.count(Registration.id))
+            .filter(Registration.event_id == event_id)
+            .with_for_update()
+            .scalar()
+        )
+        if current_count >= event.so_luong_toi_da:
+            db.session.rollback()
+            return jsonify({"success": False, "message": "Sự kiện đã đủ số lượng đăng ký."}), 400
 
     registration = Registration(
         ma_cbsv=ma_cbsv,

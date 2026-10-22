@@ -1,4 +1,4 @@
-from event_checkin.models.checkin import CheckIn
+from event_checkin.models.checkin_record import CheckinRecord
 from event_checkin.models.registration import Registration
 
 
@@ -9,8 +9,8 @@ def find_registration(ma_cbsv, event_id=1):
 def has_successful_checkin(registration):
     if not registration:
         return False
-    return CheckIn.query.filter_by(
-        ma_cbsv=registration.ma_cbsv,
+    return CheckinRecord.query.filter_by(
+        patron_code=registration.ma_cbsv,
         event_id=registration.event_id,
     ).first() is not None
 
