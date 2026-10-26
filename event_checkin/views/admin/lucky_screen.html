@@ -14,7 +14,8 @@
 <body>
 <header class="topbar">
   <span class="topbar-title">{{ event.ten_su_kien }}</span>
-  <a class="btn" href="{{ back_url }}">← Quay lại trang quản trị</a>
+  <a class="btn" href="{{ setup_url }}">Sửa thiết lập</a>
+  <a class="btn" href="{{ back_url }}">← Danh sách quay số</a>
 </header>
 
 <main class="page">
@@ -32,8 +33,6 @@
     <div class="stage-prizes" aria-label="Chọn giải">
       <label for="prizeSelect">Giải</label>
       <select id="prizeSelect"></select>
-      <label for="countInput">Số người mỗi lượt</label>
-      <input type="number" id="countInput" min="1" value="1" inputmode="numeric">
       <div class="pool" id="poolText"></div>
     </div>
 

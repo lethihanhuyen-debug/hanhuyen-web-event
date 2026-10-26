@@ -20,7 +20,9 @@
         {% endif %}
         <a class="btn btn--green" href="{{ url_for('checkin.event_index', event_id=event.id) }}" target="_blank" rel="noopener">Check-in</a>
         <a class="btn btn--green" href="{{ url_for('admin.checkins_page', event_id=event.id) }}">Danh sách check-in</a>
-        <a class="btn btn--green" href="{{ url_for('lucky.lucky_page', event_id=event.id) }}">Quay số trúng thưởng</a>
+        {% if lucky_ready %}
+        <a class="btn btn--green" href="{{ url_for('lucky.lucky_screen', event_id=event.id) }}" target="_blank" rel="noopener">Quay số trúng thưởng</a>
+        {% endif %}
       </div>
     </div>
   </div>

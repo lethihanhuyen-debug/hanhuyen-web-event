@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+{% block title %}Thiết lập quay số | Quản trị sự kiện{% endblock %}
+
+{% block head %}
+<style>
+  .lucky-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); margin-bottom: 16px; }
+  .lucky-bg { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .lucky-bg img { width: 256px; max-width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); background: var(--linen); }
+  .lucky-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lucky-check { display: flex; gap: 8px; align-items: center; justify-content: flex-start; cursor: pointer; }
+  .lucky-check input { width: auto; flex: none; margin: 0; }
+  .lucky-prize { display: grid; grid-template-columns: 34px minmax(160px, 1fr) 110px auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .lucky-prize__no { font-weight: 700; color: var(--muted); text-align: center; }
+  .lucky-prize input { width: 100%; }
+  .lucky-prize__btns { display: flex; gap: 6px; }
+  .lucky-prize__note { grid-column: 2 / -1; font-size: .85rem; }
+  .lucky-prize.has-error input.is-error { border-color: var(--danger); background: #fdecea; }
+  .lucky-prize__err { grid-column: 2 / -1; color: var(--danger); font-weight: 600; font-size: .88rem; }
+  .lucky-warn { background: #fff4d6; color: var(--warning); border-radius: 10px; padding: 8px 12px; font-weight: 600; margin-top: 8px; }
+  .lucky-save-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(0deg, var(--cloud-dancer, #f6f0e2) 70%, transparent); }
+  .lucky-dirty { color: var(--warning); font-weight: 600; }
+  @media (max-width: 640px) { .lucky-prize { grid-template-columns: 28px 1fr 84px; } .lucky-prize__btns { grid-column: 2 / -1; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="admin-panel admin-panel--wide">
+  <div class="panel-head panel-head--top">
+    <div>
+      <p class="eyebrow">Quay số may mắn</p>
+      <h1>{% if mode == 'edit' %}Sửa thiết lập: {{ data.ten_su_kien }}{% else %}Thiết lập sự kiện mới{% endif %}</h1>
+    </div>
+    <div class="panel-head__side">
+      <a class="btn btn--back" href="{{ url_for('lucky.lucky_list') }}">← Danh sách quay số</a>
+      {% if mode == 'edit' %}
+      <div class="panel-actions panel-actions--row">
+        <a class="btn btn--green" href="{{ url_for('lucky.lucky_screen', event_id=data.event_id) }}" target="_blank" rel="noopener">Mở màn hình quay</a>
+        <button id="exportButton" class="btn btn--ghost" type="button">Xuất Excel</button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div id="pageMessage" class="message{% if notice %} message--success{% endif %}"{% if not notice %} hidden{% endif %} role="status">{{ notice }}</div>
+
+  <div class="lucky-grid">
+    <div class="form-card">
+      <h2>1. Sự kiện</h2>
+      {% if mode == 'edit' %}
+        <p><strong>{{ data.ten_su_kien }}</strong></p>
+        <p class="muted">Sự kiện không đổi được sau khi đã lưu thiết lập. Muốn đổi, hãy xoá thiết lập rồi thiết lập lại.</p>
+      {% else %}
+        <label for="eventSelect" class="muted">Chọn sự kiện (chỉ hiện sự kiện chưa thiết lập)</label>
+        <select id="eventSelect">
+          <option value="">— Chọn sự kiện —</option>
+          {% for event in events %}
+            <option value="{{ event.id }}" data-checkins="{{ event.nguoi_checkin }}"{% if preselect == event.id %} selected{% endif %}>{{ event.ten_su_kien }} ({{ event.ngay }})</option>
+          {% endfor %}
+        </select>
+        {% if not events %}<p class="muted">Mọi sự kiện đều đã thiết lập.</p>{% endif %}
+      {% endif %}
+      <p class="muted" id="checkinInfo"></p>
+      <p class="muted">Danh sách quay lấy từ những người đã check-in của sự kiện (mỗi mã CB/SV 1 suất, kể cả người gửi chứng chỉ lỗi).</p>
+    </div>
+
+    <div class="form-card">
+      <h2>2. Tuỳ chọn</h2>
+      <label class="lucky-check">
+        <input type="checkbox" id="allowMulti">
+        <span>Cho phép một người trúng nhiều giải</span>
+      </label>
+      <p class="muted">Mặc định tắt: người đã trúng bị loại khỏi mọi lượt quay sau.</p>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <h2>3. Hình nền màn hình quay số</h2>
+    <div class="lucky-bg">
+      <img id="bgPreview" src="{{ data.hinh_nen_url }}" alt="Hình nền hiện tại">
+      <div>
+        <p class="muted" id="bgNote"></p>
+        <div class="lucky-inline">
+          <input type="file" id="bgFile" accept="image/jpeg,image/png,image/webp" hidden>
+          <button id="bgChoose" class="btn btn--ghost btn--sm" type="button">Chọn hình mới</button>
+          <button id="bgReset" class="btn btn--ghost btn--sm" type="button">Khôi phục mặc định</button>
+        </div>
+        <p class="muted"><strong>Kích thước khuyến nghị: 2560 × 1440 px (tỉ lệ 16:9)</strong>, JPG/PNG/WEBP, tối đa 5MB. Ảnh khác tỉ lệ sẽ tự được co và cắt giữa cho vừa khung, không bị méo. Hãy để trống vùng giữa ảnh (khoảng 3%–97% chiều ngang, 39%–84% chiều cao) để mã hiện rõ.</p>
+        <div id="bgWarn" class="lucky-warn" hidden></div>
+        <p class="muted">Hình chỉ được tải lên khi bấm <strong>Lưu thiết lập</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card" style="margin-top:16px">
+    <h2>4. Giải thưởng</h2>
+    <p class="muted">Giải được quay theo thứ tự từ trên xuống (đổi bằng ▲ ▼). Mỗi giải cần có tên và số lượng từ 1 trở lên.</p>
+    <div id="prizeList"></div>
+    <div style="margin-top:12px">
+      <button id="addPrize" class="btn btn--green" type="button" aria-label="Thêm giải">＋ Thêm giải</button>
+    </div>
+  </div>
+
+  <div class="lucky-save-bar">
+    <button id="saveButton" class="btn btn--primary" type="button">Lưu thiết lập</button>
+    <span id="dirtyNote" class="lucky-dirty" hidden>Có thay đổi chưa lưu</span>
+  </div>
+</section>
+
+<script type="application/json" id="setupData">{{ data|tojson }}</script>
+<script>
+(function () {
+  const MODE = {{ mode|tojson }};
+  const DEFAULT_BG = {{ default_background_url|tojson }};
+  const $ = (id) => document.getElementById(id);
+  let data = JSON.parse($('setupData').textContent);
+  let rows = [];            // {id, ten_giai, so_luong, da_quay, co_lich_su, error}
+  let newFile = null;       // file ảnh đã chọn, chưa tải lên
+  let resetBg = false;      // đã bấm "Khôi phục mặc định", chưa lưu
+  let previewUrl = null;
+  let baseline = '';
+  let saving = false;
+
+  function el(tag, props, children) {
+    const node = document.createElement(tag);
+    Object.assign(node, props || {});
+    (children || []).forEach((child) => node.append(child));
+    return node;
+  }
+
+  function say(text, kind) {
+    const box = $('pageMessage');
+    box.textContent = text || '';
+    box.hidden = !text;
+    box.className = 'message' + (text ? ` message--${kind || 'success'}` : '');
+    if (text) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function eventId() {
+    return MODE === 'edit' ? data.event_id : ($('eventSelect').value ? Number($('eventSelect').value) : null);
+  }
+
+  // ----- Trạng thái "có thay đổi chưa lưu" -----
+  function snapshot() {
+    return JSON.stringify({
+      e: eventId(), m: $('allowMulti').checked,
+      p: rows.map((r) => [r.id, r.ten_giai, String(r.so_luong)]),
+      f: newFile ? [newFile.name, newFile.size, newFile.lastModified] : null, r: resetBg,
+    });
+  }
+  function updateDirty() {
+    const dirty = snapshot() !== baseline;
+    $('dirtyNote').hidden = !dirty;
+    return dirty;
+  }
+  window.addEventListener('beforeunload', (e) => {
+    if (!saving && updateDirty()) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // ----- Danh sách giải -----
+  function loadRows() {
+    rows = data.prizes.map((p) => ({ id: p.id, ten_giai: p.ten_giai, so_luong: p.so_luong, da_quay: p.da_quay, co_lich_su: p.co_lich_su, error: null }));
+    if (!rows.length) rows.push(blankRow());
+  }
+  function blankRow() { return { id: null, ten_giai: '', so_luong: 1, da_quay: 0, co_lich_su: false, error: null }; }
+
+  function renderRows() {
+    const list = $('prizeList');
+    list.replaceChildren();
+    rows.forEach((row, index) => {
+      const name = el('input', { type: 'text', value: row.ten_giai, maxLength: 255, placeholder: 'Tên giải, ví dụ: Giải Nhất', ariaLabel: `Tên giải ${index + 1}` });
+      const qty = el('input', { type: 'number', min: Math.max(row.da_quay, 1), max: 1000, step: 1, value: row.so_luong, ariaLabel: `Số lượng giải ${index + 1}` });
+      const up = el('button', { type: 'button', className: 'btn btn--ghost btn--sm', textContent: '▲', title: 'Lên', disabled: index === 0 });
+      const down = el('button', { type: 'button', className: 'btn btn--ghost btn--sm', textContent: '▼', title: 'Xuống', disabled: index === rows.length - 1 });
+      const del = el('button', { type: 'button', className: 'btn btn--danger btn--sm', textContent: 'Xoá', title: row.co_lich_su ? 'Giải đã có lịch sử quay, không xoá được' : 'Xoá dòng này', disabled: row.co_lich_su });
+      name.addEventListener('input', () => { row.ten_giai = name.value; row.error = null; name.classList.remove('is-error'); updateDirty(); });
+      qty.addEventListener('input', () => { row.so_luong = qty.value; row.error = null; qty.classList.remove('is-error'); updateDirty(); });
+      up.addEventListener('click', () => move(index, -1));
+      down.addEventListener('click', () => move(index, 1));
+      del.addEventListener('click', () => {
+        if (rows.length === 1) { rows[0] = blankRow(); } else { rows.splice(index, 1); }
+        renderRows(); updateDirty();
+      });
+      const wrap = el('div', { className: 'lucky-prize' + (row.error ? ' has-error' : '') }, [
+        el('div', { className: 'lucky-prize__no', textContent: index + 1 }), name, qty,
+        el('div', { className: 'lucky-prize__btns' }, [up, down, del]),
+      ]);
+      if (row.error) {
+        (row.error.field === 'so_luong' ? qty : name).classList.add('is-error');
+        wrap.append(el('div', { className: 'lucky-prize__err', textContent: row.error.message }));
+      }
+      if (row.co_lich_su) {
+        wrap.append(el('div', { className: 'lucky-prize__note muted', textContent: `Đã quay ${row.da_quay} người — không xoá được giải, số lượng tối thiểu ${Math.max(row.da_quay, 1)}.` }));
+      }
+      list.append(wrap);
+    });
+  }
+  function move(index, delta) {
+    const target = index + delta;
+    if (target < 0 || target >= rows.length) return;
+    [rows[index], rows[target]] = [rows[target], rows[index]];
+    renderRows(); updateDirty();
+  }
+  $('addPrize').addEventListener('click', () => {
+    rows.push(blankRow());
+    renderRows(); updateDirty();
+    const inputs = $('prizeList').querySelectorAll('input[type="text"]');
+    inputs[inputs.length - 1].focus();
+  });
+
+  // ----- Ảnh nền -----
+  function renderBg() {
+    const custom = (data.hinh_nen_tuy_chinh && !resetBg) || !!newFile;
+    $('bgPreview').src = newFile ? previewUrl : (resetBg ? DEFAULT_BG : data.hinh_nen_url);
+    $('bgNote').textContent = newFile ? `Đã chọn: ${newFile.name} (chưa lưu).`
+      : resetBg ? 'Sẽ dùng hình mặc định sau khi lưu.'
+      : data.hinh_nen_tuy_chinh ? 'Đang dùng hình riêng của sự kiện này.' : 'Đang dùng hình mặc định.';
+    $('bgReset').disabled = !custom;
+  }
+  function bgWarn(text) { $('bgWarn').hidden = !text; $('bgWarn').textContent = text || ''; }
+
+  $('bgChoose').addEventListener('click', () => $('bgFile').click());
+  $('bgFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    bgWarn('');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { say('Chỉ nhận ảnh JPG, PNG hoặc WEBP.', 'error'); return; }
+    if (file.size > 5 * 1024 * 1024) { say('Hình nền tối đa 5MB.', 'error'); return; }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const url = URL.createObjectURL(file);
+    const probe = new Image();
+    probe.onload = () => {
+      previewUrl = url; newFile = file; resetBg = false;
+      const warnings = [];
+      if (probe.naturalWidth < 1920 || probe.naturalHeight < 1080) warnings.push(`Ảnh ${probe.naturalWidth}×${probe.naturalHeight} nhỏ hơn 1920×1080, có thể bị mờ khi chiếu.`);
+      const ratio = probe.naturalWidth / probe.naturalHeight;
+      if (Math.abs(ratio - 16 / 9) / (16 / 9) > 0.1) warnings.push('Ảnh không phải tỉ lệ 16:9 nên sẽ bị cắt bớt hai bên hoặc trên dưới cho vừa khung.');
+      bgWarn(warnings.join(' '));
+      say('');
+      renderBg(); updateDirty();
+    };
+    probe.onerror = () => { URL.revokeObjectURL(url); say('Không đọc được file ảnh này.', 'error'); };
+    probe.src = url;
+  });
+  $('bgReset').addEventListener('click', () => {
+    newFile = null; bgWarn('');
+    resetBg = !!data.hinh_nen_tuy_chinh;
+    renderBg(); updateDirty();
+  });
+
+  // ----- Sự kiện (thiết lập mới) -----
+  function renderCheckinInfo() {
+    if (MODE === 'edit') { $('checkinInfo').textContent = `Đã check-in: ${data.tong_nguoi} người.`; return; }
+    const option = $('eventSelect').selectedOptions[0];
+    $('checkinInfo').textContent = option && option.value ? `Đã check-in: ${option.dataset.checkins} người.` : '';
+  }
+  if (MODE === 'new') $('eventSelect').addEventListener('change', () => { renderCheckinInfo(); updateDirty(); });
+  $('allowMulti').addEventListener('change', updateDirty);
+
+  // ----- Lưu -----
+  function validateLocal() {
+    let ok = true;
+    if (!eventId()) { say('Hãy chọn sự kiện.', 'error'); return false; }
+    rows.forEach((row) => {
+      row.error = null;
+      const name = String(row.ten_giai).trim();
+      const qty = Number(row.so_luong);
+      if (!name) { row.error = { field: 'ten_giai', message: 'Tên giải không được để trống.' }; ok = false; }
+      else if (!Number.isInteger(qty) || qty < 1) { row.error = { field: 'so_luong', message: 'Số lượng phải là số nguyên từ 1 trở lên.' }; ok = false; }
+      else if (qty < row.da_quay) { row.error = { field: 'so_luong', message: `Giải đã có ${row.da_quay} người trúng, số lượng không được nhỏ hơn ${row.da_quay}.` }; ok = false; }
+    });
+    renderRows();
+    if (!ok) say('Có dòng giải chưa hợp lệ, hãy sửa rồi Lưu lại.', 'error');
+    return ok;
+  }
+
+  async function save() {
+    if (saving || !validateLocal()) return;
+    saving = true;
+    $('saveButton').disabled = true;
+    $('saveButton').textContent = 'Đang lưu…';
+    const id = eventId();
+    const form = new FormData();
+    form.append('data', JSON.stringify({
+      cho_phep_trung_nhieu_giai: $('allowMulti').checked,
+      phien_ban: data.phien_ban,
+      xoa_hinh_nen: resetBg,
+      prizes: rows.map((r) => ({ id: r.id, ten_giai: String(r.ten_giai).trim(), so_luong: Number(r.so_luong) })),
+    }));
+    if (newFile) form.append('hinh_nen', newFile);
+    try {
+      const response = await fetch(`/api/admin/lucky-draw/${id}/setup`, { method: 'PUT', body: form });
+      if (response.status === 401) { saving = false; location.href = '/admin/login?next=' + encodeURIComponent(location.pathname + location.search); return; }
+      const result = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
+      if (result.success) {
+        say('Đã lưu.', 'success');
+        if (MODE === 'new') { location.href = `/admin/lucky-draw/${id}/setup?da_luu=1`; return; }
+        applySaved(result.data);
+      } else {
+        // Lỗi: giữ nguyên dữ liệu đang nhập, chỉ đánh dấu các dòng sai
+        (result.errors || []).forEach((err) => { if (rows[err.index]) rows[err.index].error = err; });
+        renderRows();
+        say(result.message || 'Không lưu được. Dữ liệu bạn nhập vẫn còn nguyên, hãy thử lại.', 'error');
+      }
+    } catch (err) {
+      say('Không kết nối được máy chủ nên chưa lưu. Dữ liệu bạn nhập vẫn còn nguyên trên màn hình, hãy thử lại.', 'error');
+    }
+    saving = false;
+    $('saveButton').disabled = false;
+    $('saveButton').textContent = 'Lưu thiết lập';
+  }
+  $('saveButton').addEventListener('click', save);
+
+  function applySaved(saved) {
+    data = saved;
+    newFile = null; resetBg = false; bgWarn('');
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+    $('allowMulti').checked = data.cho_phep_trung_nhieu_giai;
+    loadRows(); renderRows(); renderBg();
+    baseline = snapshot(); updateDirty();
+  }
+
+  if ($('exportButton')) {
+    $('exportButton').addEventListener('click', async () => {
+      const response = await fetch(`/api/admin/lucky-draw/${data.event_id}/export`);
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        say(result.message || 'Không xuất được file.', 'error');
+        return;
+      }
+      const blob = await response.blob();
+      const link = el('a', { href: URL.createObjectURL(blob), download: `quay-so-su-kien-${data.event_id}.xlsx` });
+      document.body.append(link); link.click(); link.remove();
+      URL.revokeObjectURL(link.href);
+    });
+  }
+
+  // ----- Khởi động -----
+  $('allowMulti').checked = data.cho_phep_trung_nhieu_giai;
+  loadRows(); renderRows(); renderBg(); renderCheckinInfo();
+  baseline = snapshot(); updateDirty();
+})();
+</script>
+{% endblock %}

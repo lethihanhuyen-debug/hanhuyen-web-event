@@ -31,7 +31,10 @@
       <nav class="primary-nav" id="primaryNav" aria-label="Điều hướng chính">
         <ul class="primary-nav__list">
           <li><a class="{% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng ký</a></li>
-          <li><a class="{% if request.path.startswith('/admin') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản trị</a></li>
+          <li><a class="{% if request.path.startswith('/admin') and not request.path.startswith('/admin/lucky-draw') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản trị</a></li>
+          {% if session.get('admin_id') %}
+          <li><a class="{% if request.path.startswith('/admin/lucky-draw') %}is-active{% endif %}" href="{{ url_for('lucky.lucky_list') }}">Quay số may mắn</a></li>
+          {% endif %}
         </ul>
         {% if session.get('admin_id') %}
           <div class="admin-settings">

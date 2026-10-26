@@ -4,7 +4,7 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const base = `/api/admin/events/${window.LUCKY.eventId}/lucky-draw`;
+  const base = `/api/admin/lucky-draw/${window.LUCKY.eventId}`;
   const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Chỉ dùng cho hiệu ứng trang trí (vị trí pháo giấy, câu chúc), không quyết định ai trúng
@@ -84,8 +84,9 @@
     return state.prizes.find((p) => String(p.id) === $('prizeSelect').value) || null;
   }
 
-  function maxCount(prize) {
-    return prize ? Math.max(Math.min(prize.con_lai, prize.nguoi_con_lai), 0) : 0;
+  // Quay được khi giải còn suất và còn người trong danh sách quay
+  function canDraw(prize) {
+    return !!prize && prize.con_lai > 0 && prize.nguoi_con_lai > 0;
   }
 
   function renderIdle() {
@@ -122,11 +123,6 @@
 
   function refreshPrizeInfo() {
     const prize = currentPrize();
-    const input = $('countInput');
-    const max = maxCount(prize);
-    input.max = String(Math.max(max, 1));
-    if (Number(input.value) > max) input.value = String(Math.max(max, 1));
-    if (!input.value || Number(input.value) < 1) input.value = '1';
     $('stagePrize').replaceChildren(document.createTextNode(prize ? prize.ten_giai : 'Quay số trúng thưởng'));
     if (prize) {
       const small = document.createElement('small');
@@ -140,9 +136,9 @@
   function updateLock() {
     const busy = drawing || pending.length > 0;
     const prize = currentPrize();
-    $('btnDraw').disabled = busy || !prize || maxCount(prize) < 1;
+    $('btnDraw').disabled = busy || !canDraw(prize);
     $('prizeSelect').disabled = busy;
-    $('countInput').disabled = busy;
+    
     $('confirmBox').classList.toggle('hidden', !(pending.length && !drawing));
     $('btnResults').disabled = drawing;
   }
@@ -237,12 +233,11 @@
   async function startDraw() {
     if (drawing || pending.length) return;
     const prize = currentPrize();
-    if (!prize) { showMsg('Chưa có giải thưởng. Hãy thêm giải ở trang quản trị.'); return; }
-    const count = Number($('countInput').value) || 1;
+    if (!prize) { showMsg('Chưa có giải thưởng. Hãy thêm giải ở trang thiết lập.'); return; }
     drawing = true;
     updateLock();
     showMsg('');
-    const data = await api('POST', '/draw', { prize_id: prize.id, so_nguoi: count });
+    const data = await api('POST', '/draw', { prize_id: prize.id });
     if (!data.success) {
       drawing = false;
       showMsg(data.message || 'Không quay được.');
@@ -361,7 +356,6 @@
   $('btnResults').addEventListener('click', openResults);
   $('btnResultsClose').addEventListener('click', closeResults);
   $('prizeSelect').addEventListener('change', refreshPrizeInfo);
-  $('countInput').addEventListener('change', refreshPrizeInfo);
 
   function typing(t) {
     if (!t || !t.tagName) return false;

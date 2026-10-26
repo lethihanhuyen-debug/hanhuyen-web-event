@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block title %}Quay số may mắn | Quản trị sự kiện{% endblock %}
+
+{% block head %}
+<style>
+  .lucky-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .lucky-dialog { border: 0; border-radius: 16px; padding: 0; max-width: min(560px, 94vw); width: 100%; box-shadow: var(--shadow); background: var(--surface); color: var(--text); }
+  .lucky-dialog::backdrop { background: rgba(15, 90, 150, .45); }
+  .lucky-dialog__body { padding: 22px 24px; display: grid; gap: 12px; }
+  .lucky-dialog h2 { margin: 0; }
+  .lucky-dialog input[type="text"] { width: 100%; }
+  .lucky-warn { background: #fdecea; color: var(--danger); border-radius: 10px; padding: 10px 12px; font-weight: 600; }
+  .lucky-empty { text-align: center; padding: 28px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="admin-panel admin-panel--wide">
+  <div class="panel-head panel-head--top">
+    <div>
+      <p class="eyebrow">Quản trị</p>
+      <h1>Quay số may mắn</h1>
+      <p class="muted">Danh sách sự kiện đã thiết lập quay số. Người tham gia quay là những người đã check-in của sự kiện.</p>
+    </div>
+    <div class="panel-head__side">
+      <div class="panel-actions panel-actions--row">
+        {% if unset_count %}
+          <a class="btn btn--green" href="{{ url_for('lucky.lucky_setup_new') }}">+ Thiết lập sự kiện mới</a>
+        {% else %}
+          <span class="muted">Mọi sự kiện đều đã thiết lập.</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div id="pageMessage" class="message" hidden></div>
+
+  <div class="form-card">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Sự kiện</th><th>Giải</th><th>Đã trúng / Tổng suất</th><th>Đã huỷ</th><th>Người check-in</th><th>Cập nhật</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td><strong>{{ row.ten_su_kien }}</strong><br><span class="muted">{{ row.ngay }}</span></td>
+            <td>{{ row.so_giai }}</td>
+            <td>{{ row.da_trung }} / {{ row.so_suat }}{% if row.cho_luu %} <span class="muted">(+{{ row.cho_luu }} chờ lưu)</span>{% endif %}</td>
+            <td>{{ row.da_huy }}</td>
+            <td>{{ row.nguoi_checkin }}</td>
+            <td>{{ row.cap_nhat }}</td>
+            <td>
+              <div class="lucky-actions">
+                <a class="btn btn--green btn--sm" href="{{ url_for('lucky.lucky_screen', event_id=row.event_id) }}" target="_blank" rel="noopener">Mở màn hình quay</a>
+                <a class="btn btn--ghost btn--sm" href="{{ url_for('lucky.lucky_setup_edit', event_id=row.event_id) }}">Sửa thiết lập</a>
+                <button class="btn btn--danger btn--sm js-delete-setup" type="button"
+                        data-event-id="{{ row.event_id }}"
+                        data-name="{{ row.ten_su_kien }}"
+                        data-total="{{ row.tong_ket_qua }}"
+                        data-won="{{ row.da_trung }}"
+                        data-pending="{{ row.cho_luu }}"
+                        data-cancelled="{{ row.da_huy }}">Xoá thiết lập</button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="muted lucky-empty">Chưa có sự kiện nào thiết lập quay số. Bấm "Thiết lập sự kiện mới" để bắt đầu.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<dialog id="deleteDialog" class="lucky-dialog">
+  <form method="dialog" class="lucky-dialog__body" id="deleteForm">
+    <h2>Xoá thiết lập quay số?</h2>
+    <p id="deleteIntro"></p>
+    <div id="deleteWarn" class="lucky-warn" hidden></div>
+    <label id="deleteConfirmBox" hidden>
+      <span>Gõ lại <strong id="deleteEventName"></strong> để xác nhận:</span>
+      <input type="text" id="deleteTyped" autocomplete="off" spellcheck="false">
+    </label>
+    <p class="muted">Sự kiện và dữ liệu check-in <strong>không</strong> bị xoá. Sau khi xoá, sự kiện quay lại danh sách "chưa thiết lập" để thiết lập lại.</p>
+    <div id="deleteError" class="message message--error" hidden></div>
+    <div class="btn-row">
+      <button class="btn btn--ghost" type="button" id="deleteCancel">Giữ lại</button>
+      <button class="btn btn--danger" type="submit" id="deleteConfirm">Xoá thiết lập</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function () {
+  const dialog = document.getElementById('deleteDialog');
+  const typed = document.getElementById('deleteTyped');
+  const confirmBtn = document.getElementById('deleteConfirm');
+  const errorBox = document.getElementById('deleteError');
+  let current = null;
+
+  const same = (a, b) => a.trim().split(/\s+/).join(' ') === b.trim().split(/\s+/).join(' ');
+  function refresh() {
+    confirmBtn.disabled = current && current.total > 0 && !same(typed.value, current.name);
+  }
+
+  document.querySelectorAll('.js-delete-setup').forEach((button) => {
+    button.addEventListener('click', () => {
+      current = {
+        id: button.dataset.eventId, name: button.dataset.name, total: Number(button.dataset.total),
+        won: Number(button.dataset.won), pending: Number(button.dataset.pending), cancelled: Number(button.dataset.cancelled),
+      };
+      document.getElementById('deleteIntro').textContent = `Sự kiện: ${current.name}. Xoá thiết lập sẽ xoá toàn bộ giải thưởng và ảnh nền của sự kiện này.`;
+      const warn = document.getElementById('deleteWarn');
+      const box = document.getElementById('deleteConfirmBox');
+      if (current.total > 0) {
+        warn.hidden = false;
+        warn.textContent = `Sự kiện này đã có ${current.total} kết quả quay (${current.won} đã lưu, ${current.pending} chờ lưu, ${current.cancelled} đã huỷ vắng mặt). Xoá thiết lập sẽ MẤT TOÀN BỘ kết quả này và không khôi phục được. Hãy xuất Excel trước nếu cần.`;
+        box.hidden = false;
+        document.getElementById('deleteEventName').textContent = current.name;
+      } else {
+        warn.hidden = true; box.hidden = true;
+      }
+      typed.value = '';
+      errorBox.hidden = true;
+      confirmBtn.disabled = false;
+      refresh();
+      dialog.showModal();
+    });
+  });
+  typed.addEventListener('input', refresh);
+  document.getElementById('deleteCancel').addEventListener('click', () => dialog.close());
+
+  document.getElementById('deleteForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!current) return;
+    confirmBtn.disabled = true;
+    try {
+      const response = await fetch(`/api/admin/lucky-draw/${current.id}`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ xac_nhan_ten: typed.value }),
+      });
+      if (response.status === 401) { location.href = '/admin/login?next=' + encodeURIComponent(location.pathname); return; }
+      const data = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
+      if (data.success) { location.reload(); return; }
+      errorBox.textContent = data.message || 'Không xoá được.';
+      errorBox.hidden = false;
+    } catch (err) {
+      errorBox.textContent = 'Không kết nối được máy chủ, chưa xoá gì.';
+      errorBox.hidden = false;
+    }
+    refresh();
+  });
+})();
+</script>
+{% endblock %}
