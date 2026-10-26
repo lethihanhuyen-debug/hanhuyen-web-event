@@ -3,7 +3,13 @@
 
 {% block head %}
 <style>
-  .lucky-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); margin-bottom: 16px; }
+  .lucky-one { padding: 24px; display: block; }
+  .lucky-sec + .lucky-sec, .lucky-grid + .lucky-sec { margin-top: 28px; }
+  .lucky-sec > h2 { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; font-size: 1.05rem; color: var(--blue-700, #1976b8); white-space: nowrap; }
+  .lucky-sec > h2::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .lucky-grid > .lucky-sec { margin-top: 0 !important; }
+  .lucky-sec h3 { margin: 18px 0 8px; font-size: .98rem; }
+  .lucky-grid { display: grid; gap: 28px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
   .lucky-bg { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
   .lucky-bg img { width: 256px; max-width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); background: var(--linen); }
   .lucky-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -17,7 +23,7 @@
   .lucky-prize.has-error input.is-error { border-color: var(--danger); background: #fdecea; }
   .lucky-prize__err { grid-column: 2 / -1; color: var(--danger); font-weight: 600; font-size: .88rem; }
   .lucky-warn { background: #fff4d6; color: var(--warning); border-radius: 10px; padding: 8px 12px; font-weight: 600; margin-top: 8px; }
-  .lucky-save-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(0deg, var(--cloud-dancer, #f6f0e2) 70%, transparent); }
+  .lucky-save-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); }
   .lucky-dirty { color: var(--warning); font-weight: 600; }
   @media (max-width: 640px) { .lucky-prize { grid-template-columns: 28px 1fr 84px; } .lucky-prize__btns { grid-column: 2 / -1; } }
 </style>
@@ -41,10 +47,11 @@
     </div>
   </div>
 
+  <div class="form-card lucky-one">
   <div id="pageMessage" class="message{% if notice %} message--success{% endif %}"{% if not notice %} hidden{% endif %} role="status">{{ notice }}</div>
 
   <div class="lucky-grid">
-    <div class="form-card">
+    <div class="lucky-sec">
       <h2>1. Sự kiện</h2>
       {% if mode == 'edit' %}
         <p><strong>{{ data.ten_su_kien }}</strong></p>
@@ -63,7 +70,7 @@
       <p class="muted">Danh sách quay lấy từ những người đã check-in của sự kiện (mỗi mã CB/SV 1 suất, kể cả người gửi chứng chỉ lỗi).</p>
     </div>
 
-    <div class="form-card">
+    <div class="lucky-sec">
       <h2>2. Tuỳ chọn</h2>
       <label class="lucky-check">
         <input type="checkbox" id="allowMulti">
@@ -73,7 +80,7 @@
     </div>
   </div>
 
-  <div class="form-card">
+  <div class="lucky-sec">
     <h2>3. Hình nền màn hình quay số</h2>
     <div class="lucky-bg">
       <img id="bgPreview" src="{{ data.hinh_nen_url }}" alt="Hình nền hiện tại">
@@ -91,7 +98,7 @@
     </div>
   </div>
 
-  <div class="form-card" style="margin-top:16px">
+  <div class="lucky-sec">
     <h2>4. Giải thưởng</h2>
     <p class="muted">Giải được quay theo thứ tự từ trên xuống (đổi bằng ▲ ▼). Mỗi giải cần có tên và số lượng từ 1 trở lên.</p>
     <div id="prizeList"></div>
@@ -101,7 +108,7 @@
   </div>
 
   {% if mode == 'edit' %}
-  <div class="form-card" style="margin-top:16px" id="resultsCard">
+  <div class="lucky-sec" id="resultsCard">
     <h2>5. Kết quả trúng thưởng</h2>
     <p id="pendingNote" class="lucky-warn" hidden></p>
     <div class="table-scroll">
@@ -126,6 +133,7 @@
   <div class="lucky-save-bar">
     <button id="saveButton" class="btn btn--primary" type="button">Lưu thiết lập</button>
     <span id="dirtyNote" class="lucky-dirty" hidden>Có thay đổi chưa lưu</span>
+  </div>
   </div>
 </section>
 
