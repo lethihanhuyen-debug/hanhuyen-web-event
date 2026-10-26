@@ -33,7 +33,7 @@ MAX_PRIZES = 100
 MAX_PRIZE_NAME_LENGTH = 255
 MAX_PRIZE_QUANTITY = 1000
 DECOY_LIMIT = 100  # số mã "mồi" gửi cho màn hình để chạy hiệu ứng
-TIME_FORMAT = "%H:%M:%S %d/%m/%Y"
+TIME_FORMAT = "%d/%m/%Y %H:%M"
 
 
 class DrawError(Exception):
@@ -69,7 +69,7 @@ def _require_config(event_id):
 
 def _lock_config(event_id):
     """Khoá hàng thiết lập của sự kiện đến hết transaction (SELECT ... FOR UPDATE). Mọi thao tác
-    quay/lưu/huỷ/sửa/xoá thiết lập đều đi qua đây nên chạy tuần tự theo từng sự kiện.
+    quay/lưu/hủy/sửa/xóa thiết lập đều đi qua đây nên chạy tuần tự theo từng sự kiện.
 
     MySQL mặc định REPEATABLE READ: ảnh chụp dữ liệu được lấy ở lần đọc đầu tiên của transaction.
     admin_required đã đọc bảng admins từ trước, nên nếu cứ khoá tiếp trong transaction đó thì sau
@@ -84,7 +84,7 @@ def _lock_config(event_id):
         .with_for_update().populate_existing().one_or_none()
     )
     if not config:
-        raise DrawError("Sự kiện này chưa thiết lập quay số (hoặc thiết lập vừa bị xoá).", 404)
+        raise DrawError("Sự kiện này chưa thiết lập quay số (hoặc thiết lập vừa bị xóa).", 404)
     return config
 
 
@@ -439,7 +439,7 @@ def lucky_save_setup(event_id):
                 raise DrawError("Thiết lập vừa được thay đổi ở nơi khác (tab hoặc admin khác). Hãy tải lại trang để xem bản mới; dữ liệu bạn đang nhập vẫn còn trên màn hình.", 409)
         else:
             if payload.get("phien_ban") is not None:
-                raise DrawError("Thiết lập này vừa bị xoá ở nơi khác. Hãy tải lại trang.", 409)
+                raise DrawError("Thiết lập này vừa bị xóa ở nơi khác. Hãy tải lại trang.", 409)
             db.session.commit()
             config = LuckyConfig(event_id=event_id, cho_phep_trung_nhieu_giai=allow_multi, phien_ban=0)
             db.session.add(config)
@@ -473,7 +473,7 @@ def lucky_save_setup(event_id):
                     errors.append({"index": index, "field": "so_luong", "message": f"Giải này đã có {used} người trúng, số lượng không được nhỏ hơn {used}."})
         for prize_id, prize in existing.items():
             if prize_id not in keep_ids and history.get(prize_id, 0):
-                errors.append({"index": None, "field": "xoa", "message": f"Giải \"{prize.ten_giai}\" đã có lịch sử quay nên không xoá được."})
+                errors.append({"index": None, "field": "xoa", "message": f"Giải \"{prize.ten_giai}\" đã có lịch sử quay nên không xóa được."})
         if errors:
             blocked = [e for e in errors if e["index"] is None]
             message = blocked[0]["message"] if blocked else "Có dòng giải chưa hợp lệ, hãy sửa rồi Lưu lại."
@@ -502,7 +502,7 @@ def lucky_save_setup(event_id):
         elif reset_image:
             config.hinh_nen = None
         else:
-            old_path = None  # không đổi ảnh thì không xoá gì
+            old_path = None  # không đổi ảnh thì không xóa gì
         config.phien_ban = (config.phien_ban or 0) + 1
         config.updated_at = now_vn_naive()
         db.session.commit()
@@ -511,19 +511,19 @@ def lucky_save_setup(event_id):
         if new_path:
             new_path.unlink(missing_ok=True)
         raise
-    remove_files([old_path] if old_path else [])  # chỉ xoá ảnh cũ sau khi DB đã commit
+    remove_files([old_path] if old_path else [])  # chỉ xóa ảnh cũ sau khi DB đã commit
 
     config = _get_config(event_id)
     return jsonify({"success": True, "message": "Đã lưu thiết lập.", "data": _setup_payload(event, config)})
 
 
-# ---------- Xoá thiết lập ----------
+# ---------- Xóa thiết lập ----------
 
 @lucky_bp.delete("/api/admin/lucky-draw/<int:event_id>")
 @admin_required
 def lucky_delete_setup(event_id):
-    """Xoá thiết lập: giải thưởng, kết quả (kể cả bản huỷ), ảnh nền -- trong 1 transaction.
-    KHÔNG xoá sự kiện và dữ liệu check-in. Đã có kết quả thì phải gõ lại đúng tên sự kiện."""
+    """Xóa thiết lập: giải thưởng, kết quả (kể cả bản hủy), ảnh nền -- trong 1 transaction.
+    KHÔNG xóa sự kiện và dữ liệu check-in. Đã có kết quả thì phải gõ lại đúng tên sự kiện."""
     event = Event.query.get_or_404(event_id)
     payload = request.get_json(silent=True) or {}
     _lock_config(event_id)
@@ -531,11 +531,11 @@ def lucky_delete_setup(event_id):
     if total:
         typed = " ".join(str(payload.get("xac_nhan_ten") or "").split())
         if typed != " ".join(event.ten_su_kien.split()):
-            raise DrawError("Tên sự kiện gõ lại chưa đúng nên chưa xoá. Hãy gõ chính xác tên sự kiện để xác nhận.", 400)
+            raise DrawError("Tên sự kiện gõ lại chưa đúng nên chưa xóa. Hãy gõ chính xác tên sự kiện để xác nhận.", 400)
     files = purge_event_data(event_id)
     db.session.commit()
     remove_files(files)
-    message = f"Đã xoá thiết lập quay số của sự kiện." + (f" Đã xoá {total} kết quả." if total else "")
+    message = f"Đã xóa thiết lập quay số của sự kiện." + (f" Đã xóa {total} kết quả." if total else "")
     return jsonify({"success": True, "message": message, "da_xoa_ket_qua": total})
 
 
@@ -550,7 +550,7 @@ def lucky_state(event_id):
     return jsonify(_state(event, config, with_name))
 
 
-# ---------- Quay / Lưu / Quay lại / Huỷ ----------
+# ---------- Quay / Lưu / Quay lại / Hủy ----------
 
 def _get_prize(event_id, prize_id):
     prize = db.session.get(LuckyPrize, prize_id)
@@ -625,7 +625,7 @@ def lucky_confirm(event_id):
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/reject")
 @admin_required
 def lucky_reject(event_id):
-    """Quay lại: bỏ kết quả đang chờ (chưa Lưu nên xoá hẳn, người đó quay lại danh sách quay)."""
+    """Quay lại: bỏ kết quả đang chờ (chưa Lưu nên xóa hẳn, người đó quay lại danh sách quay)."""
     Event.query.get_or_404(event_id)
     _lock_config(event_id)
     count = LuckyWinner.query.filter_by(event_id=event_id, trang_thai="pending").delete()
@@ -638,19 +638,19 @@ def lucky_reject(event_id):
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/winners/<int:winner_id>/cancel")
 @admin_required
 def lucky_cancel(event_id, winner_id):
-    """Huỷ người vắng mặt: giữ bản ghi để đối chiếu, người này quay lại danh sách quay."""
+    """Hủy người vắng mặt: giữ bản ghi để đối chiếu, người này quay lại danh sách quay."""
     Event.query.get_or_404(event_id)
     _lock_config(event_id)
     winner = db.session.get(LuckyWinner, winner_id)
     if not winner or winner.event_id != event_id:
         raise DrawError("Không tìm thấy kết quả.", 404)
     if winner.trang_thai != "confirmed":
-        raise DrawError("Chỉ huỷ được kết quả đã lưu. Kết quả đang chờ hãy bấm Quay lại.", 409)
+        raise DrawError("Chỉ hủy được kết quả đã lưu. Kết quả đang chờ hãy bấm Quay lại.", 409)
     winner.trang_thai = "cancelled"
     winner.huy_luc = now_vn_naive()
     winner.hieu_luc = None
     db.session.commit()
-    return jsonify({"success": True, "message": f"Đã huỷ kết quả của {winner.patron_code}. Người này được đưa lại vào danh sách quay."})
+    return jsonify({"success": True, "message": f"Đã hủy kết quả của {winner.patron_code}. Người này được đưa lại vào danh sách quay."})
 
 
 # ---------- Xuất Excel ----------
@@ -682,7 +682,7 @@ def lucky_export(event_id):
 
     if cancelled:
         sheet2 = workbook.create_sheet("Da huy (vang mat)")
-        sheet2.append(["STT", "Giải", "Mã CB/SV", "Họ tên", "Giờ trúng", "Giờ huỷ"])
+        sheet2.append(["STT", "Giải", "Mã CB/SV", "Họ tên", "Giờ trúng", "Giờ hủy"])
         for cell in sheet2[1]:
             cell.font = Font(bold=True)
         for position, w in enumerate(cancelled, start=1):

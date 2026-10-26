@@ -92,11 +92,11 @@
           {%- else -%}
             {{ selected_event.dia_diem or 'Chưa có địa điểm' }}
           {%- endif %}
-          - Diễn ra {{ selected_event.ngay_bat_dau.strftime('%H:%M %d/%m/%Y') if selected_event.ngay_bat_dau else '' }}
-          {% if selected_event.ngay_ket_thuc %} - {{ selected_event.ngay_ket_thuc.strftime('%H:%M %d/%m/%Y') }}{% endif %}
+          - Diễn ra {{ selected_event.ngay_bat_dau.strftime('%d/%m/%Y %H:%M') if selected_event.ngay_bat_dau else '' }}
+          {% if selected_event.ngay_ket_thuc %} - {{ selected_event.ngay_ket_thuc.strftime('%d/%m/%Y %H:%M') }}{% endif %}
         </p>
         <p class="muted">
-          Đăng ký {{ selected_event.thoi_gian_mo_dang_ky.strftime('%H:%M %d/%m/%Y') if selected_event.thoi_gian_mo_dang_ky else '' }} - {{ selected_event.thoi_gian_dong_dang_ky.strftime('%H:%M %d/%m/%Y') if selected_event.thoi_gian_dong_dang_ky else '' }}
+          Đăng ký {{ selected_event.thoi_gian_mo_dang_ky.strftime('%d/%m/%Y %H:%M') if selected_event.thoi_gian_mo_dang_ky else '' }} - {{ selected_event.thoi_gian_dong_dang_ky.strftime('%d/%m/%Y %H:%M') if selected_event.thoi_gian_dong_dang_ky else '' }}
         </p>
         <p class="muted">
           Đã đăng ký: {{ selected_event.registration_count }} / {{ selected_event.so_luong_toi_da or 'Không giới hạn' }}

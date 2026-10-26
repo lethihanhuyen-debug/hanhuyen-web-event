@@ -43,7 +43,7 @@
       <a class="btn btn--back" href="{{ url_for('lucky.lucky_list') }}">← Danh sách quay số</a>
       {% if mode == 'edit' %}
       <div class="panel-actions panel-actions--row">
-        <a class="btn btn--green" href="{{ url_for('lucky.lucky_screen', event_id=data.event_id) }}" target="_blank" rel="noopener">Mở màn hình quay</a>
+        <a class="btn btn--primary" href="{{ url_for('lucky.lucky_screen', event_id=data.event_id) }}" target="_blank" rel="noopener">Mở màn hình quay</a>
         <button id="exportButton" class="btn btn--ghost" type="button">Xuất Excel</button>
       </div>
       {% endif %}
@@ -58,7 +58,7 @@
       <h2>1. Sự kiện</h2>
       {% if mode == 'edit' %}
         <p><strong>{{ data.ten_su_kien }}</strong></p>
-        <p class="muted">Sự kiện không đổi được sau khi đã lưu thiết lập. Muốn đổi, hãy xoá thiết lập rồi thiết lập lại.</p>
+        <p class="muted">Sự kiện không đổi được sau khi đã lưu thiết lập. Muốn đổi, hãy xóa thiết lập rồi thiết lập lại.</p>
       {% else %}
         <label for="eventSelect" class="muted">Chọn sự kiện (chỉ hiện sự kiện chưa thiết lập)</label>
         <select id="eventSelect">
@@ -70,7 +70,7 @@
         {% if not events %}<p class="muted">Mọi sự kiện đều đã thiết lập.</p>{% endif %}
       {% endif %}
       <p class="muted" id="checkinInfo"></p>
-      <p class="muted">Danh sách lấy từ những người đã checkin.</p>
+      <p class="muted">Danh sách lấy từ những người đã check-in.</p>
     </div>
 
     <div class="lucky-sec">
@@ -105,7 +105,7 @@
     <h2>4. Giải thưởng</h2>
     <div id="prizeList"></div>
     <div style="margin-top:12px">
-      <button id="addPrize" class="btn btn--green" type="button" aria-label="Thêm giải">＋ Thêm giải</button>
+      <button id="addPrize" class="btn btn--ghost" type="button" aria-label="Thêm giải">＋ Thêm giải</button>
     </div>
   </div>
 
@@ -119,12 +119,12 @@
         <tbody id="winnerRows"></tbody>
       </table>
     </div>
-    <p class="muted">Người vắng mặt: bấm "Huỷ (vắng mặt)" để đưa họ lại vào danh sách quay, sau đó quay bổ sung ở màn hình quay. Thao tác này có hiệu lực ngay, không cần bấm Lưu thiết lập.</p>
+    <p class="muted">Người vắng mặt: bấm "Hủy (vắng mặt)" để đưa họ lại vào danh sách quay, sau đó quay bổ sung ở màn hình quay. Thao tác này có hiệu lực ngay, không cần bấm Lưu thiết lập.</p>
     <div id="cancelledBox" hidden>
-      <h3>Đã huỷ (vắng mặt) — để đối chiếu</h3>
+      <h3>Đã hủy (vắng mặt) — để đối chiếu</h3>
       <div class="table-scroll">
         <table class="data-table">
-          <thead><tr><th>Giải</th><th>Mã CB/SV</th><th>Họ tên</th><th>Giờ trúng</th><th>Giờ huỷ</th></tr></thead>
+          <thead><tr><th>Giải</th><th>Mã CB/SV</th><th>Họ tên</th><th>Giờ trúng</th><th>Giờ hủy</th></tr></thead>
           <tbody id="cancelledRows"></tbody>
         </table>
       </div>
@@ -204,7 +204,7 @@
       const qty = el('input', { type: 'number', min: Math.max(row.da_quay, 1), max: 1000, step: 1, value: row.so_luong, ariaLabel: `Số lượng giải ${index + 1}` });
       const up = el('button', { type: 'button', className: 'btn btn--ghost btn--sm', textContent: '▲', title: 'Lên', disabled: index === 0 });
       const down = el('button', { type: 'button', className: 'btn btn--ghost btn--sm', textContent: '▼', title: 'Xuống', disabled: index === rows.length - 1 });
-      const del = el('button', { type: 'button', className: 'btn btn--danger btn--sm', textContent: 'Xoá', title: row.co_lich_su ? 'Giải đã có lịch sử quay, không xoá được' : 'Xoá dòng này', disabled: row.co_lich_su });
+      const del = el('button', { type: 'button', className: 'btn btn--danger btn--sm', textContent: 'Xóa', title: row.co_lich_su ? 'Giải đã có lịch sử quay, không xóa được' : 'Xóa dòng này', disabled: row.co_lich_su });
       name.addEventListener('input', () => { row.ten_giai = name.value; row.error = null; name.classList.remove('is-error'); updateDirty(); });
       qty.addEventListener('input', () => { row.so_luong = qty.value; row.error = null; qty.classList.remove('is-error'); updateDirty(); });
       up.addEventListener('click', () => move(index, -1));
@@ -222,7 +222,7 @@
         wrap.append(el('div', { className: 'lucky-prize__err', textContent: row.error.message }));
       }
       if (row.co_lich_su) {
-        wrap.append(el('div', { className: 'lucky-prize__note muted', textContent: `Đã quay ${row.da_quay} người — không xoá được giải, số lượng tối thiểu ${Math.max(row.da_quay, 1)}.` }));
+        wrap.append(el('div', { className: 'lucky-prize__note muted', textContent: `Đã quay ${row.da_quay} người — không xóa được giải, số lượng tối thiểu ${Math.max(row.da_quay, 1)}.` }));
       }
       list.append(wrap);
     });
@@ -383,9 +383,9 @@
     body.replaceChildren();
     if (!result.winners.length) body.append(el('tr', {}, [el('td', { colSpan: 6, className: 'muted', textContent: 'Chưa có kết quả đã lưu.' })]));
     result.winners.forEach((w, index) => {
-      const cancel = el('button', { type: 'button', className: 'btn btn--danger btn--sm', textContent: 'Huỷ (vắng mặt)' });
+      const cancel = el('button', { type: 'button', className: 'btn btn--danger btn--sm', textContent: 'Hủy (vắng mặt)' });
       cancel.addEventListener('click', async () => {
-        if (!confirm(`Huỷ kết quả của ${w.patron_code}${w.ho_ten ? ' - ' + w.ho_ten : ''}? Người này sẽ được đưa lại vào danh sách quay.`)) return;
+        if (!await confirmAsync(`Hủy kết quả của ${w.patron_code}${w.ho_ten ? ' - ' + w.ho_ten : ''}? Người này sẽ được đưa lại vào danh sách quay.`)) return;
         const r = await fetch(`/api/admin/lucky-draw/${data.event_id}/winners/${w.id}/cancel`, { method: 'POST' });
         const j = await r.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
         say(j.message, j.success ? 'success' : 'error');

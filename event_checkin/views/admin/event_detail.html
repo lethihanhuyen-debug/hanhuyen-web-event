@@ -20,10 +20,10 @@
         {% if event.certificate_template_url %}
           <button id="openTemplatePreview" class="btn btn--ghost" type="button">Xem mẫu chứng chỉ</button>
         {% endif %}
-        <a class="btn btn--green" href="{{ url_for('checkin.event_index', event_id=event.id) }}" target="_blank" rel="noopener">Check-in</a>
-        <a class="btn btn--green" href="{{ url_for('admin.checkins_page', event_id=event.id) }}">Danh sách check-in</a>
+        <a class="btn btn--primary" href="{{ url_for('checkin.event_index', event_id=event.id) }}" target="_blank" rel="noopener">Check-in</a>
+        <a class="btn btn--ghost" href="{{ url_for('admin.checkins_page', event_id=event.id) }}">Danh sách check-in</a>
         {% if lucky_ready %}
-        <a class="btn btn--green" href="{{ url_for('lucky.lucky_screen', event_id=event.id) }}" target="_blank" rel="noopener">Quay số trúng thưởng</a>
+        <a class="btn btn--ghost" href="{{ url_for('lucky.lucky_screen', event_id=event.id) }}" target="_blank" rel="noopener">Quay số trúng thưởng</a>
         {% endif %}
       </div>
     </div>
@@ -107,7 +107,7 @@
                   {% if row.cert_status == 'sent' %}
                     <span class="badge badge--success" title="Gửi lúc {{ row.cert_sent_at }} · đã gửi {{ row.send_count }} lần{% if row.cert_error %} · lần gửi lại gần nhất lỗi: {{ row.cert_error }}{% endif %}">Đã gửi email</span>
                   {% elif row.cert_status == 'failed' %}
-                    <span class="badge badge--warning" title="{{ row.cert_error }}">Gửi lỗi</span>
+                    <span class="badge badge--danger" title="{{ row.cert_error }}">Gửi lỗi</span>
                   {% else %}
                     <span class="badge badge--muted">Chưa gửi</span>
                   {% endif %}
@@ -272,7 +272,7 @@
       const maCbsv = button.dataset.maCbsv;
       const eventId = Number(button.dataset.eventId);
       const name = button.dataset.name || maCbsv;
-      if (!confirm(`Xóa check-in của ${name}?`)) return;
+      if (!await confirmAsync(`Xóa check-in của ${name}?`)) return;
 
       button.disabled = true;
       button.textContent = 'Đang xóa...';

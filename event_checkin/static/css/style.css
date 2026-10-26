@@ -53,6 +53,7 @@
   --shadow-md: 0 12px 32px rgba(40, 90, 130, 0.12);
   --shadow-lg: 0 22px 50px -12px rgba(25, 118, 184, 0.24);
   --control-h: 44px;
+  --backdrop: rgba(15, 45, 80, 0.55);
   --container: 1120px;
   --container-wide: 1440px;
 
@@ -905,24 +906,25 @@ textarea:focus {
 .btn--primary {
   background: var(--sage-gray);
   color: #fff;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn--primary:hover {
   background: var(--sage-gray-hover);
 }
 
-/* Nút "Quay lại" ở góc trên trang quản trị: xanh dương đậm cho dễ thấy */
+/* Nút "Quay lại": kiểu viền nhạt (nút phụ), nút chính của trang là nút xanh dương */
 .btn--back {
-  background: var(--color-accent-strong);
-  color: #fff;
-  font-weight: 700;
-  box-shadow: var(--shadow-md);
+  background: transparent;
+  color: var(--color-primary-dark);
+  border: 1px solid var(--border);
+  font-weight: 600;
+  box-shadow: none;
 }
 
 .btn--back:hover {
-  background: var(--color-accent-strong-hover);
-  color: #fff;
+  background: var(--linen);
+  color: var(--color-primary-dark);
 }
 
 /* Nút quay lại trên trang check-in: góc trên bên phải trang, ngoài khung check-in */
@@ -949,7 +951,7 @@ textarea:focus {
   background: var(--color-accent-strong);
   color: #fff;
   font-weight: 700;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn--green:hover {
@@ -1012,7 +1014,8 @@ textarea:focus {
 }
 
 .message--error,
-.checkin-result--error {
+.checkin-result--error,
+.badge--danger {
   background: var(--color-danger-bg);
   color: var(--danger);
 }
@@ -1024,9 +1027,10 @@ textarea:focus {
   color: var(--warning);
 }
 
+/* Trùng / đã bỏ qua: màu trung tính (đỏ dành riêng cho lỗi) */
 .badge--closed {
-  background: var(--color-danger-bg);
-  color: var(--danger);
+  background: rgba(40, 100, 150, 0.1);
+  color: var(--muted);
 }
 
 .checkin-result--pending {
@@ -2087,7 +2091,7 @@ th {
    Trên card đăng ký, badge--warning = "Đang diễn ra" (trạng thái sống, đáng pulse);
    badge--success ở đó = "Sắp diễn ra" (tĩnh, không cần pulse). */
 .event-card .badge--warning::before,
-.admin-event-card .badge--success::before {
+.admin-event-card .badge--warning::before {
   content: "";
   width: 7px;
   height: 7px;
@@ -3071,4 +3075,123 @@ th {
 
 .fit-table th:nth-child(4), .fit-table td:nth-child(4) {
   min-width: 200px;
+}
+
+/* ==========================================================================
+   NHÓM 3 (rà soát giao diện): thành phần dùng chung
+   ========================================================================== */
+/* Đầu trang: nội dung canh trái ở mọi cỡ màn hình */
+@media (max-width: 960px) {
+  .panel-head {
+    align-items: flex-start;
+  }
+
+  .panel-head__side {
+    align-items: flex-start;
+  }
+
+  .panel-actions--row {
+    justify-content: flex-start;
+  }
+}
+
+/* Thẻ thống kê: lưới 2x2 trên điện thoại (thay vì xếp dọc 4 hàng) */
+@media (max-width: 960px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .stat-card {
+    padding: var(--space-4);
+  }
+
+  /* khung "Chưa có hình" gọn lại, không chiếm nửa màn hình */
+  .event-card__image,
+  .admin-event-card__image {
+    aspect-ratio: 16 / 7;
+  }
+}
+
+.event-card__image:not(:has(img)),
+.admin-event-card__image:not(:has(img)) {
+  background: var(--linen);
+  color: var(--muted);
+}
+
+.lucky-table td:first-child {
+  min-width: 220px;
+}
+
+/* ----- Hộp thoại dùng chung: cùng nền, viền, bo góc, bóng, lớp phủ và hàng nút ----- */
+.manual-dialog::backdrop,
+.lucky-dialog::backdrop,
+.app-dialog::backdrop {
+  background: var(--backdrop);
+}
+
+.modal__backdrop {
+  background: var(--backdrop);
+}
+
+.modal__dialog {
+  padding: var(--space-5);
+  box-shadow: var(--shadow-lg);
+}
+
+.manual-dialog,
+.app-dialog {
+  box-shadow: var(--shadow-lg);
+}
+
+.app-dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.app-dialog__body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.app-dialog__title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+}
+
+.app-dialog__text {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.app-dialog__text + .app-dialog__text {
+  color: var(--muted);
+}
+
+.app-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.app-dialog .btn--danger-solid {
+  background: var(--danger);
+  color: #fff;
+}
+
+.app-dialog .btn--danger-solid:hover {
+  background: var(--danger);
+  filter: brightness(0.9);
 }

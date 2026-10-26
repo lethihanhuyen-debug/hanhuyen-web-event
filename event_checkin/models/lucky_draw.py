@@ -8,7 +8,7 @@ WINNER_STATUSES = ("pending", "confirmed", "cancelled")
 class LuckyConfig(db.Model):
     """Thiết lập quay số của 1 sự kiện. Dòng này CHỈ tồn tại sau khi admin bấm Lưu thiết lập
     (có dòng = sự kiện đã thiết lập). Nó cũng là dòng bị khoá (SELECT ... FOR UPDATE) mỗi khi
-    quay/lưu/huỷ/sửa thiết lập, để hai tab hay hai admin bấm cùng lúc không sinh kết quả đúp --
+    quay/lưu/hủy/sửa thiết lập, để hai tab hay hai admin bấm cùng lúc không sinh kết quả đúp --
     xem controllers/lucky_draw_controller.py."""
 
     __tablename__ = "lucky_configs"
@@ -37,8 +37,8 @@ class LuckyPrize(db.Model):
 class LuckyWinner(db.Model):
     """Một lượt trúng giải. trang_thai: pending (đã quay, chờ Lưu) / confirmed (đã lưu) /
     cancelled (vắng mặt, giữ lại để đối chiếu). `hieu_luc` = 1 khi còn hiệu lực, NULL khi đã
-    huỷ -- để UNIQUE chỉ áp cho dòng còn hiệu lực (MySQL cho phép nhiều NULL), nhờ đó người
-    bị huỷ vẫn được quay lại vào cùng giải."""
+    hủy -- để UNIQUE chỉ áp cho dòng còn hiệu lực (MySQL cho phép nhiều NULL), nhờ đó người
+    bị hủy vẫn được quay lại vào cùng giải."""
 
     __tablename__ = "lucky_winners"
     __table_args__ = (

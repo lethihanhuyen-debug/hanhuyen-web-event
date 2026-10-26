@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 # setups without the `tzdata` package).
 VN_TZ = timezone(timedelta(hours=7))
 
-DEFAULT_FORMAT = "%H:%M %d/%m/%Y"
+DEFAULT_FORMAT = "%d/%m/%Y %H:%M"
 
 
 def utc_to_vn(dt):

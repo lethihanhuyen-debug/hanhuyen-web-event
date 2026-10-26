@@ -150,7 +150,7 @@ def start_job(app, base_url, event_id, record_ids=None):
             "failed": 0,
             "current": None,
             "log": [],
-            "started_at": format_local(now_vn_naive(), "%d/%m/%Y %H:%M:%S"),
+            "started_at": format_local(now_vn_naive(), "%d/%m/%Y %H:%M"),
             "finished_at": None,
         }
         _jobs[event_id] = job
@@ -186,7 +186,7 @@ def _run_job(app, base_url, event_id, targets):
             db.session.remove()
             with _jobs_lock:
                 _jobs[event_id].update(
-                    state="done", current=None, finished_at=format_local(now_vn_naive(), "%d/%m/%Y %H:%M:%S")
+                    state="done", current=None, finished_at=format_local(now_vn_naive(), "%d/%m/%Y %H:%M")
                 )
 
 

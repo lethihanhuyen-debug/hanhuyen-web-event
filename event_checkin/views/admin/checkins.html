@@ -227,7 +227,7 @@
   const deleteButton = document.getElementById('deleteSelected');
   const message = document.getElementById('pageMessage');
   const sendButton = document.getElementById('sendCertificates');
-  const BADGES = { pending: 'badge--muted', sent: 'badge--success', failed: 'badge--warning', duplicate: 'badge--closed' };
+  const BADGES = { pending: 'badge--muted', sent: 'badge--success', failed: 'badge--danger', duplicate: 'badge--closed' };
   let currentStatus = '';
 
   function eventId() { return EVENT_ID; }
@@ -379,7 +379,7 @@
 
   document.getElementById('dedupeButton').addEventListener('click', async () => {
     const name = EVENT_NAME;
-    if (!confirm(`Lọc trùng cho sự kiện "${name}"?\nMỗi mã chỉ giữ lần check-in sớm nhất, các lần còn lại chuyển sang "Trùng" (không xóa).`)) return;
+    if (!await confirmAsync(`Lọc trùng cho sự kiện "${name}"?\nMỗi mã chỉ giữ lần check-in sớm nhất, các lần còn lại chuyển sang "Trùng" (không xóa).`)) return;
     const data = await postJson(`/api/admin/events/${eventId()}/checkins/dedupe`);
     showMessage(data.success ? 'success' : 'error', data.message || 'Không thể lọc trùng.');
     load();
@@ -522,7 +522,7 @@
 
   importConfirm.addEventListener('click', async () => {
     const name = EVENT_NAME;
-    if (!confirm(`Nhập các dòng hợp lệ từ ${importFiles.length} file vào danh sách check-in của sự kiện "${name}"?\n(Chỉ thêm vào danh sách, chưa gửi email.)`)) return;
+    if (!await confirmAsync(`Nhập các dòng hợp lệ từ ${importFiles.length} file vào danh sách check-in của sự kiện "${name}"?\n(Chỉ thêm vào danh sách, chưa gửi email.)`)) return;
     importConfirm.disabled = true;
     try {
       const data = await uploadImport(false);
@@ -553,7 +553,7 @@
   deleteButton.addEventListener('click', async () => {
     const ids = selectedIds();
     if (!ids.length) return;
-    if (!confirm(`Xóa ${ids.length} dòng check-in đã chọn? Không thể hoàn tác.`)) return;
+    if (!await confirmAsync(`Xóa ${ids.length} dòng check-in đã chọn? Không thể hoàn tác.`)) return;
     const data = await postJson(`/api/admin/events/${eventId()}/checkins/delete`, { ids });
     showMessage(data.success ? 'success' : 'error', data.message || 'Không thể xóa.');
     load();
@@ -664,7 +664,7 @@
         : "Không còn ai ở trạng thái 'Chưa gửi'. Muốn gửi lại dòng lỗi, hãy chọn dòng đó rồi bấm Gửi chứng chỉ.");
       return false;
     }
-    if (!confirm(`Sẽ gửi chứng chỉ cho ${preview.count} người. Tiếp tục?`)) return false;
+    if (!await confirmAsync(`Sẽ gửi chứng chỉ cho ${preview.count} người. Tiếp tục?`)) return false;
 
     setRunning(true);
     const data = await postJson(`/api/admin/events/${eventId()}/send-certificates`, body);
@@ -778,7 +778,7 @@
         }
         const code = codeInput.value.trim();
         const email = emailInput.value.trim();
-        if (!confirm(`Sẽ gửi chứng chỉ cho 1 người (mã ${code}${email ? ', email ' + email : ''}). Tiếp tục?`)) return;
+        if (!await confirmAsync(`Sẽ gửi chứng chỉ cho 1 người (mã ${code}${email ? ', email ' + email : ''}). Tiếp tục?`)) return;
         resendBtn.disabled = true;
         if (!(await resendRow(row, code, email))) resendBtn.disabled = false;
       });
@@ -1022,7 +1022,7 @@
   // ---- lưu / hoàn tác ----
   document.getElementById('layoutSave').addEventListener('click', async () => {
     if (Number(document.getElementById('countSent').textContent) > 0 &&
-        !confirm('Vị trí / cỡ chữ mới áp dụng cho các chứng chỉ gửi từ giờ. Chứng chỉ đã gửi qua email sẽ không đổi. Vẫn lưu?')) return;
+        !await confirmAsync('Vị trí / cỡ chữ mới áp dụng cho các chứng chỉ gửi từ giờ. Chứng chỉ đã gửi qua email sẽ không đổi. Vẫn lưu?')) return;
     const data = await postJson(`/api/admin/events/${eventId()}/certificate-layout`, {
       layout: layoutPayload(), base_width: baseW, base_height: baseH,
     });
@@ -1193,7 +1193,7 @@
     const warning = zipDownloaded
       ? ''
       : '\n\nLƯU Ý: bạn CHƯA bấm "Tải ZIP chứng chỉ" trong lần mở trang này. Nên tải về máy trước khi xóa.';
-    if (!confirm(`Xóa ${storedCount} file chứng chỉ (${storedLabel}) của sự kiện này khỏi server?\n\n` +
+    if (!await confirmAsync(`Xóa ${storedCount} file chứng chỉ (${storedLabel}) của sự kiện này khỏi server?\n\n` +
         'Chứng chỉ sinh viên đã nhận qua email không bị ảnh hưởng. Thông tin chứng chỉ vẫn được giữ; ' +
         'khi có người mở lại, hệ thống sẽ tự vẽ lại theo mẫu hiện tại.' + warning)) return;
     const data = await postJson(`/api/admin/events/${eventId()}/certificates/purge`, { confirm: true });

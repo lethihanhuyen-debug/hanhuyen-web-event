@@ -1,4 +1,4 @@
-"""Việc dùng chung của quay số trúng thưởng: thư mục ảnh nền và dọn dữ liệu khi xoá sự kiện.
+"""Việc dùng chung của quay số trúng thưởng: thư mục ảnh nền và dọn dữ liệu khi xóa sự kiện.
 Đặt riêng (không nằm trong controller) để admin_controller.delete_event gọi được mà không bị import vòng."""
 from pathlib import Path
 
@@ -27,7 +27,7 @@ def background_path(relative):
 
 
 def purge_event_data(event_id):
-    """Xoá dữ liệu quay số của sự kiện (chưa commit). Trả về đường dẫn ảnh nền cần xoá sau khi commit."""
+    """Xóa dữ liệu quay số của sự kiện (chưa commit). Trả về đường dẫn ảnh nền cần xóa sau khi commit."""
     config = LuckyConfig.query.filter_by(event_id=event_id).first()
     file_path = background_path(config.hinh_nen) if config else None
     LuckyWinner.query.filter_by(event_id=event_id).delete()

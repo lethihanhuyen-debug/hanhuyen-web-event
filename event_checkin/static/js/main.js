@@ -1,15 +1,77 @@
+/* Hộp xác nhận dùng chung: thay confirm() của trình duyệt, cùng giao diện với mọi hộp thoại khác.
+   Dùng:  if (!await confirmAsync('Nội dung...')) return;   (trong hàm async). Trả về true/false như confirm().
+   Dòng đầu của nội dung là câu hỏi, các dòng sau là ghi chú. Tên nút "đồng ý" suy ra từ câu hỏi. */
+window.confirmAsync = function (message, options) {
+  const text = String(message || '');
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  const first = lines[0] || '';
+  const guess = [
+    [/^Xóa/, 'Xóa', true],
+    [/^(Hủy|Huỷ)/, 'Hủy kết quả', true],
+    [/^Lọc trùng/, 'Lọc trùng', false],
+    [/^Nhập/, 'Nhập', false],
+    [/^Sẽ gửi/, 'Gửi', false],
+    [/^Ẩn/, 'Ẩn', false],
+    [/^Khôi phục/, 'Khôi phục', false],
+    [/^Vị trí/, 'Lưu và áp dụng', false],
+  ].find(([pattern]) => pattern.test(first));
+  const opts = Object.assign(
+    { title: 'Xác nhận', okText: guess ? guess[1] : 'Đồng ý', danger: guess ? guess[2] : false },
+    options || {},
+  );
+  opts.cancelText = opts.cancelText || (opts.danger ? 'Giữ lại' : 'Hủy');
+
+  if (typeof HTMLDialogElement === 'undefined') {
+    return Promise.resolve(window.confirm(text));
+  }
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'app-dialog';
+    const body = document.createElement('div');
+    body.className = 'app-dialog__body';
+    const title = document.createElement('h2');
+    title.className = 'app-dialog__title';
+    title.textContent = opts.title;
+    body.append(title);
+    lines.forEach((line) => {
+      const p = document.createElement('p');
+      p.className = 'app-dialog__text';
+      p.textContent = line;
+      body.append(p);
+    });
+    const actions = document.createElement('div');
+    actions.className = 'app-dialog__actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn btn--ghost';
+    cancel.textContent = opts.cancelText;
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'btn ' + (opts.danger ? 'btn--danger-solid' : 'btn--primary');
+    ok.textContent = opts.okText;
+    actions.append(cancel, ok);
+    body.append(actions);
+    dialog.append(body);
+    document.body.append(dialog);
+
+    let result = false;
+    cancel.addEventListener('click', () => dialog.close());
+    ok.addEventListener('click', () => { result = true; dialog.close(); });
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });  // bấm ra ngoài = hủy
+    dialog.addEventListener('close', () => { dialog.remove(); resolve(result); });
+    dialog.showModal();
+    (opts.danger ? cancel : ok).focus();
+  });
+};
+
 window.appUtils = {
   formatDateTimeVN(dateTimeString) {
     if (!dateTimeString) return '';
     const date = new Date(dateTimeString);
     if (Number.isNaN(date.getTime())) return dateTimeString;
-    return new Intl.DateTimeFormat('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date);
+    const pad = (n) => String(n).padStart(2, '0');
+    // chuẩn hiển thị: dd/mm/yyyy hh:mm
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   },
 
   // Thẻ sự kiện/card admin mờ dần + trượt lên khi cuộn tới (thay vì chạy ngay
@@ -301,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!item) return;
         const willActivate = !item.is_active;
         const confirmText = willActivate ? 'Khôi phục đơn vị này?' : 'Ẩn đơn vị này?';
-        if (!confirm(confirmText)) return;
+        if (!await confirmAsync(confirmText)) return;
         try {
           await requestJson(`/api/admin/don-vi/${item.id}`, {
             method: 'PATCH',
@@ -320,7 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const item = findItem(menuButton);
         closeRowMenu();
         if (!item) return;
-        if (!confirm(`Xóa vĩnh viễn đơn vị "${item.ten_don_vi}"? Hành động này không thể hoàn tác.`)) return;
+        if (!await confirmAsync(`Xóa vĩnh viễn đơn vị "${item.ten_don_vi}"? Hành động này không thể hoàn tác.`)) return;
         try {
           await requestJson(`/api/admin/don-vi/${item.id}`, { method: 'DELETE' });
           showDonViMessage('Đã xóa đơn vị.');
@@ -403,7 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (donViBulkHide) {
     donViBulkHide.addEventListener('click', async () => {
       if (!selectedIds.size) return;
-      if (!confirm(`Ẩn ${selectedIds.size} đơn vị đã chọn?`)) return;
+      if (!await confirmAsync(`Ẩn ${selectedIds.size} đơn vị đã chọn?`)) return;
       try {
         await requestJson('/api/admin/don-vi/an-hang-loat', {
           method: 'POST',
@@ -421,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (donViBulkDelete) {
     donViBulkDelete.addEventListener('click', async () => {
       if (!selectedIds.size) return;
-      if (!confirm(`Xóa vĩnh viễn ${selectedIds.size} đơn vị đã chọn? Hành động này không thể hoàn tác.`)) return;
+      if (!await confirmAsync(`Xóa vĩnh viễn ${selectedIds.size} đơn vị đã chọn? Hành động này không thể hoàn tác.`)) return;
       try {
         const result = await requestJson('/api/admin/don-vi/xoa-hang-loat', {
           method: 'POST',

@@ -5,10 +5,10 @@ Chạy tại thư mục gốc của app (nơi có app.py), bằng python của v
     python -m event_checkin.migrations.m004_lucky_draw
     python -m event_checkin.migrations.m004_lucky_draw --print-sql   # in câu CREATE TABLE cho MySQL
 
-- Chỉ TẠO bảng mới bằng db.create_all() (bảng đã có thì bỏ qua) -- không sửa/xoá bảng hay
+- Chỉ TẠO bảng mới bằng db.create_all() (bảng đã có thì bỏ qua) -- không sửa/xóa bảng hay
   dữ liệu hiện có, kể cả checkin_records.
 - Chạy lại nhiều lần vẫn an toàn.
-- Nên chạy ngay sau khi chép code mới lên server: xoá sự kiện và trang quay số cần các bảng này.
+- Nên chạy ngay sau khi chép code mới lên server: xóa sự kiện và trang quay số cần các bảng này.
 """
 import argparse
 import sys
@@ -22,7 +22,7 @@ TABLES = ("lucky_configs", "lucky_prizes", "lucky_winners")
 
 def _check_old_schema(db):
     """Bảng lucky_* có thể đã được app tự tạo (db.create_all() lúc khởi động) từ bản thử cũ, thiếu
-    cột mới. create_all không sửa bảng đã có, nên báo rõ để xoá 3 bảng (đang rỗng) rồi chạy lại."""
+    cột mới. create_all không sửa bảng đã có, nên báo rõ để xóa 3 bảng (đang rỗng) rồi chạy lại."""
     inspector = inspect(db.engine)
     if "lucky_configs" not in inspector.get_table_names():
         return
@@ -31,7 +31,7 @@ def _check_old_schema(db):
     if missing:
         raise SystemExit(
             "Bảng lucky_configs đang có là bản cũ (thiếu cột: " + ", ".join(sorted(missing)) + "). "
-            "Hãy xoá 3 bảng lucky_winners, lucky_prizes, lucky_configs (theo thứ tự này) rồi chạy lại m004 -- "
+            "Hãy xóa 3 bảng lucky_winners, lucky_prizes, lucky_configs (theo thứ tự này) rồi chạy lại m004 -- "
             "xem hướng dẫn trong DEPLOYMENT.md."
         )
 
