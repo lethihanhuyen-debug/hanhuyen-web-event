@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% block title %}{{ event.ten_su_kien }} | Quản trị sự kiện{% endblock %}
 
+{% block container_class %}container--wide{% endblock %}
+
 {% block content %}
 <section class="admin-panel admin-panel--wide">
   <div class="panel-head panel-head--top">
@@ -58,7 +60,7 @@
       <button type="button" class="filter-tab" data-filter="checked-in">Đã check-in ({{ totals.checkins }})</button>
       <button type="button" class="filter-tab" data-filter="pending">Chưa check-in ({{ totals.pending }})</button>
     </div>
-    <button id="exportRegistrations" class="btn btn--yellow" type="button" data-event-id="{{ event.id }}">Xuất danh sách đăng ký</button>
+    <button id="exportRegistrations" class="btn btn--ghost" type="button" data-event-id="{{ event.id }}">Xuất danh sách đăng ký</button>
   </div>
 
   <div class="table-card">

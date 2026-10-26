@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% block title %}Check-in: {{ event.ten_su_kien }} | Quản trị sự kiện{% endblock %}
 
+{% block container_class %}container--wide{% endblock %}
+
 {% block content %}
 <section class="admin-panel admin-panel--wide">
   <div class="panel-head panel-head--top">
@@ -59,7 +61,7 @@
           </table>
         </div>
         <div class="btn-row">
-          <button id="exportFailed" class="btn btn--yellow btn--sm" type="button">Tải danh sách lỗi</button>
+          <button id="exportFailed" class="btn btn--ghost btn--sm" type="button">Tải danh sách lỗi</button>
         </div>
       </div>
     </details>
