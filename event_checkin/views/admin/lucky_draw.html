@@ -9,7 +9,9 @@
   .lucky-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .lucky-inline input[type="number"] { width: 84px; }
   .lucky-prize-name { min-width: 180px; width: 100%; }
-  .lucky-check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .lucky-check { display: flex; gap: 8px; align-items: center; justify-content: flex-start; cursor: pointer; }
+  .lucky-check input { width: auto; flex: none; margin: 0; }
+  .lucky-inline input[type="text"] { flex: 1 1 260px; width: auto; }
   .lucky-pending { border-left: 5px solid var(--gold); }
   .lucky-code { font-weight: 700; letter-spacing: .02em; }
   .lucky-muted-row td { color: var(--muted); }

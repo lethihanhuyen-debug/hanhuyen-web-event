@@ -1,0 +1,202 @@
+/* Màn hình quay số trúng thưởng (chiếu máy chiếu).
+   Giữ bố cục/hiệu ứng của web quay số gốc; màu chữ và nút theo palette check-in (xanh dương / xanh lá),
+   riêng viền đèn nhấp nháy giữ màu vàng theo yêu cầu. Không dùng chữ đen. */
+:root {
+  --blue: #1976b8;
+  --blue-dark: #0f5a96;
+  --blue-hover: #125c92;
+  --green: #2e9a5f;
+  --green-dark: #1d7a45;
+  --cream: #f6f0e2;
+  --gold: #f6b800;
+  --danger: #c62828;
+  --ink: #0f5a96;
+}
+* { box-sizing: border-box; }
+html { color-scheme: light; }
+body {
+  margin: 0; min-height: 100vh;
+  font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--cream); color: var(--ink); line-height: 1.5;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.hidden { display: none !important; }
+.sr { position: absolute; left: -9999px; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 80px; padding: 10px 20px; color: #fff;
+  background: #004aad url("banner.png") left center / auto 100% no-repeat;
+}
+.topbar-title { font-weight: 800; font-size: 1.1rem; text-shadow: 0 1px 4px rgba(15, 90, 150, .6); margin-left: auto; text-align: right; }
+.topbar .btn { flex: none; }
+
+.btn {
+  min-height: 38px; padding: 6px 14px; border-radius: 10px; font-weight: 600;
+  border: 1px solid var(--blue); background: var(--blue); color: #fff; text-decoration: none; display: inline-flex; align-items: center;
+}
+.btn:hover:not(:disabled) { background: var(--blue-hover); }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.topbar .btn { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.5); }
+
+.page { padding: 12px 16px 28px; }
+.page .stage { width: min(100%, calc((100vh - 110px) * 16 / 9)); margin: 0 auto; }
+
+/* ===== Khu vực quay số ===== */
+.stage {
+  container-type: inline-size;
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+  aspect-ratio: 16 / 9;
+  /* vùng nội dung nằm gọn trong khung mờ của hình nền */
+  padding: 22.2% 2.6% 9% 2.6%;
+  border-radius: 20px;
+  color: var(--ink);
+  background: #cfe0fb var(--stage-bg, url("background.jpg")) center / 100% 100% no-repeat;
+  border: 1px solid #b9c9ee;
+}
+@media (max-width: 760px) {
+  .stage { aspect-ratio: auto; min-height: 560px; padding: 150px 12px 18px; background-size: cover; background-position: top center; }
+  .slots { background: rgba(255,255,255,.6); border-radius: 16px; padding-inline: 8px; }
+}
+/* Viền đèn nhấp nháy như bảng hiệu sân khấu (giữ màu vàng) */
+.stage::after {
+  content: ""; position: absolute; inset: 7px; border-radius: 14px; pointer-events: none; z-index: 2;
+  border: 5px dotted var(--gold);
+  box-shadow: 0 0 10px rgba(246,184,0,.55), inset 0 0 10px rgba(246,184,0,.35);
+  will-change: opacity;
+  animation: bulbs 1.6s ease-in-out infinite;
+}
+.stage.drawing::after { animation-duration: .5s; }
+@keyframes bulbs { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.stage > .slots, .stage > .stage-bottom { position: relative; z-index: 1; }
+
+.mascot {
+  position: absolute; left: 4%; bottom: 17%; z-index: 1; font-size: clamp(1.6rem, 3.4cqw, 3.2rem);
+  line-height: 1; pointer-events: none; transform-origin: 50% 100%;
+  will-change: transform; animation: mascotIdle 2.4s ease-in-out infinite;
+}
+.mascot.r { left: auto; right: 4%; animation-delay: -1.2s; }
+.stage.drawing .mascot { animation: mascotShake .25s linear infinite; }
+.stage.celebrate .mascot { animation: mascotJump .55s ease-out 4; }
+@keyframes mascotIdle { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-8px) rotate(4deg); } }
+@keyframes mascotShake { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes mascotJump { 0% { transform: translateY(0) scale(1); } 45% { transform: translateY(-46px) scale(1.2) rotate(-10deg); } 100% { transform: translateY(0) scale(1); } }
+.cheer { margin: 14px auto 0; max-width: 720px; font-size: clamp(1rem, 1.9cqw, 1.7rem); font-weight: 800; color: var(--green-dark); animation: cheerIn .5s ease-out; }
+@keyframes cheerIn { 0% { opacity: 0; transform: translateY(12px) scale(.9); } 100% { opacity: 1; transform: none; } }
+
+.stage:fullscreen, .stage.pseudo-full {
+  border-radius: 0; border: 0; margin: auto;
+  width: min(100vw, 177.78vh); height: min(100vh, 56.25vw);
+}
+.stage:fullscreen::backdrop { background: #000; }
+.stage.pseudo-full { position: fixed; inset: 0; z-index: 100; box-shadow: 0 0 0 100vmax #000; }
+@media (max-width: 760px) { .stage:fullscreen, .stage.pseudo-full { width: 100%; height: 100%; } }
+
+.stage-top { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 1.6cqw .8cqw 4px; }
+.stage-top .btn { position: absolute; right: 14px; top: 12px; z-index: 3; }
+.stage-prize { text-align: center; font-size: clamp(1.1rem, 2.6cqw, 2.4rem); font-weight: 800; color: var(--blue-dark); letter-spacing: .02em; }
+.stage-prize small { display: block; color: var(--green-dark); font-weight: 600; font-size: .5em; letter-spacing: 0; }
+.stage .btn { background: rgba(255,255,255,.85); color: var(--blue-dark); border-color: #9db3ea; }
+.stage .btn:hover:not(:disabled) { background: #fff; }
+
+.slots {
+  flex: 1; display: grid; gap: 14px; align-content: center; justify-content: center;
+  padding: 4px 23cqw; /* chừa chỗ hai bên để ô chọn giải không đè lên mã */
+  --fs: clamp(1.8rem, 6cqw, 8rem); min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+.slots[data-n="2"], .slots[data-n="3"], .slots[data-n="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); --fs: clamp(1.4rem, 3.8cqw, 5rem); }
+.slots[data-n="5"], .slots[data-n="6"], .slots[data-n="7"], .slots[data-n="8"], .slots[data-n="9"] { grid-template-columns: repeat(3, minmax(0, 1fr)); --fs: clamp(1.1rem, 2.6cqw, 3.4rem); }
+.slots[data-n="many"] { grid-template-columns: repeat(4, minmax(0, 1fr)); --fs: clamp(.95rem, 1.9cqw, 2.4rem); }
+@container (max-width: 640px) {
+  .slots { padding-inline: 0; }
+  .slots[data-n="1"] { --fs: clamp(1.8rem, 11cqw, 4rem); }
+  .slots[data-n]:not([data-n="1"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); --fs: clamp(1rem, 5cqw, 2rem); }
+}
+.slot {
+  text-align: center; padding: .6cqw 12px; border-radius: 16px;
+  background: rgba(255,255,255,.55); border: 2px solid rgba(25,118,184,.25);
+  display: flex; flex-direction: column; justify-content: center; min-height: 3.2em;
+  position: relative; contain: layout paint;
+}
+.slots[data-n="1"] .slot { background: transparent; border-color: transparent; }
+.slot-name { font-size: var(--fs); font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
+.slot.idle .slot-name { color: #4a6f8c; font-weight: 600; }
+.slot.spinning .slot-name { color: var(--blue-dark); }
+.slot.spinning { will-change: transform; animation: tremble .12s linear infinite; }
+@keyframes tremble { 0%,100% { transform: translate(0,0); } 25% { transform: translate(-2px,1px); } 75% { transform: translate(2px,-1px); } }
+.slot.done { border-color: var(--green); box-shadow: 0 0 28px rgba(46,154,95,.3); animation: pop .5s ease-out; }
+.slot.done::before {
+  content: ""; position: absolute; inset: -6px; border-radius: 20px; pointer-events: none;
+  border: 3px solid var(--green); box-shadow: 0 0 24px rgba(46,154,95,.6);
+  animation: ring .9s ease-out forwards;
+}
+@keyframes ring { 0% { transform: scale(.96); opacity: 1; } 100% { transform: scale(1.18); opacity: 0; } }
+.slots[data-n="1"] .slot.done { box-shadow: none; }
+.slot.done .slot-name { color: var(--blue-dark); }
+@keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+.stage-bottom { padding: 0 0 .6cqw; text-align: center; }
+.draw {
+  font-size: clamp(1.1rem, 2.2cqw, 2.2rem); font-weight: 800; letter-spacing: .08em;
+  padding: .45em 2.4em; border: 0; border-radius: 999px;
+  background: linear-gradient(180deg, #2e9fe0, var(--blue)); color: #fff;
+  box-shadow: 0 5px 0 #0f5a96, 0 10px 22px rgba(15,90,150,.35);
+  transition: transform .08s, box-shadow .08s;
+}
+.draw:hover:not(:disabled) { transform: translateY(-2px); }
+.draw:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 #0f5a96, 0 4px 10px rgba(15,90,150,.35); }
+.draw:disabled { opacity: .6; cursor: not-allowed; }
+
+.stage-prizes { position: absolute; z-index: 3; right: 6%; top: 46%; width: 17cqw; display: grid; gap: .5cqw; }
+.stage-prizes label { font-size: clamp(.6rem, 1cqw, 1.05rem); font-weight: 700; color: var(--blue-dark); }
+.stage-prizes select, .stage-prizes input {
+  width: 100%; font: inherit; font-weight: 700; color: var(--blue-dark);
+  padding: .5cqw .8cqw; font-size: clamp(.7rem, 1.2cqw, 1.25rem);
+  background: rgba(255,255,255,.92); border: 2px solid var(--blue); border-radius: 10px;
+}
+.stage-prizes select:disabled, .stage-prizes input:disabled { opacity: .6; cursor: not-allowed; }
+.stage-prizes .pool { font-size: clamp(.6rem, 1cqw, 1.05rem); color: var(--green-dark); font-weight: 600; }
+@media (max-width: 760px) { .stage-prizes { position: static; width: auto; margin: 8px 0; } }
+
+.stage .btn-results { position: absolute; right: 22px; bottom: 22px; z-index: 3; font-weight: 800; font-size: 1.2rem; width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: 50%; justify-content: center; }
+.confirm-box { display: inline-flex; gap: 12px; margin-left: 16px; vertical-align: middle; }
+.stage .act-save, .stage .act-redo {
+  font-size: clamp(.95rem, 1.8cqw, 1.8rem); font-weight: 800; padding: .45em 1.6em; border-radius: 999px; min-height: 0; border: 2px solid;
+}
+.stage .act-save { background: var(--green-dark); border-color: #155d34; color: #fff; }
+.stage .act-redo { background: #fff; border-color: var(--blue); color: var(--blue-dark); }
+
+.results-view {
+  position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column;
+  padding: 22.2% 2.6% 9% 2.6%; color: var(--ink);
+  background: #cfe0fb var(--stage-bg, url("background.jpg")) center / 100% 100% no-repeat;
+}
+.results-view .rv-title { text-align: center; font-size: clamp(1.1rem, 2.6cqw, 2.6rem); font-weight: 800; color: var(--blue-dark); margin-bottom: .8cqw; }
+.results-view .rv-body {
+  flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: 1cqw; align-content: start;
+  grid-template-columns: repeat(auto-fit, minmax(16cqw, 1fr));
+}
+.rv-card { background: rgba(255,255,255,.78); border: 2px solid rgba(25,118,184,.3); border-radius: 14px; padding: .8cqw 1cqw; text-align: center; }
+.rv-card h3 { margin: 0 0 .4cqw; font-size: clamp(.9rem, 1.6cqw, 1.8rem); color: var(--green-dark); }
+.rv-card .rv-code { font-weight: 800; font-size: clamp(.9rem, 1.7cqw, 2rem); color: var(--blue-dark); line-height: 1.35; }
+.rv-empty { grid-column: 1 / -1; text-align: center; font-weight: 700; font-size: clamp(1rem, 1.8cqw, 2rem); padding: 2cqw 0; }
+.results-view .rv-close { position: absolute; right: 14px; top: 12px; }
+
+.modal { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; background: rgba(15,90,150,.45); }
+.modal-box { background: #fffdf8; border-radius: 16px; padding: 22px 26px; max-width: 80%; text-align: center; box-shadow: 0 10px 40px rgba(15,90,150,.4); }
+.modal-box p { margin: 0 0 16px; font-size: clamp(1rem, 1.8cqw, 1.6rem); font-weight: 700; color: var(--blue-dark); }
+.modal-box .btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.stage .modal-box .btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+.msg { margin: 12px auto 0; max-width: 640px; padding: 8px 14px; border-radius: 10px; font-weight: 600; }
+.msg.error { background: rgba(255,255,255,.88); color: var(--danger); border: 1px solid rgba(198,40,40,.5); }
+.msg.info { background: rgba(255,255,255,.78); color: var(--blue-dark); }
+#confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slot.done, .slot.done::before, .slot.spinning, .stage::after, .mascot, .cheer { animation: none !important; }
+  .draw { transition: none; }
+}
