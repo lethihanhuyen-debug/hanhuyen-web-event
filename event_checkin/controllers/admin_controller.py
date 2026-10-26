@@ -27,6 +27,7 @@ from event_checkin.models.checkin_record import CheckinRecord
 from event_checkin.models.don_vi import DonVi
 from event_checkin.models.email_log import EmailLog
 from event_checkin.models.event import Event
+from event_checkin.models.lucky_draw import LuckyConfig
 from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
 from event_checkin.utils.timezone import format_local, format_utc_as_vn, now_vn_naive, vn_today_range
@@ -242,6 +243,7 @@ def event_detail(event_id):
     return render_template(
         "admin/event_detail.html",
         event=_event_payload(event),
+        lucky_ready=db.session.get(LuckyConfig, event_id) is not None,  # đã thiết lập quay số thì mới hiện nút
         rows=rows,
         totals={
             "registrations": len(rows),
