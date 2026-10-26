@@ -5,11 +5,12 @@
 <style>
   .lucky-one { padding: 24px; display: block; }
   .lucky-sec + .lucky-sec, .lucky-grid + .lucky-sec { margin-top: 28px; }
+  .lucky-grid > .lucky-sec { margin-top: 0; }
   .lucky-sec > h2 { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; font-size: 1.05rem; color: var(--blue-700, #1976b8); white-space: nowrap; }
   .lucky-sec > h2::after { content: ""; flex: 1; height: 1px; background: var(--border); }
-  .lucky-grid > .lucky-sec { margin-top: 0 !important; }
+  
   .lucky-sec h3 { margin: 18px 0 8px; font-size: .98rem; }
-  .lucky-grid { display: grid; gap: 28px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+  .lucky-grid { display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); }  /* mục 1 và 2 xếp dọc, mục 2 nằm giữa mục 1 và 3 */
   .lucky-bg { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
   .lucky-bg img { width: 256px; max-width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); background: var(--linen); }
   .lucky-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
