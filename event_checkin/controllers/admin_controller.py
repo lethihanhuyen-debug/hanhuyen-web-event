@@ -1603,6 +1603,8 @@ def delete_event(event_id):
 
     # Deleted in FK-dependency order: EmailLog references Certificate, both
     # reference Registration/CheckIn's (ma_cbsv, event_id) pair indirectly.
+    from event_checkin.utils.lucky_draw import purge_event_data, remove_files
+    lucky_files = purge_event_data(event_id)  # dữ liệu quay số + ảnh nền (có khoá ngoại sang events)
     EmailLog.query.filter_by(event_id=event_id).delete()
     Certificate.query.filter_by(event_id=event_id).delete()
     CheckinRecord.query.filter_by(event_id=event_id).delete()
@@ -1614,6 +1616,7 @@ def delete_event(event_id):
     for path in certificate_paths:
         if path.exists():
             path.unlink(missing_ok=True)
+    remove_files(lucky_files)
 
     return jsonify({"success": True, "message": "Đã xóa sự kiện."})
 

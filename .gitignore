@@ -11,3 +11,6 @@ database/
 # SQLite xem thử ở máy (dữ liệu thử, không đưa lên repo)
 instance/
 *.db
+
+# Ảnh nền màn hình quay số do admin tải lên
+event_checkin/static/lucky/uploads/
