@@ -100,3 +100,26 @@ Sửa xong bấm **Lưu & gửi lại** ở dòng đó. Bấm **Tải danh sách
 - **Nhiều người:** tick chọn các dòng → bấm **Gửi lại các dòng đã chọn**. Dòng *Trùng* được bỏ qua.
 
 Mỗi lần gửi lại, cột *Số lần gửi* tăng thêm 1. Nên nhắc sinh viên kiểm tra cả thư mục **Spam/Quảng cáo**.
+
+## 8. Quay số trúng thưởng
+
+Quay số ngay trên hệ thống, danh sách quay lấy từ những người **đã check-in** của sự kiện. Mỗi mã CB/SV chỉ có **1 suất** dù quét nhiều lần, và người gửi chứng chỉ lỗi vẫn được quay (lỗi email không liên quan đến việc có mặt).
+
+**Vào trang:** *Chi tiết sự kiện* hoặc *Danh sách check-in* → nút **Quay số trúng thưởng**.
+
+### 8.1. Chuẩn bị (trang quay số của sự kiện)
+- **Giải thưởng:** nhập tên giải, số lượng rồi bấm **Thêm giải**. Cột *Thứ tự* quyết định thứ tự hiện trên màn hình. Giải đã có người trúng thì không giảm số lượng xuống dưới số đã trúng và không xoá được.
+- **Cho phép một người trúng nhiều giải:** mặc định tắt (người đã trúng bị loại khỏi các lượt sau).
+- **Hình nền màn hình quay số:** bấm **Chọn hình mới** (JPG/PNG/WEBP, tối đa 5MB, nên tỉ lệ 16:9). Mỗi sự kiện có hình riêng; chưa chọn thì dùng hình mặc định. **Khôi phục mặc định** sẽ xoá hình riêng.
+
+### 8.2. Quay
+1. Bấm **Mở màn hình quay số** (mở ở tab mới), bấm **Toàn màn hình** để chiếu. Màn hình **chỉ hiện mã**, không hiện họ tên.
+2. Chọn **Giải** và **Số người mỗi lượt** (từ 1 đến số suất còn lại của giải), rồi bấm **QUAY** (hoặc phím Space).
+3. Kết quả hiện ra nhưng chưa chốt: bấm **Lưu** để chốt cả lượt, hoặc **Quay lại** để bỏ cả lượt và quay lại. Đang có kết quả chờ thì không quay thêm được (kể cả ở tab khác); tải lại trang vẫn thấy kết quả đang chờ.
+4. Nút **➜** ở góc dưới bên phải xem danh sách người đã trúng theo từng giải.
+
+### 8.3. Người vắng mặt
+Ở trang quay số của sự kiện, bấm **Huỷ (vắng mặt)** ở dòng của người đó. Họ được đưa lại vào danh sách quay; giải có thêm 1 suất trống để quay bổ sung. Bản huỷ vẫn được giữ ở mục *Đã huỷ* để đối chiếu.
+
+### 8.4. Xuất kết quả
+Bấm **Xuất Excel**: sheet *Trung thuong* gồm mã, họ tên, giờ trúng; sheet *Da huy* (nếu có) liệt kê người đã huỷ. Họ tên lấy theo thứ tự: tên sửa tay cho chứng chỉ → tên lúc check-in → tên đăng ký.
