@@ -6,9 +6,10 @@ WINNER_STATUSES = ("pending", "confirmed", "cancelled")
 
 
 class LuckyConfig(db.Model):
-    """Cấu hình quay số của 1 sự kiện (mỗi sự kiện tối đa 1 dòng, tạo khi truy cập lần đầu).
-    Dòng này cũng là dòng bị khoá (SELECT ... FOR UPDATE) mỗi khi quay/lưu/huỷ, để hai tab
-    hay hai admin bấm cùng lúc không sinh kết quả đúp -- xem controllers/lucky_draw_controller.py."""
+    """Thiết lập quay số của 1 sự kiện. Dòng này CHỈ tồn tại sau khi admin bấm Lưu thiết lập
+    (có dòng = sự kiện đã thiết lập). Nó cũng là dòng bị khoá (SELECT ... FOR UPDATE) mỗi khi
+    quay/lưu/huỷ/sửa thiết lập, để hai tab hay hai admin bấm cùng lúc không sinh kết quả đúp --
+    xem controllers/lucky_draw_controller.py."""
 
     __tablename__ = "lucky_configs"
 
@@ -16,6 +17,10 @@ class LuckyConfig(db.Model):
     cho_phep_trung_nhieu_giai = db.Column(db.Boolean, nullable=False, default=False)
     # Đường dẫn ảnh nền màn hình quay (tương đối so với thư mục static); NULL = dùng ảnh mặc định.
     hinh_nen = db.Column(db.String(255))
+    # Tăng 1 mỗi lần Lưu: phát hiện hai admin sửa đè nhau (trang gửi phiên bản đang xem lên).
+    phien_ban = db.Column(db.Integer, nullable=False, default=1)
+    created_at = db.Column(db.DateTime, nullable=False, default=now_vn_naive)
+    updated_at = db.Column(db.DateTime, nullable=False, default=now_vn_naive)
 
 
 class LuckyPrize(db.Model):
