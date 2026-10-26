@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+{% block title %}Quay số: {{ event.ten_su_kien }} | Quản trị sự kiện{% endblock %}
+
+{% block head %}
+<style>
+  .lucky-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 16px; }
+  .lucky-bg { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .lucky-bg img { width: 192px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); background: var(--linen); }
+  .lucky-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lucky-inline input[type="number"] { width: 84px; }
+  .lucky-prize-name { min-width: 180px; width: 100%; }
+  .lucky-check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .lucky-pending { border-left: 5px solid var(--gold); }
+  .lucky-code { font-weight: 700; letter-spacing: .02em; }
+  .lucky-muted-row td { color: var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="admin-panel admin-panel--wide">
+  <div class="panel-head panel-head--top">
+    <div>
+      <p class="eyebrow">Quay số trúng thưởng</p>
+      <h1>{{ event.ten_su_kien }}</h1>
+    </div>
+    <div class="panel-head__side">
+      <a class="btn btn--back" href="{{ back_url }}">← Quay lại</a>
+      <div class="panel-actions panel-actions--row">
+        <a class="btn btn--green" href="{{ screen_url }}" target="_blank" rel="noopener">Mở màn hình quay số</a>
+        <button id="exportButton" class="btn btn--ghost" type="button">Xuất Excel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><span>Người đã check-in (mỗi người 1 suất)</span><strong id="statTotal">0</strong></div>
+    <div class="stat-card"><span>Tổng số suất giải</span><strong id="statSlots">0</strong></div>
+    <div class="stat-card"><span>Đã trúng (đã lưu)</span><strong id="statWon">0</strong></div>
+    <div class="stat-card"><span>Đã huỷ (vắng mặt)</span><strong id="statCancelled">0</strong></div>
+  </div>
+
+  <div id="pageMessage" class="message" hidden></div>
+
+  <div id="pendingBox" class="form-card lucky-pending" hidden>
+    <strong>Đang có kết quả chờ Lưu hoặc Quay lại:</strong>
+    <p id="pendingText" class="muted"></p>
+    <p class="muted">Mở màn hình quay số để bấm Lưu / Quay lại. Hoặc xử lý nhanh tại đây:</p>
+    <div class="btn-row">
+      <button id="pendingConfirm" class="btn btn--green btn--sm" type="button">Lưu kết quả</button>
+      <button id="pendingReject" class="btn btn--danger btn--sm" type="button">Bỏ, quay lại</button>
+    </div>
+  </div>
+
+  <div class="lucky-grid">
+    <div class="form-card">
+      <h2>Cài đặt</h2>
+      <label class="lucky-check">
+        <input type="checkbox" id="allowMulti">
+        <span>Cho phép một người trúng nhiều giải</span>
+      </label>
+      <p class="muted">Mặc định tắt: người đã trúng bị loại khỏi mọi lượt quay sau. Danh sách quay là những người đã check-in (mỗi mã 1 suất).</p>
+    </div>
+
+    <div class="form-card">
+      <h2>Hình nền màn hình quay số</h2>
+      <div class="lucky-bg">
+        <img id="bgPreview" src="{{ default_background_url }}" alt="Hình nền hiện tại">
+        <div>
+          <p class="muted" id="bgNote">Đang dùng hình mặc định.</p>
+          <div class="lucky-inline">
+            <input type="file" id="bgFile" accept="image/jpeg,image/png,image/webp" hidden>
+            <button id="bgChoose" class="btn btn--ghost btn--sm" type="button">Chọn hình mới</button>
+            <button id="bgReset" class="btn btn--ghost btn--sm" type="button" disabled>Khôi phục mặc định</button>
+          </div>
+          <p class="muted">JPG, PNG hoặc WEBP, tối đa 5MB. Tỉ lệ 16:9 là đẹp nhất.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <h2>Giải thưởng</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Thứ tự</th><th>Tên giải</th><th>Số lượng</th><th>Đã quay</th><th>Người còn lại</th><th></th></tr>
+        </thead>
+        <tbody id="prizeRows"></tbody>
+      </table>
+    </div>
+    <form id="prizeForm" class="lucky-inline" style="margin-top:12px" autocomplete="off">
+      <input type="text" id="newName" class="lucky-prize-name" maxlength="255" placeholder="Tên giải mới, ví dụ: Giải Nhất" required>
+      <input type="number" id="newQty" min="1" max="1000" value="1" aria-label="Số lượng" required>
+      <button class="btn btn--green" type="submit">Thêm giải</button>
+    </form>
+  </div>
+
+  <div class="form-card">
+    <h2>Danh sách trúng thưởng</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>STT</th><th>Giải</th><th>Mã CB/SV</th><th>Họ tên</th><th>Giờ trúng</th><th></th></tr>
+        </thead>
+        <tbody id="winnerRows"></tbody>
+      </table>
+    </div>
+    <p class="muted">Người vắng mặt: bấm "Huỷ" để đưa họ lại vào danh sách quay, sau đó quay bổ sung trên màn hình quay số.</p>
+  </div>
+
+  <div class="form-card" id="cancelledBox" hidden>
+    <h2>Đã huỷ (vắng mặt) — để đối chiếu</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Giải</th><th>Mã CB/SV</th><th>Họ tên</th><th>Giờ trúng</th><th>Giờ huỷ</th></tr></thead>
+        <tbody id="cancelledRows"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  const eventId = {{ event.id }};
+  const base = `/api/admin/events/${eventId}/lucky-draw`;
+  const $ = (id) => document.getElementById(id);
+  let state = null;
+
+  function el(tag, props, children) {
+    const node = document.createElement(tag);
+    Object.assign(node, props || {});
+    (children || []).forEach((child) => node.append(child));
+    return node;
+  }
+  function cell(text, extra) { return el('td', Object.assign({ textContent: text }, extra || {})); }
+
+  function say(text, kind) {
+    const box = $('pageMessage');
+    box.textContent = text || '';
+    box.hidden = !text;
+    box.className = 'message' + (text ? ` message--${kind || 'success'}` : '');
+  }
+
+  async function api(url, options) {
+    const response = await fetch(url, options);
+    const data = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
+    if (response.status === 401) window.location.href = '/admin/login?next=' + encodeURIComponent(location.pathname);
+    return data;
+  }
+  function send(method, url, body) {
+    return api(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  }
+
+  async function load() {
+    const data = await api(base);
+    if (!data.success) { say(data.message || 'Không tải được dữ liệu.', 'error'); return; }
+    state = data;
+    render();
+  }
+
+  // Gọi API, báo kết quả, tải lại
+  async function act(promise) {
+    const data = await promise;
+    say(data.message, data.success ? 'success' : 'error');
+    await load();
+    return data;
+  }
+
+  function render() {
+    $('statTotal').textContent = state.tong_nguoi;
+    $('statSlots').textContent = state.prizes.reduce((sum, p) => sum + p.so_luong, 0);
+    $('statWon').textContent = state.winners.length;
+    $('statCancelled').textContent = state.cancelled.length;
+    $('allowMulti').checked = state.cho_phep_trung_nhieu_giai;
+    $('bgPreview').src = state.hinh_nen_url;
+    $('bgNote').textContent = state.hinh_nen_tuy_chinh ? 'Đang dùng hình riêng của sự kiện này.' : 'Đang dùng hình mặc định.';
+    $('bgReset').disabled = !state.hinh_nen_tuy_chinh;
+
+    $('pendingBox').hidden = !state.pending.length;
+    if (state.pending.length) {
+      $('pendingText').textContent = `${state.pending[0].ten_giai}: ` + state.pending.map((w) => `${w.patron_code}${w.ho_ten ? ' (' + w.ho_ten + ')' : ''}`).join(', ');
+    }
+
+    const prizeRows = $('prizeRows');
+    prizeRows.replaceChildren();
+    if (!state.prizes.length) {
+      prizeRows.append(el('tr', {}, [el('td', { colSpan: 6, className: 'muted', textContent: 'Chưa có giải nào. Thêm giải ở bên dưới.' })]));
+    }
+    state.prizes.forEach((prize) => {
+      const order = el('input', { type: 'number', min: 0, value: prize.thu_tu });
+      const name = el('input', { type: 'text', value: prize.ten_giai, maxLength: 255, className: 'lucky-prize-name' });
+      const qty = el('input', { type: 'number', min: Math.max(prize.da_quay, 1), max: 1000, value: prize.so_luong });
+      const save = el('button', { type: 'button', className: 'btn btn--ghost btn--sm', textContent: 'Lưu' });
+      const del = el('button', { type: 'button', className: 'btn btn--danger btn--sm', textContent: 'Xoá' });
+      save.addEventListener('click', () => act(send('PUT', `${base}/prizes/${prize.id}`, {
+        ten_giai: name.value, so_luong: qty.value, thu_tu: order.value,
+      })));
+      del.addEventListener('click', () => {
+        if (confirm(`Xoá giải "${prize.ten_giai}"?`)) act(send('DELETE', `${base}/prizes/${prize.id}`));
+      });
+      prizeRows.append(el('tr', {}, [
+        el('td', {}, [order]), el('td', {}, [name]), el('td', {}, [qty]),
+        cell(`${prize.da_quay} / ${prize.so_luong}`), cell(prize.nguoi_con_lai),
+        el('td', {}, [el('div', { className: 'lucky-inline' }, [save, del])]),
+      ]));
+    });
+
+    const winnerRows = $('winnerRows');
+    winnerRows.replaceChildren();
+    if (!state.winners.length) {
+      winnerRows.append(el('tr', {}, [el('td', { colSpan: 6, className: 'muted', textContent: 'Chưa có kết quả đã lưu.' })]));
+    }
+    state.winners.forEach((w, index) => {
+      const cancel = el('button', { type: 'button', className: 'btn btn--danger btn--sm', textContent: 'Huỷ (vắng mặt)' });
+      cancel.addEventListener('click', () => {
+        if (confirm(`Huỷ kết quả của ${w.patron_code}${w.ho_ten ? ' - ' + w.ho_ten : ''}? Người này sẽ được đưa lại vào danh sách quay.`)) {
+          act(send('POST', `${base}/winners/${w.id}/cancel`));
+        }
+      });
+      winnerRows.append(el('tr', {}, [
+        cell(index + 1), cell(w.ten_giai), cell(w.patron_code, { className: 'lucky-code' }),
+        cell(w.ho_ten), cell(w.trung_luc), el('td', {}, [cancel]),
+      ]));
+    });
+
+    $('cancelledBox').hidden = !state.cancelled.length;
+    const cancelledRows = $('cancelledRows');
+    cancelledRows.replaceChildren();
+    state.cancelled.forEach((w) => {
+      cancelledRows.append(el('tr', { className: 'lucky-muted-row' }, [
+        cell(w.ten_giai), cell(w.patron_code), cell(w.ho_ten), cell(w.trung_luc), cell(w.huy_luc),
+      ]));
+    });
+  }
+
+  $('allowMulti').addEventListener('change', (e) => {
+    act(send('PUT', `${base}/settings`, { cho_phep_trung_nhieu_giai: e.target.checked }));
+  });
+  $('prizeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = await act(send('POST', `${base}/prizes`, { ten_giai: $('newName').value, so_luong: $('newQty').value }));
+    if (data.success) { $('newName').value = ''; $('newQty').value = 1; }
+  });
+  $('pendingConfirm').addEventListener('click', () => act(send('POST', `${base}/confirm`)));
+  $('pendingReject').addEventListener('click', () => {
+    if (confirm('Bỏ kết quả đang chờ? Những người này sẽ quay lại danh sách quay.')) act(send('POST', `${base}/reject`));
+  });
+  $('exportButton').addEventListener('click', async () => {
+    const response = await fetch(`${base}/export`);
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      say(data.message || 'Không xuất được file.', 'error');
+      return;
+    }
+    const blob = await response.blob();
+    const link = el('a', { href: URL.createObjectURL(blob), download: `quay-so-su-kien-${eventId}.xlsx` });
+    document.body.append(link); link.click(); link.remove();
+    URL.revokeObjectURL(link.href);
+  });
+
+  $('bgChoose').addEventListener('click', () => $('bgFile').click());
+  $('bgFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { say('Hình nền tối đa 5MB.', 'error'); return; }
+    const form = new FormData();
+    form.append('hinh_nen', file);
+    await act(api(`${base}/background`, { method: 'POST', body: form }));
+  });
+  $('bgReset').addEventListener('click', () => {
+    if (confirm('Khôi phục hình nền mặc định? Hình riêng sẽ bị xoá.')) act(send('DELETE', `${base}/background`));
+  });
+
+  load();
+})();
+</script>
+{% endblock %}

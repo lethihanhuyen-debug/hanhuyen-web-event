@@ -14,6 +14,7 @@
       <a id="backButton" class="btn btn--back" href="{{ back_url }}">← Quay lại</a>
         <div class="panel-actions panel-actions--row">
           <button id="exportButton" class="btn btn--ghost" type="button">Tải file về</button>
+          <a class="btn btn--green" href="{{ url_for('lucky.lucky_page', event_id=event.id) }}">Quay số trúng thưởng</a>
           <button id="zipButton" class="btn btn--ghost" type="button" title="Tải về 1 file ZIP gồm các chứng chỉ của sự kiện đang lưu trên server">Tải ZIP chứng chỉ</button>
           <button id="purgeButton" class="btn btn--danger" type="button" title="Xóa các file chứng chỉ khỏi server cho nhẹ (nên tải ZIP về trước)" disabled>Xóa file trên server</button>
         </div>
