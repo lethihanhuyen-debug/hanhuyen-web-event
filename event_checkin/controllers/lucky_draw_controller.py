@@ -65,10 +65,11 @@ def _lock_config(event_id):
     """Khoá hàng cấu hình của sự kiện đến hết transaction (SELECT ... FOR UPDATE). Mọi thao tác
     quay/lưu/huỷ đều đi qua đây nên chạy tuần tự theo từng sự kiện.
 
-    MySQL mặc định REPEATABLE READ: ảnh chụp dữ liệu được lấy ở lần đọc đầu tiên của transaction
-    (admin_required đã đọc bảng admins rồi), nên sau khi chờ được khoá, các lần đọc tiếp theo vẫn
-    thấy dữ liệu CŨ -- tab thứ hai sẽ không thấy kết quả chờ của tab thứ nhất. Vì vậy kết thúc
-    transaction đọc đó, chuyển sang READ COMMITTED rồi mới khoá."""
+    MySQL mặc định REPEATABLE READ: ảnh chụp dữ liệu được lấy ở lần đọc đầu tiên của transaction.
+    admin_required đã đọc bảng admins từ trước, nên nếu cứ khoá tiếp trong transaction đó thì sau
+    khi chờ được khoá, tab thứ hai vẫn thấy dữ liệu CŨ (không thấy kết quả chờ của tab thứ nhất).
+    Vì vậy: kết thúc transaction đọc, mở transaction mới ở mức READ COMMITTED rồi mới khoá --
+    mọi lần đọc sau khoá đều thấy dữ liệu mới nhất."""
     db.session.commit()
     _ensure_config(event_id)  # có thể commit; phải làm trước khi đặt mức cô lập cho transaction khoá
     if db.engine.dialect.name in ("mysql", "mariadb"):
