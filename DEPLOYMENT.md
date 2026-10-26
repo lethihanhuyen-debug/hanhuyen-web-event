@@ -271,7 +271,7 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 - [ ] `http://<domain>/` tự động redirect sang `https://`
 - [ ] Đăng nhập `/admin/login` bằng tài khoản admin đã đổi mật khẩu (không phải `admin123`)
 - [ ] Đăng ký thử 1 sự kiện bằng mã CB/SV test, check-in thử tại `/checkin`
-- [ ] Trang quay số `/admin/events/<id>/lucky-draw` mở được; thêm giải, quay thử, Lưu và tải ảnh nền thử đều hoạt động (sau khi chạy m004)
+- [ ] Menu **Quay số may mắn** (`/admin/lucky-draw`) mở được; thiết lập thử 1 sự kiện (giải + ảnh nền), quay thử, Lưu, rồi xoá thiết lập thử (sau khi chạy m004)
 - [ ] Chứng chỉ PDF/PNG tạo và tải được sau check-in (nếu event bật cấp chứng chỉ)
 - [ ] Email xác nhận gửi được (kiểm tra hộp thư, và `C:\apps\eventcheckin\logs\app.log` không có lỗi SMTP)
 - [ ] `Restart-Service EventCheckinApp` xong app tự chạy lại bình thường (không cần thao tác thêm)
@@ -290,11 +290,22 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
   .venv\Scripts\python -m event_checkin.migrations.m003_email_override
   ```
   Thiếu m002/m003 thì mọi trang dùng check-in sẽ lỗi. Hướng dẫn sử dụng cho admin: `HUONG_DAN_ADMIN.md`.
-- **Bản cập nhật quay số trúng thưởng (10/2026)**: thêm 3 bảng mới `lucky_configs`, `lucky_prizes`, `lucky_winners` (không sửa/xoá bảng hay dữ liệu cũ). **Sao lưu database trước** (`Start-ScheduledTask -TaskName "CheckinEvent-DB-Backup"`), chép code mới, rồi chạy (chạy lại nhiều lần vẫn an toàn):
+- **Bản cập nhật quay số may mắn (10/2026)**: thêm 3 bảng mới `lucky_configs`, `lucky_prizes`, `lucky_winners` (không sửa/xoá bảng hay dữ liệu cũ). **Sao lưu database trước** (`Start-ScheduledTask -TaskName "CheckinEvent-DB-Backup"`), chép code mới, rồi chạy (chạy lại nhiều lần vẫn an toàn):
   ```powershell
   .venv\Scripts\python -m event_checkin.migrations.m004_lucky_draw
   Restart-Service EventCheckinApp
   ```
-  Muốn xem trước câu SQL: thêm `--print-sql`. Ảnh nền do admin tải lên được lưu ở `event_checkin\static\lucky\uploads\` — tài khoản chạy service `EventCheckinApp` cần có quyền ghi thư mục này (và nên đưa vào lịch sao lưu cùng `static\events`). Hướng dẫn cho admin: mục 8 của `HUONG_DAN_ADMIN.md`.
+  Muốn xem trước câu SQL: thêm `--print-sql`. Lưu ý app có `db.create_all()` lúc khởi động nên 3 bảng này có thể đã được tự tạo; khi đó m004 báo "đã có sẵn" và không làm gì thêm.
+  - **Kiểm tra bảng cũ (bản thử trước 26/10/2026 thiếu cột `phien_ban`, `created_at`, `updated_at`)**: nếu m004 báo *"Bảng lucky_configs đang có là bản cũ"*, hoặc bạn đã từng chạy thử trên máy dev, kiểm tra rồi xoá 3 bảng (đang rỗng hoặc chỉ có dữ liệu thử) và chạy lại m004:
+    ```sql
+    -- MySQL/MariaDB:
+    SHOW TABLES LIKE 'lucky%';
+    SELECT COUNT(*) FROM lucky_winners;      -- nếu > 0 là dữ liệu thử, cân nhắc trước khi xoá
+    SET FOREIGN_KEY_CHECKS=0;
+    DROP TABLE IF EXISTS lucky_winners, lucky_prizes, lucky_configs;
+    SET FOREIGN_KEY_CHECKS=1;
+    ```
+    Với SQLite xem thử (`instance/preview.db`): `sqlite3 instance/preview.db ".tables"`, rồi `DROP TABLE lucky_winners; DROP TABLE lucky_prizes; DROP TABLE lucky_configs;`. Sau đó chạy lại `python -m event_checkin.migrations.m004_lucky_draw`.
+  - Ảnh nền do admin tải lên được lưu ở `event_checkin\static\lucky\uploads\` — tài khoản chạy service `EventCheckinApp` cần có quyền ghi thư mục này (và nên đưa vào lịch sao lưu cùng `static\events`). Hướng dẫn cho admin: mục 8 của `HUONG_DAN_ADMIN.md`.
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.

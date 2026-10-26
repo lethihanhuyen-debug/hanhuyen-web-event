@@ -101,25 +101,32 @@ Sửa xong bấm **Lưu & gửi lại** ở dòng đó. Bấm **Tải danh sách
 
 Mỗi lần gửi lại, cột *Số lần gửi* tăng thêm 1. Nên nhắc sinh viên kiểm tra cả thư mục **Spam/Quảng cáo**.
 
-## 8. Quay số trúng thưởng
+## 8. Quay số may mắn
 
-Quay số ngay trên hệ thống, danh sách quay lấy từ những người **đã check-in** của sự kiện. Mỗi mã CB/SV chỉ có **1 suất** dù quét nhiều lần, và người gửi chứng chỉ lỗi vẫn được quay (lỗi email không liên quan đến việc có mặt).
+Quay số ngay trên hệ thống. Danh sách quay lấy từ những người **đã check-in** của sự kiện: mỗi mã CB/SV chỉ có **1 suất** dù quét nhiều lần, và người gửi chứng chỉ lỗi vẫn được quay (lỗi email không liên quan đến việc có mặt).
 
-**Vào trang:** *Chi tiết sự kiện* hoặc *Danh sách check-in* → nút **Quay số trúng thưởng**.
+**Vào trang:** menu **Quay số may mắn** (thanh trên cùng) → danh sách các sự kiện đã thiết lập.
 
-### 8.1. Chuẩn bị (trang quay số của sự kiện)
-- **Giải thưởng:** nhập tên giải, số lượng rồi bấm **Thêm giải**. Cột *Thứ tự* quyết định thứ tự hiện trên màn hình. Giải đã có người trúng thì không giảm số lượng xuống dưới số đã trúng và không xoá được.
-- **Cho phép một người trúng nhiều giải:** mặc định tắt (người đã trúng bị loại khỏi các lượt sau).
-- **Hình nền màn hình quay số:** bấm **Chọn hình mới** (JPG/PNG/WEBP, tối đa 5MB, nên tỉ lệ 16:9). Mỗi sự kiện có hình riêng; chưa chọn thì dùng hình mặc định. **Khôi phục mặc định** sẽ xoá hình riêng.
+### 8.1. Thiết lập một sự kiện
+1. Bấm **+ Thiết lập sự kiện mới**, **chọn sự kiện** (chỉ hiện sự kiện chưa thiết lập). Sự kiện không đổi được sau khi đã lưu.
+2. **Tuỳ chọn:** *Cho phép một người trúng nhiều giải* (mặc định tắt: người đã trúng bị loại khỏi các lượt sau).
+3. **Hình nền:** bấm **Chọn hình mới**. Kích thước khuyến nghị **2560 × 1440 px (16:9)**, JPG/PNG/WEBP, tối đa 5MB. Ảnh khác tỉ lệ sẽ tự co/cắt giữa cho vừa khung, không méo. Nên để trống vùng giữa ảnh để mã hiện rõ. Không chọn thì dùng hình mặc định; **Khôi phục mặc định** để bỏ hình riêng.
+4. **Giải thưởng:** mỗi dòng gồm *Tên giải* và *Số lượng* (từ 1 trở lên). Bấm **＋ Thêm giải** để thêm dòng, **▲ ▼** để đổi thứ tự, **Xoá** để bỏ dòng. Giải đã có người trúng thì không xoá được và không giảm số lượng xuống dưới số đã trúng.
+5. Bấm **Lưu thiết lập**. Tất cả được lưu vào cơ sở dữ liệu (mở lại ở máy khác vẫn còn). Có lỗi thì dòng sai được tô đỏ và dữ liệu đang nhập không mất. Rời trang khi chưa lưu, trình duyệt sẽ cảnh báo.
+
+Sau khi lưu, trang **chi tiết sự kiện** mới hiện nút **Quay số trúng thưởng**.
 
 ### 8.2. Quay
-1. Bấm **Mở màn hình quay số** (mở ở tab mới), bấm **Toàn màn hình** để chiếu. Màn hình **chỉ hiện mã**, không hiện họ tên.
-2. Chọn **Giải** và **Số người mỗi lượt** (từ 1 đến số suất còn lại của giải), rồi bấm **QUAY** (hoặc phím Space).
-3. Kết quả hiện ra nhưng chưa chốt: bấm **Lưu** để chốt cả lượt, hoặc **Quay lại** để bỏ cả lượt và quay lại. Đang có kết quả chờ thì không quay thêm được (kể cả ở tab khác); tải lại trang vẫn thấy kết quả đang chờ.
+1. Từ trang chi tiết sự kiện (hoặc nút **Mở màn hình quay** ở danh sách) mở màn hình quay, bấm **Toàn màn hình** để chiếu. Màn hình **chỉ hiện mã**, không hiện họ tên.
+2. Chọn **Giải** rồi bấm **QUAY** (hoặc phím Space). Mỗi lần quay **1 người**.
+3. Kết quả hiện ra nhưng chưa chốt: bấm **Lưu** để chốt, hoặc **Quay lại** để bỏ kết quả và quay lại. Đang có kết quả chờ thì không quay thêm được (kể cả ở tab khác); tải lại trang vẫn thấy kết quả đang chờ.
 4. Nút **➜** ở góc dưới bên phải xem danh sách người đã trúng theo từng giải.
 
 ### 8.3. Người vắng mặt
-Ở trang quay số của sự kiện, bấm **Huỷ (vắng mặt)** ở dòng của người đó. Họ được đưa lại vào danh sách quay; giải có thêm 1 suất trống để quay bổ sung. Bản huỷ vẫn được giữ ở mục *Đã huỷ* để đối chiếu.
+Vào **Sửa thiết lập**, mục *Kết quả trúng thưởng*: bấm **Huỷ (vắng mặt)** ở dòng của người đó. Họ được đưa lại vào danh sách quay; giải có thêm 1 suất trống để quay bổ sung. Bản huỷ vẫn được giữ để đối chiếu.
 
 ### 8.4. Xuất kết quả
-Bấm **Xuất Excel**: sheet *Trung thuong* gồm mã, họ tên, giờ trúng; sheet *Da huy* (nếu có) liệt kê người đã huỷ. Họ tên lấy theo thứ tự: tên sửa tay cho chứng chỉ → tên lúc check-in → tên đăng ký.
+Ở trang thiết lập bấm **Xuất Excel**: sheet *Trung thuong* gồm mã, họ tên, giờ trúng; sheet *Da huy* (nếu có) liệt kê người đã huỷ. Họ tên lấy theo thứ tự: tên sửa tay cho chứng chỉ → tên lúc check-in → tên đăng ký.
+
+### 8.5. Xoá thiết lập
+Ở danh sách **Quay số may mắn** bấm **Xoá thiết lập**. Sẽ xoá giải thưởng, kết quả trúng (kể cả bản huỷ) và ảnh nền của sự kiện đó; **không** xoá sự kiện và dữ liệu check-in. Nếu đã có kết quả, hộp xác nhận ghi rõ số kết quả sẽ mất và bạn phải **gõ lại đúng tên sự kiện**. Nên xuất Excel trước. Xoá xong, sự kiện quay lại danh sách "chưa thiết lập".

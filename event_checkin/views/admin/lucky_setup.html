@@ -100,6 +100,29 @@
     </div>
   </div>
 
+  {% if mode == 'edit' %}
+  <div class="form-card" style="margin-top:16px" id="resultsCard">
+    <h2>5. Kết quả trúng thưởng</h2>
+    <p id="pendingNote" class="lucky-warn" hidden></p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>STT</th><th>Giải</th><th>Mã CB/SV</th><th>Họ tên</th><th>Giờ trúng</th><th></th></tr></thead>
+        <tbody id="winnerRows"></tbody>
+      </table>
+    </div>
+    <p class="muted">Người vắng mặt: bấm "Huỷ (vắng mặt)" để đưa họ lại vào danh sách quay, sau đó quay bổ sung ở màn hình quay. Thao tác này có hiệu lực ngay, không cần bấm Lưu thiết lập.</p>
+    <div id="cancelledBox" hidden>
+      <h3>Đã huỷ (vắng mặt) — để đối chiếu</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Giải</th><th>Mã CB/SV</th><th>Họ tên</th><th>Giờ trúng</th><th>Giờ huỷ</th></tr></thead>
+          <tbody id="cancelledRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="lucky-save-bar">
     <button id="saveButton" class="btn btn--primary" type="button">Lưu thiết lập</button>
     <span id="dirtyNote" class="lucky-dirty" hidden>Có thay đổi chưa lưu</span>
@@ -318,6 +341,7 @@
     $('allowMulti').checked = data.cho_phep_trung_nhieu_giai;
     loadRows(); renderRows(); renderBg();
     baseline = snapshot(); updateDirty();
+    loadResults();
   }
 
   if ($('exportButton')) {
@@ -335,10 +359,41 @@
     });
   }
 
+  // ----- Kết quả trúng thưởng (chỉ khi đã thiết lập) -----
+  function cell(text, extra) { return el('td', Object.assign({ textContent: text }, extra || {})); }
+  async function loadResults() {
+    if (MODE !== 'edit') return;
+    const response = await fetch(`/api/admin/lucky-draw/${data.event_id}`);
+    const result = await response.json().catch(() => null);
+    if (!result || !result.success) return;
+    const pending = $('pendingNote');
+    pending.hidden = !result.pending.length;
+    if (result.pending.length) pending.textContent = `Đang có kết quả chờ Lưu: ${result.pending.map((w) => w.patron_code).join(', ')} (${result.pending[0].ten_giai}). Hãy bấm Lưu hoặc Quay lại ở màn hình quay.`;
+    const body = $('winnerRows');
+    body.replaceChildren();
+    if (!result.winners.length) body.append(el('tr', {}, [el('td', { colSpan: 6, className: 'muted', textContent: 'Chưa có kết quả đã lưu.' })]));
+    result.winners.forEach((w, index) => {
+      const cancel = el('button', { type: 'button', className: 'btn btn--danger btn--sm', textContent: 'Huỷ (vắng mặt)' });
+      cancel.addEventListener('click', async () => {
+        if (!confirm(`Huỷ kết quả của ${w.patron_code}${w.ho_ten ? ' - ' + w.ho_ten : ''}? Người này sẽ được đưa lại vào danh sách quay.`)) return;
+        const r = await fetch(`/api/admin/lucky-draw/${data.event_id}/winners/${w.id}/cancel`, { method: 'POST' });
+        const j = await r.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
+        say(j.message, j.success ? 'success' : 'error');
+        loadResults();
+      });
+      body.append(el('tr', {}, [cell(index + 1), cell(w.ten_giai), cell(w.patron_code, { style: 'font-weight:700' }), cell(w.ho_ten), cell(w.trung_luc), el('td', {}, [cancel])]));
+    });
+    $('cancelledBox').hidden = !result.cancelled.length;
+    const cbody = $('cancelledRows');
+    cbody.replaceChildren();
+    result.cancelled.forEach((w) => cbody.append(el('tr', {}, [cell(w.ten_giai), cell(w.patron_code), cell(w.ho_ten), cell(w.trung_luc), cell(w.huy_luc)])));
+  }
+
   // ----- Khởi động -----
   $('allowMulti').checked = data.cho_phep_trung_nhieu_giai;
   loadRows(); renderRows(); renderBg(); renderCheckinInfo();
   baseline = snapshot(); updateDirty();
+  loadResults();
 })();
 </script>
 {% endblock %}
