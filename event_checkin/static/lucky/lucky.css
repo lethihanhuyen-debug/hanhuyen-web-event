@@ -24,13 +24,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .hidden { display: none !important; }
 .sr { position: absolute; left: -9999px; }
 
-.topbar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  min-height: 80px; padding: 10px 20px; color: #fff;
-  background: #004aad url("banner.png") left center / auto 100% no-repeat;
+/* Thanh banner chỉ chứa ảnh; tên sự kiện và nút nằm ở .page-head bên dưới nên không đè lên logo */
+.topbar { min-height: 80px; background: #004aad url("banner.png") left center / auto 100% no-repeat; }
+.page-head {
+  width: min(100%, calc((100vh - 140px) * 16 / 9)); margin: 0 auto 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
 }
-.topbar-title { font-weight: 800; font-size: 1.1rem; text-shadow: 0 1px 4px rgba(15, 90, 150, .6); margin-left: auto; text-align: right; }
-.topbar .btn { flex: none; }
+.page-title { flex: 1 1 260px; min-width: 0; margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--blue-dark); overflow-wrap: anywhere; }
+.page-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.page-actions .btn { background: #fff; color: var(--blue-dark); border-color: var(--blue); }
+.page-actions .btn:hover:not(:disabled) { background: var(--blue); color: #fff; }
 
 .btn {
   min-height: 38px; padding: 6px 14px; border-radius: 10px; font-weight: 600;
@@ -38,10 +41,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .btn:hover:not(:disabled) { background: var(--blue-hover); }
 .btn:disabled { opacity: .6; cursor: not-allowed; }
-.topbar .btn { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.5); }
 
 .page { padding: 12px 16px 28px; }
-.page .stage { width: min(100%, calc((100vh - 110px) * 16 / 9)); margin: 0 auto; }
+.page .stage { width: min(100%, calc((100vh - 140px) * 16 / 9)); margin: 0 auto; }
 
 /* ===== Khu vực quay số ===== */
 .stage {
@@ -97,7 +99,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .stage-top { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 1.6cqw .8cqw 4px; }
 .stage-top .btn { position: absolute; right: 14px; top: 12px; z-index: 3; }
 .stage-prize { text-align: center; font-size: clamp(1.1rem, 2.6cqw, 2.4rem); font-weight: 800; color: var(--blue-dark); letter-spacing: .02em; }
-.stage-prize small { display: block; color: var(--green-dark); font-weight: 600; font-size: .5em; letter-spacing: 0; }
+.stage-prize small { display: block; color: var(--green-dark); font-weight: 600; font-size: max(12px, .5em); letter-spacing: 0; }
 .stage .btn { background: rgba(255,255,255,.85); color: var(--blue-dark); border-color: #9db3ea; }
 .stage .btn:hover:not(:disabled) { background: #fff; }
 
@@ -151,15 +153,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .draw:disabled { opacity: .6; cursor: not-allowed; }
 
 .stage-prizes { position: absolute; z-index: 3; right: 6%; top: 46%; width: 17cqw; display: grid; gap: .5cqw; }
-.stage-prizes label { font-size: clamp(.6rem, 1cqw, 1.05rem); font-weight: 700; color: var(--blue-dark); }
+.stage-prizes label { font-size: clamp(12px, 1cqw, 1.05rem); font-weight: 700; color: var(--blue-dark); }
 .stage-prizes select, .stage-prizes input {
   width: 100%; font: inherit; font-weight: 700; color: var(--blue-dark);
-  padding: .5cqw .8cqw; font-size: clamp(.7rem, 1.2cqw, 1.25rem);
+  padding: .5cqw .8cqw; font-size: clamp(14px, 1.2cqw, 1.25rem);
   background: rgba(255,255,255,.92); border: 2px solid var(--blue); border-radius: 10px;
 }
 .stage-prizes select:disabled, .stage-prizes input:disabled { opacity: .6; cursor: not-allowed; }
-.stage-prizes .pool { font-size: clamp(.6rem, 1cqw, 1.05rem); color: var(--green-dark); font-weight: 600; }
-@media (max-width: 760px) { .stage-prizes { position: static; width: auto; margin: 8px 0; } }
+.stage-prizes .pool { font-size: clamp(12px, 1cqw, 1.05rem); color: var(--green-dark); font-weight: 600; }
+@media (max-width: 760px) {
+  .stage-prizes { position: static; width: auto; margin: 8px 0; }
+  .stage-prizes select { min-height: 44px; }
+  .topbar { min-height: 56px; }
+  .btn, .draw { min-height: 44px; }
+}
 
 .stage .btn-results { position: absolute; right: 22px; bottom: 22px; z-index: 3; font-weight: 800; font-size: 1.2rem; width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: 50%; justify-content: center; }
 .confirm-box { display: inline-flex; gap: 12px; margin-left: 16px; vertical-align: middle; }

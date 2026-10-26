@@ -26,7 +26,7 @@
     </div>
     <div>
       <span>Trạng thái</span>
-      <strong>{{ certificate.status }}</strong>
+      <strong>{{ {'generated': 'Đã cấp', 'revoked': 'Đã thu hồi'}.get(certificate.status, certificate.status) }}</strong>
     </div>
     <div>
       <span>Ngày cấp</span>

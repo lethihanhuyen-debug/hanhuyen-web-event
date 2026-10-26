@@ -5,17 +5,18 @@
 {% block content %}
 <section class="auth-stage">
   <form class="auth-card" id="adminLoginForm">
+    <img class="auth-logo" src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Trung tâm Thông tin - Thư viện - Bảo tàng">
     <h1>Đăng nhập</h1>
     <p class="auth-subtitle">Nhập thông tin tài khoản để truy cập hệ thống</p>
     <div id="loginMessage" class="message" style="display:none"></div>
     <div class="auth-form">
       <label class="auth-field">
         <span>Tài khoản</span>
-        <input name="username" type="text" autocomplete="username" placeholder="Tài khoản" required>
+        <input name="username" type="text" autocomplete="username" placeholder="Nhập tài khoản" required>
       </label>
       <label class="auth-field auth-password">
         <span>Mật khẩu</span>
-        <input id="adminPassword" name="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" required>
+        <input id="adminPassword" name="password" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required>
         <button class="auth-password__toggle" type="button" aria-label="Hiện mật khẩu" title="Hiện mật khẩu">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>

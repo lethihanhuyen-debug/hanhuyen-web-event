@@ -1978,14 +1978,21 @@ textarea:focus {
 }
 
 .table-scroll {
-  overflow: auto;
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
+/* Bảng nền: KHÔNG ép min-width/table-layout cho mọi bảng nữa (trước đây làm bảng vỡ
+   trên điện thoại). Mỗi bảng tự đặt độ rộng tối thiểu qua lớp riêng bên dưới và nằm
+   trong .table-scroll để cuộn ngang khi màn hình hẹp. */
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1260px;
-  table-layout: fixed;
+}
+
+.data-table {
+  min-width: 680px;
 }
 
 th, td {
@@ -1995,18 +2002,6 @@ th, td {
   vertical-align: middle;
   overflow-wrap: break-word;
   transition: background .15s ease;
-}
-
-/* STT, Mã CB/SV, Giờ đăng ký, Trạng thái, Chứng nhận, Thao tác never wrap --
-   only Họ tên / Đơn vị / Email (3rd, 4th, 5th column) are allowed to break
-   onto a second line when the value genuinely doesn't fit. */
-th:nth-child(1), td:nth-child(1),
-th:nth-child(2), td:nth-child(2),
-th:nth-child(6), td:nth-child(6),
-th:nth-child(7), td:nth-child(7),
-th:nth-child(8), td:nth-child(8),
-th:nth-child(9), td:nth-child(9) {
-  white-space: nowrap;
 }
 
 th {
@@ -2654,7 +2649,7 @@ th {
 }
 
 .checkins-table {
-  min-width: 0;
+  min-width: 1000px;
   table-layout: auto;
 }
 
@@ -2682,7 +2677,7 @@ th {
 
 /* Danh sách đăng ký (chi tiết sự kiện): bảng tự vừa khung, cột dài được xuống dòng */
 .fit-table {
-  min-width: 0;
+  min-width: 960px;
   table-layout: auto;
 }
 
@@ -2839,4 +2834,153 @@ th {
   display: grid;
   gap: 12px;
   margin-top: 12px;
+}
+
+/* ==========================================================================
+   NHÓM 1 (rà soát giao diện): sửa tràn ngang, bảng vỡ, vùng bấm nhỏ trên điện thoại
+   ========================================================================== */
+/* phần tử con của lưới/flex không được nở rộng hơn khung chứa (nguyên nhân trang tràn ngang) */
+.admin-panel > *,
+.panel-head > *,
+.table-card,
+.form-card {
+  min-width: 0;
+}
+
+/* trang Check-in: vùng kết quả trống không chiếm chỗ */
+.checkin-result:empty {
+  min-height: 0;
+  padding: 0;
+}
+
+/* trang xác nhận: 5 thẻ trong lưới 2 cột -> thẻ lẻ cuối chiếm trọn hàng */
+.certificate-summary > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+/* Đăng nhập: nhãn hiện rõ, logo, ô nhập và nút đủ lớn */
+.auth-card {
+  width: min(400px, 100%);
+}
+
+.auth-logo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 14px;
+  display: block;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.auth-field span {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  display: block;
+  margin: 0 0 6px;
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.auth-field input {
+  height: 48px;
+  font-size: 1rem;
+}
+
+.auth-field input::placeholder {
+  font-weight: 500;
+}
+
+.auth-password__toggle {
+  top: auto;
+  bottom: 4px;
+  right: 4px;
+  width: 40px;
+  height: 40px;
+  transform: none;
+}
+
+.auth-submit {
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+@media (max-width: 900px) {
+  .admin-event-card__status-row {
+    flex-wrap: wrap !important;
+  }
+}
+
+/* Điện thoại: vùng bấm tối thiểu 44px, form check-in xếp dọc */
+@media (max-width: 640px) {
+  .btn,
+  .btn--sm,
+  .filter-tab,
+  .auth-password__toggle {
+    min-height: 44px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+  select {
+    min-height: 44px;
+  }
+
+  .checkin-form {
+    grid-template-columns: 1fr;
+  }
+
+  .checkin-form input {
+    min-height: 60px;
+  }
+
+  .checkin-card .muted a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .hero-slider__arrow {
+    width: 44px;
+    height: 44px;
+  }
+
+  .hero-slider__dot {
+    box-sizing: content-box;
+    width: 8px;
+    height: 8px;
+    padding: 8px;
+    background-clip: content-box;
+  }
+
+  .hero-slider__dot.is-active {
+    width: 26px;
+  }
+
+  .btn {
+    min-width: 44px;
+  }
+
+  .btn-plus {
+    width: 44px;
+    height: 44px;
+  }
+
+  .fit-table td .btn--sm {
+    min-height: 44px;
+  }
+
+  /* hàng Sửa / Chứng chỉ / Xóa của thẻ sự kiện admin: 3 nút đều nhau, không xuống dòng */
+  .admin-event-card__status-row .btn {
+    flex: 1 1 0;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .admin-event-card__status-row .badge {
+    flex: 1 0 100%;
+  }
 }
