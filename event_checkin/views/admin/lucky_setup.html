@@ -67,7 +67,7 @@
         {% if not events %}<p class="muted">Mọi sự kiện đều đã thiết lập.</p>{% endif %}
       {% endif %}
       <p class="muted" id="checkinInfo"></p>
-      <p class="muted">Danh sách quay lấy từ những người đã check-in của sự kiện (mỗi mã CB/SV 1 suất, kể cả người gửi chứng chỉ lỗi).</p>
+      <p class="muted">Danh sách lấy từ những người đã checkin.</p>
     </div>
 
     <div class="lucky-sec">
@@ -91,7 +91,7 @@
           <button id="bgChoose" class="btn btn--ghost btn--sm" type="button">Chọn hình mới</button>
           <button id="bgReset" class="btn btn--ghost btn--sm" type="button">Khôi phục mặc định</button>
         </div>
-        <p class="muted"><strong>Kích thước khuyến nghị: 2560 × 1440 px (tỉ lệ 16:9)</strong>, JPG/PNG/WEBP, tối đa 5MB. Ảnh khác tỉ lệ sẽ tự được co và cắt giữa cho vừa khung, không bị méo. Hãy để trống vùng giữa ảnh (khoảng 3%–97% chiều ngang, 39%–84% chiều cao) để mã hiện rõ.</p>
+        <p class="muted"><strong>Kích thước khuyến nghị: 2560 × 1440 px</strong></p>
         <div id="bgWarn" class="lucky-warn" hidden></div>
         <p class="muted">Hình chỉ được tải lên khi bấm <strong>Lưu thiết lập</strong>.</p>
       </div>
@@ -100,7 +100,6 @@
 
   <div class="lucky-sec">
     <h2>4. Giải thưởng</h2>
-    <p class="muted">Giải được quay theo thứ tự từ trên xuống (đổi bằng ▲ ▼). Mỗi giải cần có tên và số lượng từ 1 trở lên.</p>
     <div id="prizeList"></div>
     <div style="margin-top:12px">
       <button id="addPrize" class="btn btn--green" type="button" aria-label="Thêm giải">＋ Thêm giải</button>
