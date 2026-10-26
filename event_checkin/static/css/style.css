@@ -3195,3 +3195,104 @@ th {
   background: var(--danger);
   filter: brightness(0.9);
 }
+
+/* ==========================================================================
+   NHÓM 4 (rà soát giao diện): tinh chỉnh
+   ========================================================================== */
+/* T1: viền focus bàn phím rõ ràng, đồng nhất cho mọi thành phần bấm được */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+.filter-tab:focus-visible,
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(25, 118, 184, 0.16);
+}
+
+/* T2: nút bị khoá và nút đang xử lý */
+.btn:disabled,
+.btn[disabled],
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn.is-loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.btn.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 18px;
+  height: 18px;
+  margin: auto;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  animation: btnSpin 0.7s linear infinite;
+}
+
+.btn--ghost.is-loading::after,
+.btn--back.is-loading::after {
+  border-color: rgba(15, 90, 150, 0.25);
+  border-top-color: var(--color-primary-dark);
+}
+
+@keyframes btnSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.is-loading::after {
+    animation-duration: 2s;
+  }
+}
+
+/* T3: báo lỗi ngay ở ô nhập */
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"],
+.is-error {
+  border-color: var(--danger);
+  background: var(--color-danger-bg);
+}
+
+.field-error {
+  margin: var(--space-1) 0 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+/* T4-T5: bảng: tiêu đề cột đồng nhất, cột số căn phải, dòng trống */
+th {
+  font-weight: var(--weight-semibold);
+}
+
+th.col-num,
+td.col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--muted);
+}

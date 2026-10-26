@@ -8,8 +8,7 @@
   .lucky-dialog__body { padding: var(--space-5); display: grid; gap: var(--space-3); }
   .lucky-dialog h2 { margin: 0; font-size: var(--text-xl); }
   .lucky-dialog input[type="text"] { width: 100%; }
-  .lucky-warn { background: #fdecea; color: var(--danger); border-radius: 10px; padding: 10px 12px; font-weight: 600; }
-  .lucky-empty { text-align: center; padding: 28px 0; }
+  .lucky-warn { background: var(--color-danger-bg); color: var(--danger); border-radius: var(--radius-sm); padding: var(--space-3); font-weight: 600; }
 </style>
 {% endblock %}
 
@@ -41,17 +40,17 @@
       <table class="data-table lucky-table">
         <thead>
           <tr>
-            <th>Sự kiện</th><th>Giải</th><th>Đã trúng / Tổng suất</th><th>Đã hủy</th><th>Người check-in</th><th>Cập nhật</th><th></th>
+            <th>Sự kiện</th><th class="col-num">Giải</th><th class="col-num">Đã trúng / Tổng suất</th><th class="col-num">Đã hủy</th><th class="col-num">Người check-in</th><th>Cập nhật</th><th></th>
           </tr>
         </thead>
         <tbody>
           {% for row in rows %}
           <tr>
             <td><strong>{{ row.ten_su_kien }}</strong><br><span class="muted">{{ row.ngay }}</span></td>
-            <td>{{ row.so_giai }}</td>
-            <td>{{ row.da_trung }} / {{ row.so_suat }}{% if row.cho_luu %} <span class="muted">(+{{ row.cho_luu }} chờ lưu)</span>{% endif %}</td>
-            <td>{{ row.da_huy }}</td>
-            <td>{{ row.nguoi_checkin }}</td>
+            <td class="col-num">{{ row.so_giai }}</td>
+            <td class="col-num">{{ row.da_trung }} / {{ row.so_suat }}{% if row.cho_luu %} <span class="muted">(+{{ row.cho_luu }} chờ lưu)</span>{% endif %}</td>
+            <td class="col-num">{{ row.da_huy }}</td>
+            <td class="col-num">{{ row.nguoi_checkin }}</td>
             <td>{{ row.cap_nhat }}</td>
             <td>
               <div class="lucky-actions">
@@ -68,7 +67,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="7" class="muted lucky-empty">Chưa có sự kiện nào thiết lập quay số. Bấm "Thiết lập sự kiện mới" để bắt đầu.</td></tr>
+          <tr><td colspan="7" class="table-empty">Chưa có sự kiện nào thiết lập quay số. Bấm "Thiết lập sự kiện mới" để bắt đầu.</td></tr>
           {% endfor %}
         </tbody>
       </table>
