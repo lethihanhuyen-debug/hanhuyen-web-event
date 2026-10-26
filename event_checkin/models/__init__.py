@@ -12,3 +12,4 @@ from event_checkin.models.email_log import EmailLog  # noqa: E402,F401
 from event_checkin.models.event import Event  # noqa: E402,F401
 from event_checkin.models.registration import Registration  # noqa: E402,F401
 from event_checkin.models.user import User  # noqa: E402,F401
+from event_checkin.models.lucky_draw import LuckyConfig, LuckyPrize, LuckyWinner  # noqa: E402,F401
