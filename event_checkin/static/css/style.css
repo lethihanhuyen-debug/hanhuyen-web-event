@@ -559,7 +559,7 @@ a {
 
 .page-shell {
   padding: var(--space-6) 0 var(--space-7);
-  animation: fadeInUp .35s ease both;
+  animation: fadeInUp .35s ease backwards;
 }
 
 @keyframes fadeInUp {
@@ -594,7 +594,7 @@ a {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  animation: fadeInUp .4s ease both;
+  animation: fadeInUp .4s ease backwards;
 }
 
 .auth-card h1 {
@@ -1016,7 +1016,7 @@ textarea:focus {
   padding: var(--space-4) var(--space-4);
   border-radius: var(--radius-lg);
   font-weight: 400;
-  animation: fadeInUp .25s ease both;
+  animation: fadeInUp .25s ease backwards;
 }
 
 /* Màu trạng thái theo đúng bảng "STATUS" -- mỗi trạng thái 1 cặp nền/chữ cố
@@ -2449,7 +2449,7 @@ th {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  animation: fadeInUp .35s ease .05s both;
+  animation: fadeInUp .35s ease .05s backwards;
 }
 
 .search-box {
@@ -2637,7 +2637,7 @@ th {
   letter-spacing: 0.04em;
   color: var(--soft-taupe);
   opacity: 0;
-  animation: fadeInUp .4s ease .6s both;
+  animation: fadeInUp .4s ease .6s backwards;
 }
 
 @keyframes introDraw {
