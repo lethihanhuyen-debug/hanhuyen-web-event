@@ -3721,3 +3721,12 @@ td.col-num {
 .row-menu__toggle svg {
   stroke-width: 3.4;
 }
+
+.list-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}

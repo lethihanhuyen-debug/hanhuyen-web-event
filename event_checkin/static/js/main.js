@@ -715,8 +715,15 @@ window.listUi = (function () {
     if (open && !open.list.contains(event.target) && !open.toggle.contains(event.target)) closeMenu(false);
   });
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMenu(true); });
-  window.addEventListener('resize', () => closeMenu(false));
-  window.addEventListener('scroll', () => closeMenu(false), true);
+  // Cuộn hoặc đổi cỡ cửa sổ: menu đi theo nút ⋯; chỉ đóng khi nút ⋯ đã ra khỏi màn hình
+  function followToggle() {
+    if (!open) return;
+    const rect = open.toggle.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) closeMenu(false);
+    else placeMenu(open.toggle, open.list);
+  }
+  window.addEventListener('resize', followToggle);
+  window.addEventListener('scroll', followToggle, true);
 
   return { icon, el, normalize, infoButton, rowMenu, closeMenu };
 })();

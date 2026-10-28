@@ -53,7 +53,7 @@
       <div class="failed-panel__body">
         <p class="muted">Sửa mã CB/SV (nếu quét/nhập sai) hoặc nhập email tay, rồi bấm "Lưu &amp; gửi lại" cho từng dòng.</p>
         <div class="table-scroll">
-          <table class="data-table">
+          <table class="list-table data-table">
             <thead>
               <tr><th>Mã CB/SV</th><th>Họ tên</th><th>Email</th><th>Lý do lỗi</th><th></th></tr>
             </thead>
@@ -105,11 +105,7 @@
    </div>
   </dialog>
 
-  <div class="filter-tabs" id="statusTabs" style="margin: 12px 0">
-    <button type="button" class="filter-tab is-active" data-status="">Tất cả</button>
-    {% for value, label in status_labels.items() %}
-      <button type="button" class="filter-tab" data-status="{{ value }}">{{ label }} (<span data-count="{{ value }}">0</span>)</button>
-    {% endfor %}
+  <div class="list-bar">
     <button id="quickAddCheckin" class="btn-plus" type="button" onclick="document.getElementById('khung').showModal()" title="Thêm check-in thủ công" aria-label="Thêm check-in thủ công">+</button>
     <button id="deleteSelected" class="btn btn--danger filter-tabs__end" type="button" disabled>Xóa</button>
     <button id="dedupeButton" class="btn btn--ghost" type="button">Lọc trùng</button>
@@ -118,23 +114,33 @@
 
   <div id="checkinsLayout" class="checkins-layout">
   <div class="table-card">
+    <div class="list-toolbar">
+      {# Số trên chip lấy từ dữ liệu API (đếm theo lượt check-in của cả sự kiện, không phụ thuộc ô tìm kiếm) #}
+      <div class="chips" id="statusTabs" role="group" aria-label="Lọc theo trạng thái gửi chứng chỉ">
+        <button type="button" class="filter-tab chip is-active" data-status="">Tất cả · <span data-count="all">0</span></button>
+        {% for value, label in status_labels.items() %}
+          <button type="button" class="filter-tab chip{% if value == 'failed' %} chip--danger{% endif %}" data-status="{{ value }}">{{ 'Gửi lỗi' if value == 'failed' else label }} · <span data-count="{{ value }}">0</span></button>
+        {% endfor %}
+      </div>
+      <label class="list-search">
+        <span class="sr-only">Tìm theo tên, mã CB/SV hoặc email</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"></path><path d="m21 21-4.3-4.3"></path></svg>
+        <input id="rowSearch" type="search" placeholder="Tìm tên, mã CB/SV, email…" autocomplete="off">
+      </label>
+    </div>
     <div class="table-scroll">
-      <table class="checkins-table">
+      <table class="list-table list-table--people">
         <thead>
           <tr>
             <th><input id="selectAll" type="checkbox" aria-label="Chọn tất cả"></th>
-            <th>STT</th>
-            <th>Mã CB/SV</th>
-            <th>Thời gian check-in</th>
-            <th>Họ tên</th>
-            <th>Email</th>
-            <th>Trạng thái</th>
-            <th>Ghi chú lỗi</th>
+            <th>Người tham dự</th>
+            <th>Check-in</th>
             <th>Chứng chỉ</th>
+            <th class="col-actions"><span class="sr-only">Thêm thao tác</span></th>
           </tr>
         </thead>
         <tbody id="checkinRows">
-          <tr><td colspan="9">Đang tải...</td></tr>
+          <tr><td colspan="5" class="table-empty">Đang tải…</td></tr>
         </tbody>
       </table>
     </div>
@@ -246,11 +252,11 @@
   }
 
   function selectedIds() {
-    return Array.from(tbody.querySelectorAll('.js-row-check:checked')).map((box) => Number(box.value));
+    return Array.from(tbody.querySelectorAll('tr:not([hidden]) .js-row-check:checked')).map((box) => Number(box.value));
   }
 
   function syncSelection() {
-    const boxes = tbody.querySelectorAll('.js-row-check');
+    const boxes = tbody.querySelectorAll('tr:not([hidden]) .js-row-check');
     const checked = selectedIds().length;
     deleteButton.disabled = checked === 0;
     deleteButton.textContent = checked ? `Xóa (${checked})` : 'Xóa';
@@ -286,80 +292,123 @@
       return;
     }
     const counts = data.counts;
+    counts.all = (counts.pending || 0) + (counts.sent || 0) + (counts.failed || 0) + (counts.duplicate || 0);
     document.getElementById('countCheckedIn').textContent = counts.checked_in;
     document.getElementById('countPending').textContent = counts.pending;
     document.getElementById('countSent').textContent = counts.sent;
     document.getElementById('countFailed').textContent = counts.failed;
     document.querySelectorAll('[data-count]').forEach((el) => { el.textContent = counts[el.dataset.count] ?? 0; });
 
+    const { el, icon, normalize, infoButton, rowMenu } = window.listUi;
     tbody.replaceChildren();
-    if (!data.rows.length) {
-      const tr = document.createElement('tr');
-      const td = cell('Không có lượt check-in nào.');
-      td.colSpan = 9;
-      tr.appendChild(td);
-      tbody.appendChild(tr);
-    }
+    emptyRow = null;
     currentRows = data.rows;
     data.rows.forEach((row) => {
       const tr = document.createElement('tr');
       tr.dataset.rowId = row.id;
-      tr.className = 'js-clickable-row';
+      tr.className = 'js-clickable-row' + (row.cert_status === 'failed' ? ' row--error' : '');
+      tr.dataset.search = normalize([row.patron_name, row.patron_code, row.patron_email, row.cert_display_name].join(' '));
+
       const checkTd = document.createElement('td');
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.className = 'js-row-check';
       box.value = row.id;
-      box.setAttribute('aria-label', `Chọn dòng ${row.stt}`);
+      box.setAttribute('aria-label', `Chọn dòng của ${row.patron_name || row.patron_code}`);
       checkTd.appendChild(box);
       tr.appendChild(checkTd);
-      tr.appendChild(cell(row.stt));
-      const codeTd = cell(row.patron_code);
-      tr.appendChild(codeTd);
-      tr.appendChild(cell(row.checkin_at));
-      const nameTd = cell(row.patron_name, row.from_registration ? 'muted' : '');
-      const emailTd = cell(row.patron_email, row.from_registration ? 'muted' : '');
-      if (row.from_registration) {
-        nameTd.title = emailTd.title = 'Tạm lấy theo dữ liệu đăng ký, sẽ được ghi chính thức khi gửi chứng chỉ';
+
+      // Người tham dự: tên · mã; dòng gửi lỗi thêm email (để kiểm tra địa chỉ sai)
+      const personTd = document.createElement('td');
+      const person = el('div', 'cell-person');
+      const line = el('div');
+      line.appendChild(el('strong', row.from_registration ? 'cell-muted' : '', row.patron_name || row.patron_code));
+      if (row.patron_name) {
+        line.appendChild(document.createTextNode(' · '));
+        line.appendChild(el('span', 'cell-person__code', row.patron_code));
       }
+      if (row.from_registration) line.title = 'Tạm lấy theo dữ liệu đăng ký, sẽ được ghi chính thức khi gửi chứng chỉ';
+      person.appendChild(line);
       if (row.cert_display_name) {
-        const printed = document.createElement('div');
-        printed.style.fontSize = '12px';
-        printed.textContent = `In: ${row.cert_display_name}`;
+        const printed = el('div', 'cell-person__code', `In: ${row.cert_display_name}`);
+        printed.style.fontSize = 'var(--text-xs)';
         printed.title = 'Họ tên đã sửa tay để in trên chứng chỉ';
-        nameTd.appendChild(printed);
+        person.appendChild(printed);
       }
-      tr.appendChild(nameTd);
-      tr.appendChild(emailTd);
-      const statusTd = document.createElement('td');
-      const badge = document.createElement('span');
-      badge.className = `badge ${BADGES[row.cert_status] || 'badge--muted'}`;
-      badge.textContent = row.cert_status_label;
-      statusTd.appendChild(badge);
-      tr.appendChild(statusTd);
-      tr.appendChild(cell(row.error_msg));
-      const actionTd = document.createElement('td');
-      const previewBtn = document.createElement('button');
-      previewBtn.type = 'button';
-      previewBtn.className = 'btn btn--ghost btn--sm';
-      previewBtn.textContent = 'Xem chứng chỉ';
-      previewBtn.addEventListener('click', () => showRow(row));
-      actionTd.appendChild(previewBtn);
-      if (row.cert_status !== 'duplicate') {
-        const resendRowBtn = document.createElement('button');
-        resendRowBtn.type = 'button';
-        resendRowBtn.className = 'btn btn--ghost btn--sm';
-        resendRowBtn.textContent = row.cert_status === 'pending' ? 'Gửi' : 'Gửi lại';
-        resendRowBtn.addEventListener('click', () => openResend(row));
-        actionTd.appendChild(resendRowBtn);
+      if (row.cert_status === 'failed') person.appendChild(el('div', 'row-error', row.email_override || row.patron_email || 'Chưa có email'));
+      personTd.appendChild(person);
+      tr.appendChild(personTd);
+
+      const checkinTd = document.createElement('td');
+      const tag = el('span', 'cell-checkin');
+      tag.append(icon('check'), document.createTextNode(row.checkin_at));
+      checkinTd.appendChild(tag);
+      tr.appendChild(checkinTd);
+
+      // Chứng chỉ: nhãn trạng thái + tối đa 1 nút chính (Gửi / Gửi lại mở hộp xác nhận, sửa mã/email như trước)
+      const certTd = document.createElement('td');
+      const status = el('div', 'row-status');
+      const mainButton = (label, kind) => {
+        const button = el('button', `btn btn--row ${kind}`, label);
+        button.type = 'button';
+        button.addEventListener('click', () => openResend(row));
+        return button;
+      };
+      if (row.cert_status === 'sent') {
+        const badge = el('span', 'badge badge--success', 'Đã gửi');
+        badge.title = `Đã gửi ${row.send_count || 0} lần`;
+        status.appendChild(badge);
+      } else if (row.cert_status === 'failed') {
+        status.appendChild(el('span', 'badge badge--danger', 'Gửi lỗi'));
+        // TODO: chưa có giờ lỗi (checkin_records chỉ lưu error_msg) -> tooltip chỉ hiện lý do lỗi
+        status.appendChild(infoButton(row.error_msg || 'Chưa có chi tiết lỗi.', `Xem lý do gửi lỗi của ${row.patron_name || row.patron_code}`));
+        status.appendChild(mainButton('Gửi lại', 'btn--danger-solid'));
+      } else if (row.cert_status === 'duplicate') {
+        status.appendChild(el('span', 'badge badge--closed', 'Trùng'));
+      } else {
+        status.appendChild(el('span', 'badge badge--muted', 'Chưa gửi'));
+        status.appendChild(mainButton('Gửi', 'btn--green'));
       }
+      certTd.appendChild(status);
+      tr.appendChild(certTd);
+
+      const actions = [{ label: 'Xem chứng chỉ', onClick: () => showRow(row) }];
+      if (row.cert_status === 'sent') actions.push({ label: 'Gửi lại chứng chỉ', onClick: () => openResend(row) });
+      const actionTd = el('td', 'col-actions');
+      actionTd.appendChild(rowMenu(`Thêm thao tác cho ${row.patron_name || row.patron_code}`, actions));
       tr.appendChild(actionTd);
       tbody.appendChild(tr);
     });
+    applySearch();
     syncSelection();
     syncPreviewWithRows();
     loadFailed();
   }
+
+  // Tìm kiếm phía trình duyệt trên các dòng đã tải (bỏ dấu tiếng Việt, không phân biệt hoa thường)
+  const rowSearch = document.getElementById('rowSearch');
+  let emptyRow = null;
+  function applySearch() {
+    const q = window.listUi.normalize(rowSearch.value);
+    let visible = 0;
+    tbody.querySelectorAll('tr[data-row-id]').forEach((tr) => {
+      const show = !q || tr.dataset.search.includes(q);
+      tr.hidden = !show;
+      if (show) visible += 1;
+    });
+    if (!emptyRow) {
+      emptyRow = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.className = 'table-empty';
+      emptyRow.appendChild(td);
+    }
+    emptyRow.firstChild.textContent = tbody.querySelector('tr[data-row-id]') ? 'Không có dòng nào khớp từ khóa.' : 'Không có lượt check-in nào.';
+    if (!emptyRow.parentNode) tbody.appendChild(emptyRow);
+    emptyRow.hidden = visible > 0;
+    syncSelection();
+  }
+  rowSearch.addEventListener('input', applySearch);
 
   document.querySelectorAll('#statusTabs .filter-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
@@ -370,7 +419,7 @@
   });
 
   selectAll.addEventListener('change', () => {
-    tbody.querySelectorAll('.js-row-check').forEach((box) => { box.checked = selectAll.checked; });
+    tbody.querySelectorAll('tr:not([hidden]) .js-row-check').forEach((box) => { box.checked = selectAll.checked; });
     syncSelection();
   });
   tbody.addEventListener('change', (event) => {
@@ -1201,9 +1250,12 @@
     loadStorage();
   });
 
-  load();
-  loadStorage();
-  watchJob();
+  // main.js (defer) chạy sau script này: khởi tạo khi DOM xong, lúc window.listUi đã có
+  window.addEventListener('DOMContentLoaded', () => {
+    load();
+    loadStorage();
+    watchJob();
+  });
 })();
 </script>
 {% endblock %}
