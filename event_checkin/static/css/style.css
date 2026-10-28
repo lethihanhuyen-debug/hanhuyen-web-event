@@ -394,6 +394,7 @@ a {
 }
 
 .admin-settings__item {
+  display: inline-block;
   width: 100%;
   padding: var(--space-3) var(--space-3);
   border: 0;
@@ -403,7 +404,9 @@ a {
   font: inherit;
   font-weight: 700;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 .admin-settings__item:hover {
@@ -609,6 +612,18 @@ a {
   font-weight: 700;
 }
 
+.auth-back {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-back:hover {
+  color: var(--blue-900);
+  text-decoration: underline;
+}
+
 .auth-form {
   display: grid;
   gap: var(--space-4);
@@ -687,7 +702,7 @@ a {
 .auth-options {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: var(--space-3);
   margin-top: 1px;
   font-size: var(--text-xs);
