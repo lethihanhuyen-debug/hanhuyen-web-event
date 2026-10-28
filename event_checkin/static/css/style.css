@@ -564,7 +564,7 @@ a {
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }  /* none (không phải translateY(0)) để không tạo khối chứa cho phần tử position: fixed bên trong, vd. menu ⋯ */
 }
 
 .auth-page .site-header {
