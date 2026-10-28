@@ -37,101 +37,66 @@
     </div>
     <div class="stat-card">
       <span>Đã check-in</span>
-      <strong>{{ totals.checkins }}</strong>
+      <strong id="statCheckins">{{ totals.checkins }}</strong>
     </div>
     <div class="stat-card">
       <span>Chưa check-in</span>
-      <strong>{{ totals.pending }}</strong>
+      <strong id="statPending">{{ totals.pending }}</strong>
     </div>
     <div class="stat-card">
       <span>Đã gửi chứng chỉ</span>
-      <strong>{{ totals.emails_sent }}/{{ totals.checkins }}</strong>
+      <strong id="statSent">{{ totals.emails_sent }}/{{ totals.checkins }}</strong>
     </div>
   </div>
 
   <div id="eventCheckinMessage" class="message" hidden></div>
 
-  <div class="filter-bar">
-    <div class="filter-tabs" id="checkinFilterTabs">
-      <button type="button" class="filter-tab is-active" data-filter="all">Tất cả ({{ totals.registrations }})</button>
-      <button type="button" class="filter-tab" data-filter="checked-in">Đã check-in ({{ totals.checkins }})</button>
-      <button type="button" class="filter-tab" data-filter="pending">Chưa check-in ({{ totals.pending }})</button>
+  <div class="list-head">
+    <div>
+      <p class="list-head__sub">{{ event.ten_su_kien }}{% if event.ngay_bat_dau_display %} · {{ event.ngay_bat_dau_display[:10] }}{% endif %}</p>
+      <h2 class="list-head__title">Danh sách tham dự</h2>
     </div>
-    <button id="exportRegistrations" class="btn btn--ghost" type="button" data-event-id="{{ event.id }}">Xuất danh sách đăng ký</button>
+    <div class="list-head__actions">
+      <button id="exportRegistrations" class="btn btn--outline btn--lg" type="button" data-event-id="{{ event.id }}">Xuất Excel</button>
+      {# TODO: gửi hàng loạt ngay tại trang này (POST send-certificates + GET send-certificates/status).
+         Hiện dẫn sang Danh sách check-in, nơi đã có thanh tiến trình gửi. #}
+      <a id="sendBulk" class="btn btn--green btn--lg" href="{{ url_for('admin.checkins_page', event_id=event.id) }}">Gửi chứng nhận hàng loạt</a>
+    </div>
   </div>
 
   <div class="table-card">
+    <div class="list-toolbar">
+      {# Số trên chip tính trên TOÀN BỘ người đăng ký của sự kiện (trang không phân trang) #}
+      <div class="chips" id="checkinFilterTabs" role="group" aria-label="Lọc theo trạng thái">
+        <button type="button" class="chip is-active" data-filter="all" aria-pressed="true">Tất cả · <span data-count="all">{{ totals.registrations }}</span></button>
+        <button type="button" class="chip" data-filter="checked-in" aria-pressed="false">Đã check-in · <span data-count="checked-in">{{ totals.checkins }}</span></button>
+        <button type="button" class="chip" data-filter="pending" aria-pressed="false">Chưa check-in · <span data-count="pending">{{ totals.pending }}</span></button>
+        <button type="button" class="chip chip--danger" data-filter="failed" aria-pressed="false">Gửi lỗi · <span data-count="failed">{{ rows|selectattr('cert_status', 'equalto', 'failed')|list|length }}</span></button>
+      </div>
+      <label class="list-search">
+        <span class="sr-only">Tìm theo tên, mã CB/SV hoặc email</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"></path><path d="m21 21-4.3-4.3"></path></svg>
+        <input id="regSearch" type="search" placeholder="Tìm tên, mã CB/SV, email…" autocomplete="off">
+      </label>
+    </div>
     <div class="table-scroll">
-      <table class="fit-table">
+      <table class="list-table list-table--people">
         <thead>
           <tr>
-            <th>STT</th>
-            <th>Mã CB/SV</th>
-            <th>Họ tên</th>
+            <th>Người tham dự</th>
             <th>Đơn vị</th>
-            <th>Email</th>
-            <th>Giờ đăng ký</th>
-            <th>Trạng thái</th>
+            <th>Check-in</th>
             <th>Chứng nhận</th>
-            <th>Thao tác</th>
+            <th class="col-actions"><span class="sr-only">Thêm thao tác</span></th>
           </tr>
         </thead>
-        <tbody>
-          {% for row in rows %}
-          <tr data-checked-in="{{ 'true' if row.checked_in else 'false' }}">
-            <td>{{ row.stt }}</td>
-            <td>{{ row.ma_cbsv }}</td>
-            <td>{{ row.ho_ten }}</td>
-            <td>{{ row.don_vi }}</td>
-            <td>{{ row.email }}</td>
-            <td>{{ row.thoi_gian_dang_ky }}</td>
-            <td>
-              {% if row.checked_in %}
-                <span class="badge badge--success">Đã check-in</span>
-                <div class="muted" style="font-size: 12px; margin-top: 4px">
-                  {{ row.checkin_time }}{% if row.scans > 1 %} · quét {{ row.scans }} lần{% endif %}
-                </div>
-              {% else %}
-                <span class="badge badge--warning">Chưa check-in</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if row.certificate_url %}
-                <button class="btn btn--ghost btn--sm js-open-certificate" type="button" data-certificate-code="{{ row.certificate_code }}">Xem</button>
-              {% endif %}
-              {% if True %}
-                <div{% if row.certificate_url %} style="margin-top: 4px"{% endif %}>
-                  {% if row.cert_status == 'sent' %}
-                    <span class="badge badge--success" title="Gửi lúc {{ row.cert_sent_at }} · đã gửi {{ row.send_count }} lần{% if row.cert_error %} · lần gửi lại gần nhất lỗi: {{ row.cert_error }}{% endif %}">Đã gửi email</span>
-                  {% elif row.cert_status == 'failed' %}
-                    <span class="badge badge--danger" title="{{ row.cert_error }}">Gửi lỗi</span>
-                  {% else %}
-                    <span class="badge badge--muted">Chưa gửi</span>
-                  {% endif %}
-                </div>
-              {% endif %}
-            </td>
-            <td>
-              {% if row.checked_in %}
-                <button
-                  class="btn btn--danger btn--sm js-delete-checkin"
-                  type="button"
-                  data-event-id="{{ row.event_id }}"
-                  data-ma-cbsv="{{ row.ma_cbsv }}"
-                  data-name="{{ row.ho_ten }}"
-                >Xóa check-in</button>
-              {% endif %}
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="9">Chưa có ai đăng ký sự kiện này.</td>
-          </tr>
-          {% endfor %}
+        <tbody id="regRows">
+          <tr><td colspan="5" class="table-empty">Đang tải…</td></tr>
         </tbody>
       </table>
     </div>
   </div>
+  <script type="application/json" id="regData">{{ rows|tojson }}</script>
 
   <div class="back-to-top-row">
     <button id="backToTop" class="btn btn--ghost" type="button">↑ Quay lại đầu trang</button>
@@ -226,47 +191,320 @@
     });
   }
 
-  document.querySelectorAll('.js-delete-checkin').forEach((button) => {
-    button.addEventListener('click', async () => {
-      const maCbsv = button.dataset.maCbsv;
-      const eventId = Number(button.dataset.eventId);
-      const name = button.dataset.name || maCbsv;
-      if (!await confirmAsync(`Xóa check-in của ${name}?`)) return;
+  // main.js (defer) chạy sau script này nên bảng chỉ khởi tạo khi DOM xong, lúc window.listUi đã có
+  window.addEventListener('DOMContentLoaded', () => {
+    const EVENT_ID = {{ event.id }};
+    const tbody = document.getElementById('regRows');
+    const searchInput = document.getElementById('regSearch');
+    const chipButtons = Array.from(document.querySelectorAll('#checkinFilterTabs .chip'));
+    const { el, icon, normalize, infoButton, rowMenu, closeMenu } = window.listUi;
+    let activeFilter = 'all';
 
-      button.disabled = true;
-      button.textContent = 'Đang xóa...';
-      message.hidden = true;
+    async function api(url, options) {
+      const response = await fetch(url, options);
+      const data = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
+      if (response.status === 401) window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
+      return data;
+    }
+    function postJson(url, body) {
+      return api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    }
+    const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-      try {
-        const response = await fetch(`/api/admin/events/${eventId}/checkins/${encodeURIComponent(maCbsv)}`, {
-          method: 'DELETE',
+    // ---- Dữ liệu: dựng từ danh sách đăng ký đã render sẵn (chuỗi giờ ở đây đã là GIỜ VIỆT NAM, chỉ cắt chuỗi, không đổi múi giờ) ----
+    function toPerson(r) {
+      const person = {
+        code: r.ma_cbsv, name: r.ho_ten || '', unit: r.don_vi || '', email: r.email || '',
+        checkedIn: !!r.checked_in, checkinFull: r.checkin_time || '', scans: r.scans || 0,
+        certCode: r.certificate_code || '', status: r.checked_in ? (r.cert_status || 'pending') : '',
+        error: r.cert_error || '', sentAt: r.cert_sent_at || '', sendCount: r.send_count || 0,
+        recordId: null, sending: false, tr: null,
+      };
+      person.searchKey = normalize([person.name, person.code, person.email].join(' '));
+      return person;
+    }
+    const people = JSON.parse(document.getElementById('regData').textContent).map(toPerson);
+
+    function timeOnly(full) {
+      const m = /(\d{2}:\d{2})(?::\d{2})?$/.exec(full || '');
+      return m ? m[1] : '';
+    }
+
+    // ---- Dựng từng dòng ----
+    function badge(kind, text, title) {
+      const node = el('span', `badge badge--${kind}`, text);
+      if (title) node.title = title;
+      return node;
+    }
+
+    function certCell(p) {
+      const td = el('td');
+      if (!p.checkedIn) {
+        td.appendChild(el('span', 'cell-muted', '—'));
+        return td;
+      }
+      const box = el('div', 'row-status');
+      if (p.status === 'sent') {
+        box.appendChild(badge('success', 'Đã gửi', `Gửi lúc ${p.sentAt || '—'} · đã gửi ${p.sendCount} lần`));
+      } else if (p.status === 'failed') {
+        box.appendChild(badge('danger', 'Gửi lỗi'));
+        // TODO: hệ thống chưa lưu giờ lỗi (checkin_records chỉ có error_msg) -> tooltip hiện lý do; thêm giờ lỗi khi backend có.
+        box.appendChild(infoButton(p.error || 'Chưa có chi tiết lỗi.', `Xem lý do gửi lỗi của ${p.name || p.code}`));
+        box.appendChild(sendButton(p, 'Gửi lại', 'btn--danger-solid'));
+      } else {
+        box.appendChild(badge('muted', 'Chưa gửi'));
+        box.appendChild(sendButton(p, 'Gửi', 'btn--green'));
+      }
+      td.appendChild(box);
+      return td;
+    }
+
+    function sendButton(p, label, kind) {
+      const button = el('button', `btn btn--row ${kind}`, p.sending ? 'Đang gửi…' : label);
+      button.type = 'button';
+      if (p.sending) { button.disabled = true; button.classList.add('is-loading'); }
+      button.addEventListener('click', () => sendRow(p));
+      return button;
+    }
+
+    function menuFor(p) {
+      const who = p.name || p.code;
+      const actions = [];
+      if (p.checkedIn) {
+        actions.push({
+          label: 'Xem chứng nhận',
+          disabled: !p.certCode,
+          title: p.certCode ? '' : 'Chưa có chứng nhận được tạo cho người này',
+          onClick: () => openCertificatePreview(p.certCode),
         });
-        const data = await response.json();
-        if (data.success) {
-          showMessage('success', data.message || 'Đã xóa check-in.');
-          window.setTimeout(() => window.location.reload(), 700);
-          return;
-        }
-        showMessage('error', data.message || 'Không thể xóa check-in.');
+        if (p.status === 'sent') actions.push({ label: 'Gửi lại chứng nhận', onClick: () => sendRow(p) });
+        actions.push({ label: 'Xóa check-in', danger: true, onClick: () => deleteCheckin(p) });
+      } else {
+        actions.push({ label: 'Check-in thủ công', onClick: () => manualCheckin(p) });
+      }
+      return rowMenu(`Thêm thao tác cho ${who}`, actions);
+    }
+
+    function buildRow(p) {
+      const tr = document.createElement('tr');
+      tr.dataset.code = p.code;
+      if (p.status === 'failed') tr.classList.add('row--error');
+
+      const person = el('td');
+      const cell = el('div', 'cell-person');
+      const line = el('div');
+      line.append(el('strong', '', p.name || p.code));
+      if (p.name) {
+        line.append(document.createTextNode(' · '));
+        line.append(el('span', 'cell-person__code', p.code));
+      }
+      cell.appendChild(line);
+      if (p.checkedIn && p.status === 'failed') cell.appendChild(el('div', 'row-error', p.email || 'Chưa có email'));  // để admin kiểm tra địa chỉ sai
+      person.appendChild(cell);
+      tr.appendChild(person);
+
+      const unit = el('td');
+      const unitText = el('span', 'cell-ellipsis', p.unit || '—');
+      unitText.title = p.unit || '';
+      unit.appendChild(unitText);
+      tr.appendChild(unit);
+
+      const checkin = el('td');
+      if (p.checkedIn) {
+        const tag = el('span', 'cell-checkin');
+        tag.title = p.checkinFull + (p.scans > 1 ? ` · quét ${p.scans} lần` : '');
+        tag.append(icon('check'), document.createTextNode(timeOnly(p.checkinFull) || p.checkinFull));
+        checkin.appendChild(tag);
+      } else {
+        checkin.appendChild(el('span', 'cell-checkin--none', 'Chưa check-in'));
+      }
+      tr.appendChild(checkin);
+
+      tr.appendChild(certCell(p));
+      const actions = el('td', 'col-actions');
+      actions.appendChild(menuFor(p));
+      tr.appendChild(actions);
+      return tr;
+    }
+
+    // ---- Lọc / tìm kiếm / đếm (phía trình duyệt, trên toàn bộ người đăng ký của sự kiện) ----
+    function matches(p) {
+      const q = normalize(searchInput.value);
+      if (q && !p.searchKey.includes(q)) return false;
+      if (activeFilter === 'checked-in') return p.checkedIn;
+      if (activeFilter === 'pending') return !p.checkedIn;
+      if (activeFilter === 'failed') return p.checkedIn && p.status === 'failed';
+      return true;
+    }
+
+    let emptyRow = null;
+    function applyFilter() {
+      let visible = 0;
+      people.forEach((p) => {
+        if (!p.tr) return;
+        const show = matches(p);
+        p.tr.hidden = !show;
+        if (show) visible += 1;
+      });
+      if (!emptyRow) {
+        emptyRow = document.createElement('tr');
+        const td = el('td', 'table-empty');
+        td.colSpan = 5;
+        emptyRow.appendChild(td);
+      }
+      emptyRow.firstChild.textContent = people.length ? 'Không có ai phù hợp với bộ lọc hoặc từ khóa.' : 'Chưa có ai đăng ký sự kiện này.';
+      if (!emptyRow.parentNode) tbody.appendChild(emptyRow);
+      emptyRow.hidden = visible > 0;
+    }
+
+    function updateCounts() {
+      const checked = people.filter((p) => p.checkedIn).length;
+      const failed = people.filter((p) => p.checkedIn && p.status === 'failed').length;
+      const sent = people.filter((p) => p.checkedIn && p.status === 'sent').length;
+      const counts = { all: people.length, 'checked-in': checked, pending: people.length - checked, failed };
+      document.querySelectorAll('#checkinFilterTabs [data-count]').forEach((node) => { node.textContent = counts[node.dataset.count]; });
+      document.getElementById('statCheckins').textContent = checked;
+      document.getElementById('statPending').textContent = people.length - checked;
+      document.getElementById('statSent').textContent = `${sent}/${checked}`;
+    }
+
+    function renderAll() {
+      closeMenu(false);
+      tbody.replaceChildren();
+      emptyRow = null;
+      people.forEach((p) => { p.tr = buildRow(p); tbody.appendChild(p.tr); });
+      applyFilter();
+      updateCounts();
+    }
+
+    function updateRow(p) {
+      closeMenu(false);
+      const fresh = buildRow(p);
+      if (p.tr && p.tr.parentNode) p.tr.replaceWith(fresh); else tbody.appendChild(fresh);
+      p.tr = fresh;
+      applyFilter();
+      updateCounts();
+    }
+
+    chipButtons.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        activeFilter = chip.dataset.filter;
+        chipButtons.forEach((c) => { const on = c === chip; c.classList.toggle('is-active', on); c.setAttribute('aria-pressed', String(on)); });
+        applyFilter();
+      });
+    });
+    searchInput.addEventListener('input', applyFilter);
+
+    // ---- Đồng bộ với máy chủ bằng API sẵn có (không tải lại trang) ----
+    // Lấy id dòng check-in (cần để gửi từng người), trạng thái, lý do lỗi mới nhất.
+    async function loadRecords() {
+      const data = await api(`/api/admin/events/${EVENT_ID}/checkins`);
+      if (!data.success) return false;
+      const byCode = new Map();
+      data.rows.forEach((row) => { if (!byCode.has(row.patron_code)) byCode.set(row.patron_code, []); byCode.get(row.patron_code).push(row); });
+      people.forEach((p) => {
+        const rows = byCode.get(p.code) || [];
+        if (!rows.length) { p.checkedIn = false; p.status = ''; p.recordId = null; p.error = ''; p.checkinFull = ''; p.scans = 0; return; }
+        const primary = rows.find((r) => r.cert_status !== 'duplicate') || rows[0];
+        p.checkedIn = true;
+        p.checkinFull = rows[0].checkin_at;
+        p.scans = rows.length;
+        p.recordId = primary.id;
+        p.status = primary.cert_status === 'duplicate' ? 'pending' : primary.cert_status;
+        p.error = primary.error_msg || '';
+        p.sendCount = primary.send_count || 0;
+        p.email = primary.email_override || primary.patron_email || p.email;
+      });
+      return true;
+    }
+
+    // Mã chứng nhận mới tạo sau khi gửi: đọc lại từ chính trang này (không có API tra cứu) rồi chỉ lấy dữ liệu, không tải lại giao diện
+    async function refreshCertCodes() {
+      try {
+        const html = await (await fetch(window.location.href, { credentials: 'same-origin' })).text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const node = doc.getElementById('regData');
+        if (!node) return;
+        const fresh = new Map(JSON.parse(node.textContent).map((r) => [r.ma_cbsv, r]));
+        people.forEach((p) => {
+          const r = fresh.get(p.code);
+          if (r) { p.certCode = r.certificate_code || ''; p.sentAt = r.cert_sent_at || ''; }
+        });
+      } catch (error) {
+        // bỏ qua: chỉ ảnh hưởng nút "Xem chứng nhận" cho tới lần tải trang sau
+      }
+    }
+
+    async function syncAll() {
+      if (await loadRecords()) { await refreshCertCodes(); renderAll(); }
+    }
+
+    async function waitJob() {
+      for (let i = 0; i < 120; i += 1) {
+        await sleep(i === 0 ? 800 : 1500);
+        const data = await api(`/api/admin/events/${EVENT_ID}/send-certificates/status`);
+        const job = data && data.job;
+        if (!job || (job.state !== 'queued' && job.state !== 'running')) return job;
+      }
+      return null;
+    }
+
+    async function sendRow(p) {
+      if (p.sending) return;
+      if (!p.recordId) { showMessage('error', 'Chưa lấy được dòng check-in của người này. Hãy tải lại trang rồi thử lại.'); return; }
+      const email = p.email ? `, email ${p.email}` : '';
+      if (!await confirmAsync(`Sẽ gửi chứng chỉ cho 1 người (mã ${p.code}${email}). Tiếp tục?`)) return;
+      p.sending = true;
+      updateRow(p);
+      message.hidden = true;
+      try {
+        const data = await postJson(`/api/admin/events/${EVENT_ID}/send-certificates`, { ids: [p.recordId] });
+        if (!data.success) { showMessage('error', data.message || 'Không bắt đầu gửi được.'); return; }
+        await waitJob();
+        await loadRecords();
+        await refreshCertCodes();
+        if (p.status === 'sent') showMessage('success', `Đã gửi chứng chỉ cho ${p.name || p.code}.`);
+        else showMessage('error', `Không gửi được cho ${p.code}${p.name ? ' — ' + p.name : ''}: ${p.error || 'chưa rõ lý do'}`);
       } catch (error) {
         showMessage('error', 'Không thể kết nối máy chủ.');
       } finally {
-        button.disabled = false;
-        button.textContent = 'Xóa check-in';
+        p.sending = false;
+        renderAll();
       }
-    });
-  });
+    }
 
-  // Lọc danh sách theo trạng thái check-in (lọc phía trình duyệt, không tải lại trang)
-  document.querySelectorAll('#checkinFilterTabs .filter-tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('#checkinFilterTabs .filter-tab').forEach((t) => t.classList.toggle('is-active', t === tab));
-      const filter = tab.dataset.filter;
-      document.querySelectorAll('tbody tr[data-checked-in]').forEach((row) => {
-        const checkedIn = row.dataset.checkedIn === 'true';
-        row.hidden = (filter === 'checked-in' && !checkedIn) || (filter === 'pending' && checkedIn);
-      });
-    });
+    async function deleteCheckin(p) {
+      const who = p.name || p.code;
+      if (!await confirmAsync(`Xóa check-in của ${who}?`)) return;
+      message.hidden = true;
+      try {
+        const data = await api(`/api/admin/events/${EVENT_ID}/checkins/${encodeURIComponent(p.code)}`, { method: 'DELETE' });
+        if (!data.success) { showMessage('error', data.message || 'Không thể xóa check-in.'); return; }
+        p.checkedIn = false; p.status = ''; p.recordId = null; p.error = ''; p.checkinFull = ''; p.scans = 0;
+        updateRow(p);
+        showMessage('success', data.message || 'Đã xóa check-in.');
+      } catch (error) {
+        showMessage('error', 'Không thể kết nối máy chủ.');
+      }
+    }
+
+    async function manualCheckin(p) {
+      const who = p.name || p.code;
+      if (!await confirmAsync(`Check-in thủ công cho ${who} (mã ${p.code}) với giờ hiện tại?`)) return;
+      message.hidden = true;
+      try {
+        const data = await postJson(`/api/admin/events/${EVENT_ID}/checkins`, { patron_code: p.code });
+        if (!data.success) { showMessage('error', data.message || 'Không thể check-in thủ công.'); return; }
+        await loadRecords();
+        updateRow(p);
+        showMessage('success', data.message || 'Đã thêm check-in.');
+      } catch (error) {
+        showMessage('error', 'Không thể kết nối máy chủ.');
+      }
+    }
+
+    renderAll();
+    syncAll();
   });
 
   document.getElementById('backToTop').addEventListener('click', () => {
@@ -309,13 +547,6 @@
       certificatePreviewContent.innerHTML = 'Không thể tải chứng nhận.';
     }
   }
-
-  document.querySelectorAll('.js-open-certificate').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const code = btn.dataset.certificateCode;
-      openCertificatePreview(code);
-    });
-  });
 
   if (closeCertificatePreview) closeCertificatePreview.addEventListener('click', () => { certificatePreviewModal.hidden = true; });
   document.querySelectorAll('[data-close-certificate-preview]').forEach((el) => el.addEventListener('click', () => { certificatePreviewModal.hidden = true; }));

@@ -530,3 +530,193 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+
+/* ==========================================================================
+   Thành phần dùng chung cho các trang danh sách admin (bảng, chip, tìm kiếm, menu ⋯, tooltip).
+   Mọi dữ liệu người dùng đều đi qua textContent (không dùng innerHTML) để tránh XSS.
+   ========================================================================== */
+window.listUi = (function () {
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const ICONS = {
+    check: ['M20 6 9 17l-5-5'],
+    info: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z', 'M12 16v-4', 'M12 8h.01'],
+    more: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
+  };
+
+  function icon(name) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    (ICONS[name] || []).forEach((d) => {
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', d);
+      svg.appendChild(path);
+    });
+    return svg;
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  // Bỏ dấu tiếng Việt + hoa thường để so khớp khi tìm kiếm
+  function normalize(text) {
+    return String(text == null ? '' : text)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/đ/g, 'd')
+      .trim();
+  }
+
+  // ---------- Tooltip dùng chung: [data-tip] (rê chuột hoặc focus bàn phím) ----------
+  let tooltip = null;
+  function tipNode() {
+    if (!tooltip) {
+      tooltip = el('div', 'app-tooltip');
+      tooltip.id = 'appTooltip';
+      tooltip.setAttribute('role', 'tooltip');
+      tooltip.hidden = true;
+      document.body.appendChild(tooltip);
+    }
+    return tooltip;
+  }
+  function showTip(target) {
+    const text = target.getAttribute('data-tip');
+    if (!text) return;
+    const node = tipNode();
+    node.textContent = text;
+    node.hidden = false;
+    target.setAttribute('aria-describedby', 'appTooltip');
+    const rect = target.getBoundingClientRect();
+    const box = node.getBoundingClientRect();
+    let top = rect.top - box.height - 8;
+    if (top < 8) top = rect.bottom + 8;
+    let left = rect.left + rect.width / 2 - box.width / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - box.width - 8));
+    node.style.top = `${top}px`;
+    node.style.left = `${left}px`;
+  }
+  function hideTip(target) {
+    if (tooltip) tooltip.hidden = true;
+    if (target) target.removeAttribute('aria-describedby');
+  }
+  document.addEventListener('mouseover', (event) => { const t = event.target.closest('[data-tip]'); if (t) showTip(t); });
+  document.addEventListener('mouseout', (event) => { const t = event.target.closest('[data-tip]'); if (t) hideTip(t); });
+  document.addEventListener('focusin', (event) => { const t = event.target.closest('[data-tip]'); if (t) showTip(t); });
+  document.addEventListener('focusout', (event) => { const t = event.target.closest('[data-tip]'); if (t) hideTip(t); });
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') hideTip(null); });
+
+  // Nút ⓘ có tooltip (rê chuột hoặc focus)
+  function infoButton(text, label) {
+    const button = el('button', 'info-btn');
+    button.type = 'button';
+    button.setAttribute('aria-label', label || 'Xem chi tiết');
+    button.setAttribute('data-tip', text);
+    button.appendChild(icon('info'));
+    return button;
+  }
+
+  // ---------- Menu ⋯ ----------
+  let open = null;  // { toggle, list }
+
+  function closeMenu(returnFocus) {
+    if (!open) return;
+    open.list.hidden = true;
+    open.toggle.setAttribute('aria-expanded', 'false');
+    if (returnFocus) open.toggle.focus();
+    open = null;
+  }
+
+  function placeMenu(toggle, list) {
+    list.hidden = false;
+    const rect = toggle.getBoundingClientRect();
+    const box = list.getBoundingClientRect();
+    let top = rect.bottom + 6;
+    if (top + box.height > window.innerHeight - 8) top = Math.max(8, rect.top - box.height - 6);  // mở lên trên nếu hết chỗ phía dưới
+    list.style.top = `${top}px`;
+    list.style.left = 'auto';
+    list.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+  }
+
+  function items(list) {
+    return Array.from(list.querySelectorAll('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])'));
+  }
+
+  function openMenu(toggle, list, focusFirst) {
+    closeMenu(false);
+    hideTip(null);
+    placeMenu(toggle, list);
+    toggle.setAttribute('aria-expanded', 'true');
+    open = { toggle, list };
+    if (focusFirst) {
+      const first = items(list)[0];
+      if (first) first.focus();
+    }
+  }
+
+  // actions: [{ label, danger, disabled, title, href, onClick }]
+  function rowMenu(label, actions) {
+    const wrap = el('div', 'row-menu');
+    const toggle = el('button', 'btn btn--ghost btn--icon btn--row row-menu__toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-haspopup', 'menu');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-label', label);
+    toggle.appendChild(icon('more'));
+    const list = el('div', 'row-menu__list');
+    list.setAttribute('role', 'menu');
+    list.hidden = true;
+    actions.forEach((action) => {
+      const node = action.href ? el('a', 'row-menu__item', action.label) : el('button', 'row-menu__item', action.label);
+      if (action.href) node.href = action.href; else node.type = 'button';
+      node.setAttribute('role', 'menuitem');
+      node.tabIndex = -1;
+      if (action.danger) node.classList.add('row-menu__item--danger');
+      if (action.title) node.title = action.title;
+      if (action.disabled) { node.setAttribute('aria-disabled', 'true'); if (!action.href) node.disabled = true; }
+      node.addEventListener('click', (event) => {
+        if (action.disabled) { event.preventDefault(); return; }
+        closeMenu(false);
+        if (action.onClick) action.onClick(event);
+      });
+      list.appendChild(node);
+    });
+    toggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (open && open.toggle === toggle) closeMenu(false); else openMenu(toggle, list, false);
+    });
+    toggle.addEventListener('keydown', (event) => {
+      if (['ArrowDown', 'Enter', ' '].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        openMenu(toggle, list, true);
+      }
+    });
+    list.addEventListener('keydown', (event) => {
+      const nodes = items(list);
+      const index = nodes.indexOf(document.activeElement);
+      if (event.key === 'ArrowDown') { event.preventDefault(); nodes[(index + 1) % nodes.length].focus(); }
+      else if (event.key === 'ArrowUp') { event.preventDefault(); nodes[(index - 1 + nodes.length) % nodes.length].focus(); }
+      else if (event.key === 'Home') { event.preventDefault(); nodes[0].focus(); }
+      else if (event.key === 'End') { event.preventDefault(); nodes[nodes.length - 1].focus(); }
+      else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeMenu(true); }
+      else if (event.key === 'Tab') { closeMenu(false); }
+    });
+    wrap.append(toggle, list);
+    return wrap;
+  }
+
+  document.addEventListener('click', (event) => {
+    if (open && !open.list.contains(event.target) && !open.toggle.contains(event.target)) closeMenu(false);
+  });
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMenu(true); });
+  window.addEventListener('resize', () => closeMenu(false));
+  window.addEventListener('scroll', () => closeMenu(false), true);
+
+  return { icon, el, normalize, infoButton, rowMenu, closeMenu };
+})();
