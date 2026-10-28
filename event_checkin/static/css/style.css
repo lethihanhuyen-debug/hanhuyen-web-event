@@ -1388,7 +1388,7 @@ textarea:focus {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: var(--space-6);
-  animation: modalPopIn .22s cubic-bezier(.34, 1.4, .64, 1) both;
+  animation: modalPopIn .22s cubic-bezier(.34, 1.4, .64, 1) backwards;
 }
 
 .designer-grid {
@@ -2175,7 +2175,7 @@ th {
   z-index: 1;
   width: min(520px, 100%);
   padding: var(--space-6);
-  animation: modalPopIn .22s cubic-bezier(.34, 1.4, .64, 1) both;
+  animation: modalPopIn .22s cubic-bezier(.34, 1.4, .64, 1) backwards;
 }
 
 @keyframes fadeIn {
@@ -2183,9 +2183,12 @@ th {
   to { opacity: 1; }
 }
 
+/* Hộp thoại dùng fill-mode "backwards" (không phải "both"): sau khi hiệu ứng xong không còn giữ transform,
+   nếu không hộp thoại thành "khung chứa" của các phần tử position: fixed bên trong (menu ⋯ của danh sách
+   đơn vị) và làm chúng lệch khỏi chỗ bấm. */
 @keyframes modalPopIn {
   from { opacity: 0; transform: scale(.95) translateY(6px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 1; transform: none; }
 }
 
 .modal__actions {

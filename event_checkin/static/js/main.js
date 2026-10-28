@@ -141,11 +141,15 @@ document.addEventListener('DOMContentLoaded', () => window.appUtils.observeRevea
   primaryNav.querySelectorAll('a').forEach((link) => {
     link.addEventListener('click', closeMobileNav);
   });
+  // Mở "Quản lý đơn vị" từ menu điện thoại: đóng menu để nó không phủ lên hộp thoại (làm không bấm được nút ⋯)
+  primaryNav.querySelectorAll('[data-open-don-vi]').forEach((item) => {
+    item.addEventListener('click', closeMobileNav);
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeMobileNav();
   });
   window.addEventListener('resize', () => {
-    if (window.innerWidth > 860) closeMobileNav();
+    if (window.innerWidth > 960) closeMobileNav();  // cùng điểm gãy 960px với CSS
   });
 })();
 
