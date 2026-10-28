@@ -74,9 +74,24 @@
     </form>
   </div>
 
+  <div class="list-toolbar list-toolbar--plain">
+    {# Số trên chip đếm trên toàn bộ sự kiện đang có trên trang (không phân trang) #}
+    <div class="chips" id="eventFilter" role="group" aria-label="Lọc theo trạng thái sự kiện">
+      <button type="button" class="chip is-active" data-filter="all" aria-pressed="true">Tất cả · <span data-count="all">0</span></button>
+      <button type="button" class="chip" data-filter="upcoming" aria-pressed="false">Sắp diễn ra · <span data-count="upcoming">0</span></button>
+      <button type="button" class="chip" data-filter="ongoing" aria-pressed="false">Đang diễn ra · <span data-count="ongoing">0</span></button>
+      <button type="button" class="chip" data-filter="ended" aria-pressed="false">Đã kết thúc · <span data-count="ended">0</span></button>
+    </div>
+    <label class="list-search">
+      <span class="sr-only">Tìm theo tên sự kiện</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"></path><path d="m21 21-4.3-4.3"></path></svg>
+      <input id="eventSearch" type="search" placeholder="Tìm tên sự kiện…" autocomplete="off">
+    </label>
+  </div>
+
   <div class="admin-event-list">
     {% for event in events %}
-      <article class="admin-event-card js-event-row" data-url="{{ url_for('admin.event_detail', event_id=event.id) }}">
+      <article class="admin-event-card js-event-row" data-status="{{ event.trang_thai }}" data-url="{{ url_for('admin.event_detail', event_id=event.id) }}">
         <div class="admin-event-card__image">
           {% if event.hinh_url %}
             <img src="{{ event.hinh_url }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
@@ -131,6 +146,7 @@
       </div>
     {% endfor %}
   </div>
+  <p id="eventEmpty" class="table-empty" hidden>Không có sự kiện nào phù hợp.</p>
 
   <div id="certificateDesigner" class="designer-modal" hidden>
     <div class="designer-modal__backdrop" data-close-designer></div>
@@ -1111,5 +1127,38 @@
     });
   })();
 })();
+</script>
+<script>
+// Chip lọc + ô tìm kiếm cho danh sách sự kiện (phía trình duyệt, bỏ dấu tiếng Việt)
+window.addEventListener('DOMContentLoaded', () => {
+  const cards = Array.from(document.querySelectorAll('.admin-event-list .admin-event-card'));
+  const chips = Array.from(document.querySelectorAll('#eventFilter .chip'));
+  const search = document.getElementById('eventSearch');
+  const empty = document.getElementById('eventEmpty');
+  const { normalize } = window.listUi;
+  const items = cards.map((card) => ({ card, status: card.dataset.status, key: normalize(card.querySelector('h2') ? card.querySelector('h2').textContent : '') }));
+  let active = 'all';
+
+  const counts = { all: items.length, upcoming: 0, ongoing: 0, ended: 0 };
+  items.forEach((item) => { if (counts[item.status] !== undefined) counts[item.status] += 1; });
+  document.querySelectorAll('#eventFilter [data-count]').forEach((node) => { node.textContent = counts[node.dataset.count]; });
+
+  function apply() {
+    const q = normalize(search.value);
+    let visible = 0;
+    items.forEach((item) => {
+      const show = (active === 'all' || item.status === active) && (!q || item.key.includes(q));
+      item.card.hidden = !show;
+      if (show) visible += 1;
+    });
+    empty.hidden = visible > 0 || items.length === 0;
+  }
+  chips.forEach((chip) => chip.addEventListener('click', () => {
+    active = chip.dataset.filter;
+    chips.forEach((c) => { const on = c === chip; c.classList.toggle('is-active', on); c.setAttribute('aria-pressed', String(on)); });
+    apply();
+  }));
+  search.addEventListener('input', apply);
+});
 </script>
 {% endblock %}
