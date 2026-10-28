@@ -114,8 +114,8 @@
     <h2>5. Kết quả trúng thưởng</h2>
     <p id="pendingNote" class="lucky-warn" hidden></p>
     <div class="table-scroll">
-      <table class="data-table">
-        <thead><tr><th>STT</th><th>Giải</th><th>Mã CB/SV</th><th>Họ tên</th><th>Giờ trúng</th><th></th></tr></thead>
+      <table class="list-table list-table--compact">
+        <thead><tr><th>Người trúng</th><th>Giải</th><th>Giờ trúng</th><th class="col-actions"><span class="sr-only">Thêm thao tác</span></th></tr></thead>
         <tbody id="winnerRows"></tbody>
       </table>
     </div>
@@ -123,8 +123,8 @@
     <div id="cancelledBox" hidden>
       <h3>Đã hủy (vắng mặt) — để đối chiếu</h3>
       <div class="table-scroll">
-        <table class="data-table">
-          <thead><tr><th>Giải</th><th>Mã CB/SV</th><th>Họ tên</th><th>Giờ trúng</th><th>Giờ hủy</th></tr></thead>
+        <table class="list-table list-table--compact">
+          <thead><tr><th>Người trúng</th><th>Giải</th><th>Giờ trúng</th><th>Giờ hủy</th></tr></thead>
           <tbody id="cancelledRows"></tbody>
         </table>
       </div>
@@ -381,31 +381,62 @@
     const pending = $('pendingNote');
     pending.hidden = !result.pending.length;
     if (result.pending.length) pending.textContent = `Đang có kết quả chờ Lưu: ${result.pending.map((w) => w.patron_code).join(', ')} (${result.pending[0].ten_giai}). Hãy bấm Lưu hoặc Quay lại ở màn hình quay.`;
+    const ui = window.listUi;
+    const personCell = (w, extraClass) => {
+      const td = ui.el('td');
+      const box = ui.el('div', 'cell-person');
+      const line = ui.el('div');
+      line.appendChild(ui.el('strong', extraClass || '', w.ho_ten || w.patron_code));
+      if (w.ho_ten) {
+        line.appendChild(document.createTextNode(' · '));
+        line.appendChild(ui.el('span', 'cell-person__code', w.patron_code));
+      }
+      box.appendChild(line);
+      td.appendChild(box);
+      return td;
+    };
     const body = $('winnerRows');
     body.replaceChildren();
-    if (!result.winners.length) body.append(el('tr', {}, [el('td', { colSpan: 6, className: 'table-empty', textContent: 'Chưa có kết quả đã lưu.' })]));
-    result.winners.forEach((w, index) => {
-      const cancel = el('button', { type: 'button', className: 'btn btn--danger btn--sm', textContent: 'Hủy (vắng mặt)' });
-      cancel.addEventListener('click', async () => {
-        if (!await confirmAsync(`Hủy kết quả của ${w.patron_code}${w.ho_ten ? ' - ' + w.ho_ten : ''}? Người này sẽ được đưa lại vào danh sách quay.`)) return;
-        const r = await fetch(`/api/admin/lucky-draw/${data.event_id}/winners/${w.id}/cancel`, { method: 'POST' });
-        const j = await r.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
-        say(j.message, j.success ? 'success' : 'error');
-        loadResults();
-      });
-      body.append(el('tr', {}, [cell(index + 1), cell(w.ten_giai), cell(w.patron_code, { style: 'font-weight:700' }), cell(w.ho_ten), cell(w.trung_luc), el('td', {}, [cancel])]));
+    if (!result.winners.length) {
+      const tr = ui.el('tr');
+      const td = ui.el('td', 'table-empty', 'Chưa có kết quả đã lưu.');
+      td.colSpan = 4;
+      tr.appendChild(td);
+      body.appendChild(tr);
+    }
+    result.winners.forEach((w) => {
+      const tr = ui.el('tr');
+      tr.append(personCell(w), ui.el('td', '', w.ten_giai), ui.el('td', '', w.trung_luc));
+      const actions = ui.el('td', 'col-actions');
+      actions.appendChild(ui.rowMenu(`Thêm thao tác cho ${w.ho_ten || w.patron_code}`, [{
+        label: 'Hủy (vắng mặt)',
+        danger: true,
+        onClick: async () => {
+          if (!await confirmAsync(`Hủy kết quả của ${w.patron_code}${w.ho_ten ? ' - ' + w.ho_ten : ''}? Người này sẽ được đưa lại vào danh sách quay.`)) return;
+          const r = await fetch(`/api/admin/lucky-draw/${data.event_id}/winners/${w.id}/cancel`, { method: 'POST' });
+          const j = await r.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
+          say(j.message, j.success ? 'success' : 'error');
+          loadResults();
+        },
+      }]));
+      tr.appendChild(actions);
+      body.appendChild(tr);
     });
     $('cancelledBox').hidden = !result.cancelled.length;
     const cbody = $('cancelledRows');
     cbody.replaceChildren();
-    result.cancelled.forEach((w) => cbody.append(el('tr', {}, [cell(w.ten_giai), cell(w.patron_code), cell(w.ho_ten), cell(w.trung_luc), cell(w.huy_luc)])));
+    result.cancelled.forEach((w) => {
+      const tr = ui.el('tr');
+      tr.append(personCell(w, 'cell-muted'), ui.el('td', '', w.ten_giai), ui.el('td', '', w.trung_luc), ui.el('td', '', w.huy_luc));
+      cbody.appendChild(tr);
+    });
   }
 
   // ----- Khởi động -----
   $('allowMulti').checked = data.cho_phep_trung_nhieu_giai;
   loadRows(); renderRows(); renderBg(); renderCheckinInfo();
   baseline = snapshot(); updateDirty();
-  loadResults();
+  window.addEventListener('DOMContentLoaded', loadResults);
 })();
 </script>
 {% endblock %}

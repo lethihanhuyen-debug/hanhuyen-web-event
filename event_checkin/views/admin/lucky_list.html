@@ -3,7 +3,6 @@
 
 {% block head %}
 <style>
-  .lucky-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .lucky-dialog { max-width: min(560px, 94vw); width: 100%; }
   .lucky-dialog__body { padding: var(--space-5); display: grid; gap: var(--space-3); }
   .lucky-dialog h2 { margin: 0; font-size: var(--text-xl); }
@@ -35,44 +34,22 @@
 
   <div id="pageMessage" class="message" hidden></div>
 
-  <div class="form-card">
+  <div class="table-card">
     <div class="table-scroll">
-      <table class="data-table lucky-table">
+      <table class="list-table list-table--people lucky-table">
         <thead>
           <tr>
-            <th>Sự kiện</th><th class="col-num">Giải</th><th class="col-num">Đã trúng / Tổng suất</th><th class="col-num">Đã hủy</th><th class="col-num">Người check-in</th><th>Cập nhật</th><th></th>
+            <th>Sự kiện</th><th class="col-num">Giải</th><th class="col-num">Đã trúng / Tổng suất</th><th class="col-num">Đã hủy</th><th class="col-num">Người check-in</th><th>Cập nhật</th>
+            <th class="col-actions"><span class="sr-only">Thao tác</span></th>
           </tr>
         </thead>
-        <tbody>
-          {% for row in rows %}
-          <tr>
-            <td><strong>{{ row.ten_su_kien }}</strong><br><span class="muted">{{ row.ngay }}</span></td>
-            <td class="col-num">{{ row.so_giai }}</td>
-            <td class="col-num">{{ row.da_trung }} / {{ row.so_suat }}{% if row.cho_luu %} <span class="muted">(+{{ row.cho_luu }} chờ lưu)</span>{% endif %}</td>
-            <td class="col-num">{{ row.da_huy }}</td>
-            <td class="col-num">{{ row.nguoi_checkin }}</td>
-            <td>{{ row.cap_nhat }}</td>
-            <td>
-              <div class="lucky-actions">
-                <a class="btn btn--primary btn--sm" href="{{ url_for('lucky.lucky_screen', event_id=row.event_id) }}" target="_blank" rel="noopener">Mở màn hình quay</a>
-                <a class="btn btn--ghost btn--sm" href="{{ url_for('lucky.lucky_setup_edit', event_id=row.event_id) }}">Sửa thiết lập</a>
-                <button class="btn btn--danger btn--sm js-delete-setup" type="button"
-                        data-event-id="{{ row.event_id }}"
-                        data-name="{{ row.ten_su_kien }}"
-                        data-total="{{ row.tong_ket_qua }}"
-                        data-won="{{ row.da_trung }}"
-                        data-pending="{{ row.cho_luu }}"
-                        data-cancelled="{{ row.da_huy }}">Xóa thiết lập</button>
-              </div>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="7" class="table-empty">Chưa có sự kiện nào thiết lập quay số. Bấm "Thiết lập sự kiện mới" để bắt đầu.</td></tr>
-          {% endfor %}
+        <tbody id="luckyRows">
+          <tr><td colspan="7" class="table-empty">Đang tải…</td></tr>
         </tbody>
       </table>
     </div>
   </div>
+  <script type="application/json" id="luckyData">{{ rows|tojson }}</script>
 </section>
 
 <dialog id="deleteDialog" class="lucky-dialog app-dialog">
@@ -106,29 +83,80 @@
     confirmBtn.disabled = current && current.total > 0 && !same(typed.value, current.name);
   }
 
-  document.querySelectorAll('.js-delete-setup').forEach((button) => {
-    button.addEventListener('click', () => {
-      current = {
-        id: button.dataset.eventId, name: button.dataset.name, total: Number(button.dataset.total),
-        won: Number(button.dataset.won), pending: Number(button.dataset.pending), cancelled: Number(button.dataset.cancelled),
-      };
-      document.getElementById('deleteIntro').textContent = `Sự kiện: ${current.name}. Xóa thiết lập sẽ xóa toàn bộ giải thưởng và ảnh nền của sự kiện này.`;
-      const warn = document.getElementById('deleteWarn');
-      const box = document.getElementById('deleteConfirmBox');
-      if (current.total > 0) {
-        warn.hidden = false;
-        warn.textContent = `Sự kiện này đã có ${current.total} kết quả quay (${current.won} đã lưu, ${current.pending} chờ lưu, ${current.cancelled} đã hủy vắng mặt). Xóa thiết lập sẽ MẤT TOÀN BỘ kết quả này và không khôi phục được. Hãy xuất Excel trước nếu cần.`;
-        box.hidden = false;
-        document.getElementById('deleteEventName').textContent = current.name;
-      } else {
-        warn.hidden = true; box.hidden = true;
-      }
-      typed.value = '';
-      errorBox.hidden = true;
-      confirmBtn.disabled = false;
-      refresh();
-      dialog.showModal();
-    });
+  // Mở hộp xác nhận xóa thiết lập cho 1 dòng (số liệu lấy từ dữ liệu dòng, không còn đọc từ thuộc tính data-*)
+  function openDelete(row) {
+    current = { id: row.event_id, name: row.ten_su_kien, total: row.tong_ket_qua, won: row.da_trung, pending: row.cho_luu, cancelled: row.da_huy };
+    document.getElementById('deleteIntro').textContent = `Sự kiện: ${current.name}. Xóa thiết lập sẽ xóa toàn bộ giải thưởng và ảnh nền của sự kiện này.`;
+    const warn = document.getElementById('deleteWarn');
+    const box = document.getElementById('deleteConfirmBox');
+    if (current.total > 0) {
+      warn.hidden = false;
+      warn.textContent = `Sự kiện này đã có ${current.total} kết quả quay (${current.won} đã lưu, ${current.pending} chờ lưu, ${current.cancelled} đã hủy vắng mặt). Xóa thiết lập sẽ MẤT TOÀN BỘ kết quả này và không khôi phục được. Hãy xuất Excel trước nếu cần.`;
+      box.hidden = false;
+      document.getElementById('deleteEventName').textContent = current.name;
+    } else {
+      warn.hidden = true; box.hidden = true;
+    }
+    typed.value = '';
+    errorBox.hidden = true;
+    confirmBtn.disabled = false;
+    refresh();
+    dialog.showModal();
+  }
+
+  // ---- Bảng sự kiện đã thiết lập (cùng kiểu bảng, menu ⋯ như các trang danh sách khác) ----
+  const SCREEN_URL = {{ url_for('lucky.lucky_screen', event_id=0)|tojson }};
+  const SETUP_URL = {{ url_for('lucky.lucky_setup_edit', event_id=0)|tojson }};
+  const forEvent = (template, id) => template.replace('/0/', `/${id}/`);
+
+  function buildLuckyRow(row) {
+    const { el, rowMenu } = window.listUi;
+    const tr = el('tr');
+    const first = el('td');
+    const person = el('div', 'cell-person');
+    const line = el('div');
+    line.appendChild(el('strong', '', row.ten_su_kien));
+    person.append(line, el('div', 'cell-person__code', row.ngay));
+    first.appendChild(person);
+    tr.appendChild(first);
+    tr.appendChild(el('td', 'col-num', row.so_giai));
+    const won = el('td', 'col-num', `${row.da_trung} / ${row.so_suat}`);
+    if (row.cho_luu) won.appendChild(el('span', 'cell-muted', ` (+${row.cho_luu} chờ lưu)`));
+    tr.appendChild(won);
+    tr.appendChild(el('td', 'col-num', row.da_huy));
+    tr.appendChild(el('td', 'col-num', row.nguoi_checkin));
+    tr.appendChild(el('td', '', row.cap_nhat));
+    const actions = el('td', 'col-actions');
+    const box = el('div', 'row-status row-status--end');
+    const open = el('a', 'btn btn--row btn--primary', 'Mở màn hình quay');
+    open.href = forEvent(SCREEN_URL, row.event_id);
+    open.target = '_blank';
+    open.rel = 'noopener';
+    box.append(open, rowMenu(`Thêm thao tác cho ${row.ten_su_kien}`, [
+      { label: 'Sửa thiết lập', href: forEvent(SETUP_URL, row.event_id) },
+      { label: 'Xóa thiết lập', danger: true, onClick: () => openDelete(row) },
+    ]));
+    actions.appendChild(box);
+    tr.appendChild(actions);
+    return tr;
+  }
+
+  // main.js (defer) chạy sau script này: dựng bảng khi DOM xong, lúc window.listUi đã có
+  window.addEventListener('DOMContentLoaded', () => {
+    const rows = JSON.parse(document.getElementById('luckyData').textContent);
+    const body = document.getElementById('luckyRows');
+    body.replaceChildren();
+    if (!rows.length) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 7;
+      td.className = 'table-empty';
+      td.textContent = 'Chưa có sự kiện nào thiết lập quay số. Bấm "Thiết lập sự kiện mới" để bắt đầu.';
+      tr.appendChild(td);
+      body.appendChild(tr);
+      return;
+    }
+    rows.forEach((row) => body.appendChild(buildLuckyRow(row)));
   });
   typed.addEventListener('input', refresh);
   document.getElementById('deleteCancel').addEventListener('click', () => dialog.close());

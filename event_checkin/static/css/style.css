@@ -3730,3 +3730,17 @@ td.col-num {
   gap: var(--space-3);
   margin: var(--space-3) 0;
 }
+
+.row-status--end {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.list-table--compact {
+  min-width: 600px;
+}
+
+.list-toolbar--plain {
+  padding: 0;
+  border-bottom: 0;
+}
