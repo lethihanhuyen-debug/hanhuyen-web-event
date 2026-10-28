@@ -31,25 +31,27 @@
       <nav class="primary-nav" id="primaryNav" aria-label="Điều hướng chính">
         <ul class="primary-nav__list">
           <li><a class="{% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng ký</a></li>
-          <li><a class="{% if request.path.startswith('/admin') and not request.path.startswith('/admin/lucky-draw') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản trị</a></li>
           {% if session.get('admin_id') %}
-          <li><a class="{% if request.path.startswith('/admin/lucky-draw') %}is-active{% endif %}" href="{{ url_for('lucky.lucky_list') }}">Quay số may mắn</a></li>
+          <li><a class="{% if request.path.startswith('/admin') and not request.path.startswith('/admin/lucky-draw') %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản trị</a></li>
           {% endif %}
         </ul>
-        {% if session.get('admin_id') %}
-          <div class="admin-settings">
-            <button class="admin-settings__button" type="button" aria-label="Cài đặt admin" title="Cài đặt admin" aria-expanded="false">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"></path>
-                <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05A1.7 1.7 0 0 0 15 19.36a1.7 1.7 0 0 0-1 .94l-.03.08a2 2 0 0 1-3.84 0l-.03-.08a1.7 1.7 0 0 0-1-.94 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 0 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.64 15a1.7 1.7 0 0 0-.94-1l-.08-.03a2 2 0 0 1 0-3.84l.08-.03a1.7 1.7 0 0 0 .94-1 1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 0 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.64a1.7 1.7 0 0 0 1-.94l.03-.08a2 2 0 0 1 3.84 0l.03.08a1.7 1.7 0 0 0 1 .94 1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.36 9c.11.42.45.76.94 1l.08.03a2 2 0 0 1 0 3.84l-.08.03a1.7 1.7 0 0 0-.94 1Z"></path>
-              </svg>
-            </button>
-            <div class="admin-settings__menu" hidden>
+        <div class="admin-settings">
+          <button class="admin-settings__button" type="button" aria-label="Cài đặt admin" title="Cài đặt admin" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"></path>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05A1.7 1.7 0 0 0 15 19.36a1.7 1.7 0 0 0-1 .94l-.03.08a2 2 0 0 1-3.84 0l-.03-.08a1.7 1.7 0 0 0-1-.94 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 0 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.64 15a1.7 1.7 0 0 0-.94-1l-.08-.03a2 2 0 0 1 0-3.84l.08-.03a1.7 1.7 0 0 0 .94-1 1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 0 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.64a1.7 1.7 0 0 0 1-.94l.03-.08a2 2 0 0 1 3.84 0l.03.08a1.7 1.7 0 0 0 1 .94 1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.36 9c.11.42.45.76.94 1l.08.03a2 2 0 0 1 0 3.84l-.08.03a1.7 1.7 0 0 0-.94 1Z"></path>
+            </svg>
+          </button>
+          <div class="admin-settings__menu" hidden>
+            {% if session.get('admin_id') %}
               <button class="admin-settings__item" type="button" data-open-don-vi>Quản lý đơn vị</button>
+              <a class="admin-settings__item" href="{{ url_for('lucky.lucky_list') }}">Quay số may mắn</a>
               <button class="admin-settings__item admin-settings__item--danger" type="button" data-admin-logout>Đăng xuất</button>
-            </div>
+            {% else %}
+              <a class="admin-settings__item" href="{{ url_for('admin.login_page') }}">Đăng nhập</a>
+            {% endif %}
           </div>
-        {% endif %}
+        </div>
       </nav>
     </div>
   </header>
