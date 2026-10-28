@@ -200,7 +200,9 @@ a {
 .brand__title {
   font-family: var(--font-sans);
   font-weight: 700;
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   line-height: 1.2;
   color: var(--cocoa-brown); /* xanh ngọc: tách khỏi dòng tên trường */
   white-space: nowrap;
@@ -3743,4 +3745,10 @@ td.col-num {
 .list-toolbar--plain {
   padding: 0;
   border-bottom: 0;
+}
+
+/* Tên trường + tên đơn vị viết hoa khá dài: thu nhỏ ở màn hình vừa để không đè lên menu */
+@media (min-width: 961px) and (max-width: 1280px) {
+  .brand__eyebrow,
+  .brand__title { font-size: var(--text-md); letter-spacing: 0.02em; }
 }
