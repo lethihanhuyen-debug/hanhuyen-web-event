@@ -17,9 +17,6 @@
     <div class="panel-head__side">
       <a class="btn btn--back" href="{{ url_for('admin.index') }}">← Quay lại</a>
       <div class="panel-actions panel-actions--row">
-        {% if event.certificate_template_url %}
-          <button id="openTemplatePreview" class="btn btn--ghost" type="button">Xem mẫu chứng chỉ</button>
-        {% endif %}
         <a class="btn btn--primary" href="{{ url_for('checkin.event_index', event_id=event.id) }}" target="_blank" rel="noopener">Check-in</a>
         <a class="btn btn--ghost" href="{{ url_for('admin.checkins_page', event_id=event.id) }}">Danh sách check-in</a>
         {% if lucky_ready %}
@@ -140,23 +137,6 @@
     <button id="backToTop" class="btn btn--ghost" type="button">↑ Quay lại đầu trang</button>
   </div>
 
-  {% if event.certificate_template_url %}
-  <div id="templatePreviewModal" class="designer-modal" hidden>
-    <div class="designer-modal__backdrop" data-close-template-preview></div>
-    <div class="designer-modal__dialog template-preview-dialog">
-      <div class="panel-head">
-        <div>
-          <p class="eyebrow">Chứng chỉ</p>
-          <h2>Mẫu chứng chỉ</h2>
-        </div>
-        <button id="closeTemplatePreview" class="btn btn--ghost" type="button">Đóng</button>
-      </div>
-      <div class="template-preview-wrap">
-        <img src="{{ event.certificate_template_url }}" alt="Mẫu chứng chỉ">
-      </div>
-    </div>
-  </div>
-  {% endif %}
 
   <div id="certificatePreviewModal" class="designer-modal" hidden>
     <div class="designer-modal__backdrop" data-close-certificate-preview></div>
@@ -183,9 +163,6 @@
 <script>
 (function () {
   const message = document.getElementById('eventCheckinMessage');
-  const openTemplatePreview = document.getElementById('openTemplatePreview');
-  const templatePreviewModal = document.getElementById('templatePreviewModal');
-  const closeTemplatePreview = document.getElementById('closeTemplatePreview');
   const exportButton = document.getElementById('exportRegistrations');
 
   function showMessage(type, text) {
@@ -248,24 +225,6 @@
       }
     });
   }
-
-  if (openTemplatePreview && templatePreviewModal) {
-    openTemplatePreview.addEventListener('click', () => {
-      templatePreviewModal.hidden = false;
-    });
-  }
-
-  if (closeTemplatePreview && templatePreviewModal) {
-    closeTemplatePreview.addEventListener('click', () => {
-      templatePreviewModal.hidden = true;
-    });
-  }
-
-  document.querySelectorAll('[data-close-template-preview]').forEach((element) => {
-    element.addEventListener('click', () => {
-      templatePreviewModal.hidden = true;
-    });
-  });
 
   document.querySelectorAll('.js-delete-checkin').forEach((button) => {
     button.addEventListener('click', async () => {
