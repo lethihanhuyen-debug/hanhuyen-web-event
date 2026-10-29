@@ -3882,6 +3882,67 @@ td.col-num {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .header-auth { padding: 0 var(--space-3); letter-spacing: 0.03em; }
-  .header-auth--icon { padding: 0; }
+}
+
+/* ==========================================================================
+   Header: các mục điều hướng và nút Đăng nhập cùng một dạng nút bo tròn
+   ========================================================================== */
+.primary-nav__list a,
+.header-auth:not(.header-auth--icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--soft-taupe);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease;
+}
+
+/* bỏ gạch chân cũ */
+.primary-nav__list a::after {
+  display: none;
+}
+
+.primary-nav__list a:hover,
+.header-auth:not(.header-auth--icon):hover {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+}
+
+/* mục đang mở: nền xanh nhạt, chữ xanh, không viền */
+.primary-nav__list a.is-active {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border-color: transparent;
+  color: var(--color-primary);
+}
+
+/* nút Đăng nhập: viền xanh nhạt */
+.header-auth:not(.header-auth--icon) {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+  color: var(--color-primary);
+}
+
+.primary-nav__list a:focus-visible,
+.header-auth:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+  color: var(--color-primary);
+}
+
+@media (max-width: 960px) {
+  .primary-nav__list a {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
