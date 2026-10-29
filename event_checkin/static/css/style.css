@@ -342,57 +342,6 @@ a {
   .primary-nav__list a:hover::after,
   .primary-nav__list button:hover::after,
   .primary-nav__list a.is-active::after { width: 28px; }
-
-  /* trên mobile, khối cài đặt admin xuống hàng riêng trong menu trượt */
-  .primary-nav .admin-settings { margin-top: var(--space-3); align-self: flex-start; }
-}
-
-.admin-settings {
-  position: relative;
-}
-
-.admin-settings__button {
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--blue-100);
-  color: var(--blue-900);
-  cursor: pointer;
-  transition: background .18s ease, color .18s ease, transform .18s ease;
-}
-
-.admin-settings__button:hover,
-.admin-settings__button[aria-expanded="true"] {
-  background: var(--blue-700);
-  color: #fff;
-  transform: translateY(-1px);
-}
-
-.admin-settings__button svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.admin-settings__menu {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  z-index: 40;
-  width: 240px;
-  padding: var(--space-4);
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
 }
 
 .admin-settings__item {
@@ -423,16 +372,6 @@ a {
 .admin-settings__item--danger:hover {
   background: rgba(179, 65, 58, 0.12);
   color: var(--danger);
-}
-
-.admin-data-modal.is-open {
-  display: flex;
-}
-
-.admin-data-modal__dialog {
-  width: min(680px, 100%);
-  max-height: calc(100vh - 48px);
-  overflow-y: scroll;
 }
 
 .admin-data-form {
@@ -3751,4 +3690,272 @@ td.col-num {
 @media (min-width: 961px) and (max-width: 1280px) {
   .brand__eyebrow,
   .brand__title { font-size: var(--text-md); letter-spacing: 0.02em; }
+}
+
+/* Nút quay lại ở đầu trang đăng ký của một sự kiện: ngay trên tiêu đề, góc phải */
+.register-back {
+  display: flex;
+  width: fit-content;
+  margin: 0 0 var(--space-4) auto;
+}
+
+.panel-head > div:has(.register-back) {
+  flex: 1;
+}
+
+/* Nút đóng menu bên trong ngăn menu điện thoại (nút ☰ bị lớp phủ che khi menu đang mở) */
+.nav-close {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .nav-close {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--mist-gray);
+    border-radius: var(--radius-sm);
+    color: var(--color-primary-dark);
+    cursor: pointer;
+  }
+
+  .nav-close svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+}
+
+/* ---- Đăng nhập / đăng xuất ở góc phải header ---- */
+.header-auth {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-primary-dark);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .18s ease, color .18s ease;
+}
+
+.header-auth:hover {
+  background: var(--blue-100);
+}
+
+@media (max-width: 960px) {
+  /* điện thoại: nút đăng nhập/đăng xuất nằm ngay trái nút ☰, luôn thấy mà không cần mở menu */
+  .header-auth { order: 1; margin-left: auto; }
+  .nav-toggle { order: 2; width: 44px; height: 44px; }
+}
+
+/* ---- Trang Quản trị: thẻ chọn chức năng ---- */
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin-top: var(--space-5);
+}
+
+.hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background: var(--card-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.hub-card:hover,
+.hub-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--blue-700);
+}
+
+.hub-card__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--blue-100);
+  color: var(--color-primary-dark);
+}
+
+.hub-card__icon svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hub-card__body {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.hub-card__body strong {
+  font-size: var(--text-xl);
+  color: var(--color-primary-dark);
+}
+
+.hub-card__body span {
+  color: var(--muted);
+}
+
+@media (max-width: 960px) {
+  .hub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .hub-grid { grid-template-columns: 1fr; gap: var(--space-4); }
+  .hub-card { flex-direction: row; align-items: center; padding: var(--space-5); }
+  .hub-card__icon { flex-shrink: 0; }
+}
+
+/* Trang Quản lý đơn vị: danh sách cao theo nội dung thay vì khung 300px của hộp thoại cũ */
+.admin-data-list--page {
+  height: auto;
+  max-height: 60vh;
+}
+
+@media (max-width: 640px) {
+  /* điện thoại hẹp: tên đơn vị thu nhỏ, tối đa 4 dòng để chừa chỗ cho nút Đăng nhập/Đăng xuất và nút ☰ */
+  .header-container { gap: var(--space-3); padding: 0 var(--space-4); }
+  .brand { gap: var(--space-3); }
+  .brand__text { min-width: 0; }
+  .brand__title {
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* ==========================================================================
+   Header: các mục điều hướng và nút Đăng nhập cùng một dạng nút bo tròn
+   ========================================================================== */
+.primary-nav__list a,
+.header-auth {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--soft-taupe);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease;
+}
+
+/* bỏ gạch chân cũ */
+.primary-nav__list a::after {
+  display: none;
+}
+
+.primary-nav__list a:hover,
+.header-auth:hover {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+}
+
+/* mục đang mở không tô nền riêng: mọi mục giống nhau, chỉ hiện nền nhạt khi rê chuột */
+.primary-nav__list a.is-active {
+  color: var(--soft-taupe);
+}
+
+.primary-nav__list a.is-active:hover,
+.primary-nav__list a.is-active:focus-visible {
+  color: var(--color-primary);
+}
+
+/* nút Đăng nhập: viền xanh nhạt */
+.header-auth {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+  color: var(--color-primary);
+}
+
+.primary-nav__list a:focus-visible,
+.header-auth:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+  color: var(--color-primary);
+}
+
+@media (max-width: 960px) {
+  .primary-nav__list a {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* máy tính: "Đăng ký", "Quản trị" nằm sát nút Đăng nhập/Đăng xuất ở bên phải */
+@media (min-width: 961px) {
+  .primary-nav { margin-left: auto; }
+  .header-container { gap: var(--space-3); }
+}
+
+/* Điện thoại / máy tính bảng: nút "Quay lại" và các nút thao tác ở đầu trang dồn sang góc phải */
+@media (max-width: 960px) {
+  .panel-head > .panel-actions,
+  .panel-head__side {
+    align-self: stretch;
+  }
+
+  .panel-head > .panel-actions,
+  .panel-head__side .panel-actions {
+    justify-content: flex-end;
+  }
+
+  .panel-head__side {
+    align-items: flex-end;
+  }
+
+  .panel-actions--row {
+    justify-content: flex-end;
+  }
+}
+
+/* Nút "Quay lại" luôn nằm cuối hàng, sát mép phải (sau nút thao tác bên cạnh), ở mọi cỡ màn hình */
+.panel-actions > .btn--back {
+  order: 2;
 }

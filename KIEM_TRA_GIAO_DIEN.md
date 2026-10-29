@@ -15,7 +15,7 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 
 ### 1. Đầu trang & menu (mọi trang)
 - [ ] Tên trường / tên trung tâm viết hoa, không đè lên menu ở 1000px, 1280px, 1920px
-- [ ] Menu: Đăng ký, Quản trị, biểu tượng bánh răng (Quản lý đơn vị, Quay số may mắn, Đăng xuất / Đăng nhập)
+- [ ] Menu: Đăng ký, Quản trị (chỉ khi đã đăng nhập); góc phải: chữ "Đăng nhập" (chưa đăng nhập) hoặc nút "Đăng xuất" có hộp xác nhận (đã đăng nhập); điện thoại: nằm cạnh nút ☰
 - [ ] Điện thoại: nút ☰ mở/đóng menu, bấm ra ngoài thì đóng
 - [ ] Nút "Quay lại đầu trang" ở cuối trang
 
@@ -40,9 +40,11 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 - [ ] Đăng nhập đúng → vào danh sách sự kiện
 - [ ] Sai mật khẩu / bỏ trống → báo lỗi đỏ, nút hiện trạng thái đang xử lý
 - [ ] Chưa đăng nhập mà vào `/admin` → bị chuyển về đăng nhập, đăng nhập xong quay lại đúng trang
-- [ ] Đăng xuất (menu bánh răng) → các trang admin không vào được nữa
+- [ ] Đăng xuất (nút góc phải header) → về trang chủ đăng ký → các trang admin không vào được nữa
 
-### 5. Danh sách sự kiện admin (`/admin`)
+### 5. Trang Quản trị (`/admin`) và danh sách sự kiện (`/admin/events`)
+- [ ] `/admin` hiện 3 thẻ (Sự kiện, Quay số may mắn, Quản lý đơn vị), mỗi thẻ mở đúng trang; các trang con có nút ← Quay lại về `/admin`
+- [ ] Đăng nhập xong vào `/admin`
 - [ ] Số liệu tổng quan, chip lọc (Tất cả / Sắp diễn ra / Đang diễn ra / Đã kết thúc) + số đếm
 - [ ] Ô tìm kiếm sự kiện (bỏ dấu), thông báo khi không có kết quả
 - [ ] Nút "Thêm sự kiện": biểu mẫu đủ ô (tên, cơ sở, địa chỉ, ngày bắt đầu, mở đăng ký, ngày kết thúc, đóng đăng ký, số lượng, mô tả, hình)
@@ -85,7 +87,7 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 - [ ] Xem trước chứng chỉ của từng người, chỉnh vị trí/cỡ chữ ("Lưu vị trí & cỡ chữ")
 - [ ] **Gửi 1 chứng chỉ thật vào email của chính mình** (nhớ tắt Avast Mail/Web Shield nếu máy dev lỗi SMTP)
 
-### 2. Thiết lập chứng chỉ (nút "Chứng chỉ" ở thẻ sự kiện trong `/admin`)
+### 2. Thiết lập chứng chỉ (nút "Chứng chỉ" ở thẻ sự kiện trong `/admin/events`)
 - [ ] Tải mẫu chứng chỉ, hộp "Cắt ảnh về tỉ lệ 2000×1414" (kéo, thu phóng, Cắt & Tải lên, Hủy)
 - [ ] Kéo thả 6 trường: Họ tên, Mã CB/SV, Đơn vị, Ngày cấp, Mã chứng nhận, Tên sự kiện (QR nếu có)
 - [ ] Thanh công cụ trường: căn trái/giữa/phải, Đậm, cỡ chữ, font riêng (tải lên / xóa ⟲)
@@ -93,7 +95,7 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 - [ ] Đóng hộp có cảnh báo khi còn thay đổi chưa lưu
 - [ ] Điện thoại: hộp thiết lập dùng được hoặc có thông báo dùng máy tính
 
-### 3. Quay số may mắn (menu bánh răng → Quay số may mắn)
+### 3. Quay số may mắn (thẻ Quay số may mắn ở `/admin`)
 - [ ] Danh sách (`/admin/lucky-draw`): bảng sự kiện đã thiết lập, "＋ Thiết lập sự kiện mới", ⋯ → Sửa thiết lập / Xóa thiết lập
 - [ ] Xóa thiết lập: hộp xác nhận; nếu đã có kết quả phải gõ lại tên sự kiện; sự kiện quay về "chưa thiết lập"
 - [ ] Trang thiết lập: chọn sự kiện, tuỳ chọn trùng giải, danh sách giải (thêm, xóa, ▲▼ đổi thứ tự, số suất), ảnh nền (JPG/PNG/WEBP ≤ 5MB, xem trước, đặt lại)
@@ -104,11 +106,10 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 - [ ] QUAY → 1 người/lần → Lưu / Quay lại; hết suất, hết người thì báo; không quay trùng người
 - [ ] Thử mở 2 tab cùng bấm quay (chỉ 1 thành công)
 
-### 4. Quản lý đơn vị (menu bánh răng → Quản lý đơn vị)
-- [ ] Mở hộp, danh sách đơn vị, **menu ⋯ bấm được và hiện sát nút**
+### 4. Quản lý đơn vị (thẻ Quản lý đơn vị ở `/admin`, trang `/admin/don-vi`)
+- [ ] Mở trang, danh sách đơn vị, **menu ⋯ bấm được và hiện sát nút**
 - [ ] Thêm, sửa tên, xóa (hộp xác nhận), ẩn hàng loạt, xóa hàng loạt
 - [ ] Đơn vị mới xuất hiện ở ô "Đơn vị" của biểu mẫu đăng ký
-- [ ] Điện thoại: mở hộp thì menu ☰ tự đóng
 
 ### 5. Mẫu chứng chỉ & chứng nhận (đầu ra)
 - [ ] Ảnh chứng chỉ có đúng tên trường/đơn vị, tiếng Việt không vỡ dấu

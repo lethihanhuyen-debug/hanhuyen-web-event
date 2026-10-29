@@ -191,6 +191,19 @@ def _dashboard_payload():
 @admin_bp.get("/admin")
 @admin_required
 def index():
+    """Trang tổng "Quản trị": thẻ chọn chức năng (Sự kiện, Quay số may mắn, Quản lý đơn vị)."""
+    return render_template("admin/hub.html")
+
+
+@admin_bp.get("/admin/don-vi")
+@admin_required
+def don_vi_page():
+    return render_template("admin/don_vi.html")
+
+
+@admin_bp.get("/admin/events")
+@admin_required
+def events_page():
     events = Event.query.order_by(Event.ngay_bat_dau.desc()).all()
     return render_template(
         "admin/index.html",
@@ -401,7 +414,7 @@ def checkins_page_legacy():
     event_id = request.args.get("event_id", type=int)
     if event_id and Event.query.get(event_id):
         return redirect(url_for("admin.checkins_page", event_id=event_id))
-    return redirect(url_for("admin.index"))
+    return redirect(url_for("admin.events_page"))
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/checkins")
@@ -1149,6 +1162,26 @@ def bulk_hide_don_vi():
         "success": True,
         "message": f"Đã ẩn {len(da_an)} đơn vị.",
         "data": {"da_an": da_an, "loi": []},
+    })
+
+
+@admin_bp.post("/api/admin/don-vi/hien-hang-loat")
+@admin_required
+def bulk_show_don_vi():
+    payload = request.get_json(silent=True) or {}
+    ids = [int(item_id) for item_id in (payload.get("ids") or []) if str(item_id).isdigit()]
+    if not ids:
+        return jsonify({"success": False, "message": "Vui lòng chọn ít nhất một đơn vị."}), 400
+
+    items = DonVi.query.filter(DonVi.id.in_(ids)).all()
+    da_hien = [item.id for item in items]
+    for item in items:
+        item.is_active = True
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "message": f"Đã hiện {len(da_hien)} đơn vị.",
+        "data": {"da_hien": da_hien, "loi": []},
     })
 
 

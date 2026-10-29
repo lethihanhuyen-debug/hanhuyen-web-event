@@ -138,12 +138,10 @@ document.addEventListener('DOMContentLoaded', () => window.appUtils.observeRevea
     if (isOpen) closeMobileNav(); else openMobileNav();
   });
   navOverlay.addEventListener('click', closeMobileNav);
+  const navClose = document.getElementById('navClose');
+  if (navClose) navClose.addEventListener('click', closeMobileNav);
   primaryNav.querySelectorAll('a').forEach((link) => {
     link.addEventListener('click', closeMobileNav);
-  });
-  // Mở "Quản lý đơn vị" từ menu điện thoại: đóng menu để nó không phủ lên hộp thoại (làm không bấm được nút ⋯)
-  primaryNav.querySelectorAll('[data-open-don-vi]').forEach((item) => {
-    item.addEventListener('click', closeMobileNav);
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeMobileNav();
@@ -153,15 +151,24 @@ document.addEventListener('DOMContentLoaded', () => window.appUtils.observeRevea
   });
 })();
 
+// Đăng xuất (icon ở góc phải header): hỏi xác nhận rồi gọi API đăng xuất sẵn có
 document.addEventListener('DOMContentLoaded', () => {
-  const settings = document.querySelector('.admin-settings');
-  if (!settings) return;
-
-  const button = settings.querySelector('.admin-settings__button');
-  const menu = settings.querySelector('.admin-settings__menu');
   const logoutButton = document.querySelector('[data-admin-logout]');
-  const openDonVi = settings.querySelector('[data-open-don-vi]');
-  const donViModal = document.getElementById('donViModal');
+  if (!logoutButton) return;
+  logoutButton.addEventListener('click', async () => {
+    if (!await confirmAsync('Đăng xuất khỏi trang quản trị?')) return;
+    logoutButton.disabled = true;
+    try {
+      await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
+    } finally {
+      window.location.replace('/');
+    }
+  });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.getElementById('donViList')) return;
+
   const donViForm = document.getElementById('donViForm');
   const donViId = document.getElementById('donViId');
   const donViName = document.getElementById('donViName');
@@ -172,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const donViBulkToolbar = document.getElementById('donViBulkToolbar');
   const donViBulkCount = document.getElementById('donViBulkCount');
   const donViBulkHide = document.getElementById('donViBulkHide');
+  const donViBulkShow = document.getElementById('donViBulkShow');
   const donViBulkDelete = document.getElementById('donViBulkDelete');
   const donViBulkCancel = document.getElementById('donViBulkCancel');
 
@@ -180,11 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedIds = new Set();
   let openRowMenu = null;
 
-  function closeMenu() {
-    menu.hidden = true;
-    button.setAttribute('aria-expanded', 'false');
-  }
-
   function closeRowMenu() {
     if (!openRowMenu) return;
     openRowMenu.menu.hidden = true;
@@ -192,32 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
     openRowMenu = null;
   }
 
-  button.addEventListener('click', (event) => {
-    event.stopPropagation();
-    const shouldOpen = menu.hidden;
-    menu.hidden = !shouldOpen;
-    button.setAttribute('aria-expanded', String(shouldOpen));
-  });
-
-  if (logoutButton) {
-    logoutButton.addEventListener('click', async () => {
-      logoutButton.disabled = true;
-      try {
-        await fetch('/api/admin/logout', {
-          method: 'POST',
-          credentials: 'same-origin',
-          cache: 'no-store',
-        });
-      } finally {
-        window.location.replace('/admin/login');
-      }
-    });
-  }
-
   document.addEventListener('click', (event) => {
-    if (!settings.contains(event.target)) {
-      closeMenu();
-    }
     if (openRowMenu && !openRowMenu.toggleButton.parentElement.contains(event.target)) {
       closeRowMenu();
     }
@@ -225,9 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
-      closeMenu();
       closeRowMenu();
-      closeDonViModal();
     }
   });
 
@@ -242,23 +218,6 @@ document.addEventListener('DOMContentLoaded', () => {
     donViName.value = '';
     donViActive.checked = true;
     donViName.focus();
-  }
-
-  function openDonViModal() {
-    donViModal.classList.add('is-open');
-    donViModal.setAttribute('aria-hidden', 'false');
-    donViMessage.hidden = true;
-    bulkMode = false;
-    selectedIds.clear();
-    closeMenu();
-    loadDonVi();
-    window.setTimeout(() => donViName.focus(), 0);
-  }
-
-  function closeDonViModal() {
-    if (!donViModal) return;
-    donViModal.classList.remove('is-open');
-    donViModal.setAttribute('aria-hidden', 'true');
   }
 
   async function requestJson(url, options = {}) {
@@ -333,10 +292,15 @@ document.addEventListener('DOMContentLoaded', () => {
           // không bị cắt bởi #donViList (khung danh sách có overflow-y cố định).
           const rect = toggleButton.getBoundingClientRect();
           rowMenu.style.position = 'fixed';
-          rowMenu.style.top = `${rect.bottom + 6}px`;
           rowMenu.style.left = 'auto';
           rowMenu.style.right = `${window.innerWidth - rect.right}px`;
+          rowMenu.style.top = `${rect.bottom + 6}px`;
           rowMenu.hidden = false;
+          // hết chỗ phía dưới thì mở lên trên nút ⋯
+          const menuHeight = rowMenu.getBoundingClientRect().height;
+          if (rect.bottom + 6 + menuHeight > window.innerHeight - 8) {
+            rowMenu.style.top = `${Math.max(8, rect.top - menuHeight - 6)}px`;
+          }
           toggleButton.setAttribute('aria-expanded', 'true');
           openRowMenu = { menu: rowMenu, toggleButton };
         }
@@ -423,6 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
     donViBulkCount.textContent = `Đã chọn ${selectedIds.size} đơn vị`;
     const hasSelection = selectedIds.size > 0;
     donViBulkHide.disabled = !hasSelection;
+    donViBulkShow.disabled = !hasSelection;
     donViBulkDelete.disabled = !hasSelection;
   }
 
@@ -450,14 +415,6 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/'/g, '&#039;');
   }
 
-  if (openDonVi && donViModal) {
-    openDonVi.addEventListener('click', openDonViModal);
-  }
-
-  document.querySelectorAll('[data-close-don-vi]').forEach((item) => {
-    item.addEventListener('click', closeDonViModal);
-  });
-
   if (resetDonViForm) {
     resetDonViForm.addEventListener('click', resetForm);
   }
@@ -476,6 +433,24 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ ids: Array.from(selectedIds) }),
         });
         showDonViMessage('Đã ẩn các đơn vị đã chọn.');
+        exitBulkMode();
+        loadDonVi();
+      } catch (error) {
+        showDonViMessage(error.message, 'error');
+      }
+    });
+  }
+
+  if (donViBulkShow) {
+    donViBulkShow.addEventListener('click', async () => {
+      if (!selectedIds.size) return;
+      if (!await confirmAsync(`Hiện ${selectedIds.size} đơn vị đã chọn?`)) return;
+      try {
+        await requestJson('/api/admin/don-vi/hien-hang-loat', {
+          method: 'POST',
+          body: JSON.stringify({ ids: Array.from(selectedIds) }),
+        });
+        showDonViMessage('Đã hiện các đơn vị đã chọn.');
         exitBulkMode();
         loadDonVi();
       } catch (error) {
@@ -507,6 +482,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  loadDonVi();
 
   if (donViForm) {
     donViForm.addEventListener('submit', async (event) => {

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Quản lý đơn vị | Event Check-in{% endblock %}
+
+{% block content %}
+<section class="admin-panel">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Quản trị</p>
+      <h1>Quản lý đơn vị</h1>
+    </div>
+    <div class="panel-actions">
+      <a class="btn btn--back" href="{{ url_for('admin.index') }}">← Quay lại</a>
+    </div>
+  </div>
+
+  <div id="donViMessage" class="message" hidden></div>
+  <form id="donViForm" class="admin-data-form">
+    <input type="hidden" id="donViId">
+    <label>
+      <span>Tên đơn vị</span>
+      <input id="donViName" name="ten_don_vi" placeholder="Nhập đơn vị" required>
+    </label>
+    <label class="admin-data-form__toggle">
+      <input id="donViActive" type="checkbox" checked>
+      <span>Đang sử dụng</span>
+    </label>
+    <div class="btn-row">
+      <button class="btn btn--primary" type="submit">Lưu</button>
+    </div>
+  </form>
+  <div id="donViBulkToolbar" class="admin-data-bulk-toolbar" hidden>
+    <span id="donViBulkCount">Đã chọn 0 đơn vị</span>
+    <div class="btn-row">
+      <button id="donViBulkHide" class="btn btn--ghost btn--sm" type="button" disabled>Ẩn</button>
+      <button id="donViBulkShow" class="btn btn--ghost btn--sm" type="button" disabled>Hiện</button>
+      <button id="donViBulkDelete" class="btn btn--danger btn--sm" type="button" disabled>Xóa</button>
+      <button id="donViBulkCancel" class="btn btn--ghost btn--sm" type="button">Hủy</button>
+    </div>
+  </div>
+  <div id="donViList" class="admin-data-list admin-data-list--page"></div>
+</section>
+{% endblock %}

@@ -15,7 +15,7 @@
       </p>
     </div>
     <div class="panel-head__side">
-      <a class="btn btn--back" href="{{ url_for('admin.index') }}">← Quay lại</a>
+      <a class="btn btn--back" href="{{ url_for('admin.events_page') }}">← Quay lại</a>
       <div class="panel-actions panel-actions--row">
         <a class="btn btn--primary" href="{{ url_for('checkin.event_index', event_id=event.id) }}" target="_blank" rel="noopener">Check-in</a>
         <a class="btn btn--ghost" href="{{ url_for('admin.checkins_page', event_id=event.id) }}">Danh sách check-in</a>

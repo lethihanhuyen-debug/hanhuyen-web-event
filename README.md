@@ -65,10 +65,11 @@ Nhánh `main` của repo này **chỉ chứa thư mục `event_checkin/`** (cont
 
 ### Phía quản trị viên (`/admin`)
 - **Đăng nhập**: `/admin/login`, dùng tài khoản admin đã seed sẵn hoặc tài khoản admin đã tạo.
-- **Danh sách sự kiện**: thêm/sửa/xóa sự kiện, tải hình đại diện sự kiện.
+- **Trang Quản trị** (`/admin`): trang chọn chức năng gồm 3 thẻ — Sự kiện, Quay số may mắn, Quản lý đơn vị.
+- **Danh sách sự kiện** (`/admin/events`): thêm/sửa/xóa sự kiện, tải hình đại diện sự kiện.
 - **Thiết lập chứng chỉ**: bấm nút "Chứng chỉ" ở mỗi sự kiện để mở trình thiết kế mẫu chứng chỉ — tải ảnh nền (tự động gợi ý crop nếu ảnh không đúng tỉ lệ 2000×1414), kéo-thả 5 trường thông tin (họ tên, mã CB/SV, đơn vị, ngày cấp, mã chứng nhận) vào đúng vị trí trên ảnh nền, chỉnh cỡ chữ/màu/căn lề/font riêng cho từng trường, rồi bấm "Lưu vị trí".
 - **Chi tiết sự kiện**: xem danh sách đăng ký/check-in của từng sự kiện, check-in thủ công hoặc xóa check-in, xem/tải chứng chỉ đã cấp.
-- **Quản lý đơn vị**: bấm biểu tượng bánh răng ở góc phải thanh điều hướng khi đang ở khu vực quản trị.
+- **Quản lý đơn vị**: thẻ "Quản lý đơn vị" ở trang Quản trị (`/admin/don-vi`).
 - **Xuất CSV / Reset dữ liệu**: có trong trang quản trị để xuất báo cáo hoặc xóa toàn bộ dữ liệu đăng ký/check-in/chứng chỉ khi cần làm lại từ đầu.
 
 ## Lưu ý kỹ thuật
