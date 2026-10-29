@@ -138,6 +138,8 @@ document.addEventListener('DOMContentLoaded', () => window.appUtils.observeRevea
     if (isOpen) closeMobileNav(); else openMobileNav();
   });
   navOverlay.addEventListener('click', closeMobileNav);
+  const navClose = document.getElementById('navClose');
+  if (navClose) navClose.addEventListener('click', closeMobileNav);
   primaryNav.querySelectorAll('a').forEach((link) => {
     link.addEventListener('click', closeMobileNav);
   });

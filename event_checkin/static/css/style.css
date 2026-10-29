@@ -3763,3 +3763,36 @@ td.col-num {
 .panel-head > div:has(.register-back) {
   flex: 1;
 }
+
+/* Nút đóng menu bên trong ngăn menu điện thoại (nút ☰ bị lớp phủ che khi menu đang mở) */
+.nav-close {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .nav-close {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--mist-gray);
+    border-radius: var(--radius-sm);
+    color: var(--color-primary-dark);
+    cursor: pointer;
+  }
+
+  .nav-close svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+}

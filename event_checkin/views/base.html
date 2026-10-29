@@ -29,6 +29,9 @@
       </button>
 
       <nav class="primary-nav" id="primaryNav" aria-label="Điều hướng chính">
+        <button type="button" class="nav-close" id="navClose" aria-label="Đóng menu điều hướng">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        </button>
         <ul class="primary-nav__list">
           <li><a class="{% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng ký</a></li>
           {% if session.get('admin_id') %}
