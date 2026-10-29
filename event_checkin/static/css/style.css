@@ -3898,10 +3898,13 @@ td.col-num {
   color: var(--color-primary);
 }
 
-/* mục đang mở: nền xanh nhạt, chữ xanh, không viền */
+/* mục đang mở không tô nền riêng: mọi mục giống nhau, chỉ hiện nền nhạt khi rê chuột */
 .primary-nav__list a.is-active {
-  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-  border-color: transparent;
+  color: var(--soft-taupe);
+}
+
+.primary-nav__list a.is-active:hover,
+.primary-nav__list a.is-active:focus-visible {
   color: var(--color-primary);
 }
 
