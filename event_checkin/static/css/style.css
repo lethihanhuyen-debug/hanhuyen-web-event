@@ -3933,3 +3933,24 @@ td.col-num {
   .primary-nav { margin-left: auto; }
   .header-container { gap: var(--space-3); }
 }
+
+/* Điện thoại / máy tính bảng: nút "Quay lại" và các nút thao tác ở đầu trang dồn sang góc phải */
+@media (max-width: 960px) {
+  .panel-head > .panel-actions,
+  .panel-head__side {
+    align-self: stretch;
+  }
+
+  .panel-head > .panel-actions,
+  .panel-head__side .panel-actions {
+    justify-content: flex-end;
+  }
+
+  .panel-head__side {
+    align-items: flex-end;
+  }
+
+  .panel-actions--row {
+    justify-content: flex-end;
+  }
+}
