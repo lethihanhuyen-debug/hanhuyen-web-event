@@ -3753,9 +3753,13 @@ td.col-num {
   .brand__title { font-size: var(--text-md); letter-spacing: 0.02em; }
 }
 
-/* Nút quay lại ở đầu trang đăng ký của một sự kiện: ngay trên tiêu đề, bên trái */
+/* Nút quay lại ở đầu trang đăng ký của một sự kiện: ngay trên tiêu đề, góc phải */
 .register-back {
   display: flex;
   width: fit-content;
-  margin-bottom: var(--space-4);
+  margin: 0 0 var(--space-4) auto;
+}
+
+.panel-head > div:has(.register-back) {
+  flex: 1;
 }
