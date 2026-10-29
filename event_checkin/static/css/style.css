@@ -3954,3 +3954,10 @@ td.col-num {
     justify-content: flex-end;
   }
 }
+
+/* Điện thoại / máy tính bảng: nút "Quay lại" luôn nằm cuối hàng, sát mép phải (sau nút thao tác bên cạnh) */
+@media (max-width: 960px) {
+  .panel-actions > .btn--back {
+    order: 2;
+  }
+}
