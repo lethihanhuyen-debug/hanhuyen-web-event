@@ -3752,3 +3752,10 @@ td.col-num {
   .brand__eyebrow,
   .brand__title { font-size: var(--text-md); letter-spacing: 0.02em; }
 }
+
+/* Nút quay lại ở đầu trang đăng ký của một sự kiện: ngay trên tiêu đề, bên trái */
+.register-back {
+  display: flex;
+  width: fit-content;
+  margin-bottom: var(--space-4);
+}

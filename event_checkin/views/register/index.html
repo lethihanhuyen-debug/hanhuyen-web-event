@@ -83,6 +83,7 @@
   <div class="panel-head">
     <div>
       {% if selected_event %}
+        <a class="btn btn--back register-back" href="{{ url_for('register.index') }}">← Quay lại</a>
         <h1>{{ selected_event.ten_su_kien }}</h1>
         <p class="muted">
           {%- if selected_event.co_so and selected_event.dia_diem -%}
@@ -103,9 +104,6 @@
         </p>
       {% endif %}
     </div>
-    {% if selected_event %}
-      <a class="btn btn--ghost" href="{{ url_for('register.index') }}">Chọn sự kiện khác</a>
-    {% endif %}
   </div>
 
   {% if not selected_event %}
