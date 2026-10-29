@@ -41,9 +41,7 @@
       </nav>
 
       {% if session.get('admin_id') %}
-        <button type="button" class="header-auth header-auth--icon" data-admin-logout aria-label="Đăng xuất" data-tip="Đăng xuất">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>
-        </button>
+        <button type="button" class="header-auth" data-admin-logout>Đăng xuất</button>
       {% elif request.path != '/admin/login' %}
         <a class="header-auth" href="{{ url_for('admin.login_page') }}">Đăng nhập</a>
       {% endif %}

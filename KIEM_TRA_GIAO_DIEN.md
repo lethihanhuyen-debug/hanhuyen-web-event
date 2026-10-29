@@ -15,7 +15,7 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 
 ### 1. Đầu trang & menu (mọi trang)
 - [ ] Tên trường / tên trung tâm viết hoa, không đè lên menu ở 1000px, 1280px, 1920px
-- [ ] Menu: Đăng ký, Quản trị (chỉ khi đã đăng nhập); góc phải: chữ "Đăng nhập" (chưa đăng nhập) hoặc icon đăng xuất có hộp xác nhận (đã đăng nhập); điện thoại: nằm cạnh nút ☰
+- [ ] Menu: Đăng ký, Quản trị (chỉ khi đã đăng nhập); góc phải: chữ "Đăng nhập" (chưa đăng nhập) hoặc nút "Đăng xuất" có hộp xác nhận (đã đăng nhập); điện thoại: nằm cạnh nút ☰
 - [ ] Điện thoại: nút ☰ mở/đóng menu, bấm ra ngoài thì đóng
 - [ ] Nút "Quay lại đầu trang" ở cuối trang
 
@@ -40,7 +40,7 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 - [ ] Đăng nhập đúng → vào danh sách sự kiện
 - [ ] Sai mật khẩu / bỏ trống → báo lỗi đỏ, nút hiện trạng thái đang xử lý
 - [ ] Chưa đăng nhập mà vào `/admin` → bị chuyển về đăng nhập, đăng nhập xong quay lại đúng trang
-- [ ] Đăng xuất (icon góc phải header) → các trang admin không vào được nữa
+- [ ] Đăng xuất (nút góc phải header) → các trang admin không vào được nữa
 
 ### 5. Trang Quản trị (`/admin`) và danh sách sự kiện (`/admin/events`)
 - [ ] `/admin` hiện 3 thẻ (Sự kiện, Quay số may mắn, Quản lý đơn vị), mỗi thẻ mở đúng trang; các trang con có nút ← Quay lại về `/admin`

@@ -3761,28 +3761,6 @@ td.col-num {
   background: var(--blue-100);
 }
 
-.header-auth--icon {
-  width: 44px;
-  padding: 0;
-  background: var(--blue-100);
-  border: 0;
-}
-
-.header-auth--icon:hover {
-  background: var(--blue-700);
-  color: #fff;
-}
-
-.header-auth svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 @media (max-width: 960px) {
   /* điện thoại: nút đăng nhập/đăng xuất nằm ngay trái nút ☰, luôn thấy mà không cần mở menu */
   .header-auth { order: 1; margin-left: auto; }
@@ -3888,7 +3866,7 @@ td.col-num {
    Header: các mục điều hướng và nút Đăng nhập cùng một dạng nút bo tròn
    ========================================================================== */
 .primary-nav__list a,
-.header-auth:not(.header-auth--icon) {
+.header-auth {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3915,7 +3893,7 @@ td.col-num {
 }
 
 .primary-nav__list a:hover,
-.header-auth:not(.header-auth--icon):hover {
+.header-auth:hover {
   background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   color: var(--color-primary);
 }
@@ -3928,7 +3906,7 @@ td.col-num {
 }
 
 /* nút Đăng nhập: viền xanh nhạt */
-.header-auth:not(.header-auth--icon) {
+.header-auth {
   border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
   color: var(--color-primary);
 }
@@ -3945,4 +3923,10 @@ td.col-num {
     width: 100%;
     justify-content: flex-start;
   }
+}
+
+/* máy tính: "Đăng ký", "Quản trị" nằm sát nút Đăng nhập/Đăng xuất ở bên phải */
+@media (min-width: 961px) {
+  .primary-nav { margin-left: auto; }
+  .header-container { gap: var(--space-3); }
 }
