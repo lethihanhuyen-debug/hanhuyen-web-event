@@ -172,6 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const donViBulkToolbar = document.getElementById('donViBulkToolbar');
   const donViBulkCount = document.getElementById('donViBulkCount');
   const donViBulkHide = document.getElementById('donViBulkHide');
+  const donViBulkShow = document.getElementById('donViBulkShow');
   const donViBulkDelete = document.getElementById('donViBulkDelete');
   const donViBulkCancel = document.getElementById('donViBulkCancel');
 
@@ -423,6 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
     donViBulkCount.textContent = `Đã chọn ${selectedIds.size} đơn vị`;
     const hasSelection = selectedIds.size > 0;
     donViBulkHide.disabled = !hasSelection;
+    donViBulkShow.disabled = !hasSelection;
     donViBulkDelete.disabled = !hasSelection;
   }
 
@@ -476,6 +478,24 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ ids: Array.from(selectedIds) }),
         });
         showDonViMessage('Đã ẩn các đơn vị đã chọn.');
+        exitBulkMode();
+        loadDonVi();
+      } catch (error) {
+        showDonViMessage(error.message, 'error');
+      }
+    });
+  }
+
+  if (donViBulkShow) {
+    donViBulkShow.addEventListener('click', async () => {
+      if (!selectedIds.size) return;
+      if (!await confirmAsync(`Hiện ${selectedIds.size} đơn vị đã chọn?`)) return;
+      try {
+        await requestJson('/api/admin/don-vi/hien-hang-loat', {
+          method: 'POST',
+          body: JSON.stringify({ ids: Array.from(selectedIds) }),
+        });
+        showDonViMessage('Đã hiện các đơn vị đã chọn.');
         exitBulkMode();
         loadDonVi();
       } catch (error) {

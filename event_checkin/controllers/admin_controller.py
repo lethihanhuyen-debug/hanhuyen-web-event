@@ -1152,6 +1152,26 @@ def bulk_hide_don_vi():
     })
 
 
+@admin_bp.post("/api/admin/don-vi/hien-hang-loat")
+@admin_required
+def bulk_show_don_vi():
+    payload = request.get_json(silent=True) or {}
+    ids = [int(item_id) for item_id in (payload.get("ids") or []) if str(item_id).isdigit()]
+    if not ids:
+        return jsonify({"success": False, "message": "Vui lòng chọn ít nhất một đơn vị."}), 400
+
+    items = DonVi.query.filter(DonVi.id.in_(ids)).all()
+    da_hien = [item.id for item in items]
+    for item in items:
+        item.is_active = True
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "message": f"Đã hiện {len(da_hien)} đơn vị.",
+        "data": {"da_hien": da_hien, "loi": []},
+    })
+
+
 @admin_bp.post("/api/admin/don-vi/xoa-hang-loat")
 @admin_required
 def bulk_delete_don_vi():
