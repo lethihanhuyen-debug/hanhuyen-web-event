@@ -107,10 +107,9 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 - [ ] Thử mở 2 tab cùng bấm quay (chỉ 1 thành công)
 
 ### 4. Quản lý đơn vị (thẻ Quản lý đơn vị ở `/admin`, trang `/admin/don-vi`)
-- [ ] Mở hộp, danh sách đơn vị, **menu ⋯ bấm được và hiện sát nút**
+- [ ] Mở trang, danh sách đơn vị, **menu ⋯ bấm được và hiện sát nút**
 - [ ] Thêm, sửa tên, xóa (hộp xác nhận), ẩn hàng loạt, xóa hàng loạt
 - [ ] Đơn vị mới xuất hiện ở ô "Đơn vị" của biểu mẫu đăng ký
-- [ ] Điện thoại: mở hộp thì menu ☰ tự đóng
 
 ### 5. Mẫu chứng chỉ & chứng nhận (đầu ra)
 - [ ] Ảnh chứng chỉ có đúng tên trường/đơn vị, tiếng Việt không vỡ dấu
