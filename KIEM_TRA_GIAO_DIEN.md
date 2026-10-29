@@ -40,7 +40,7 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 - [ ] Đăng nhập đúng → vào danh sách sự kiện
 - [ ] Sai mật khẩu / bỏ trống → báo lỗi đỏ, nút hiện trạng thái đang xử lý
 - [ ] Chưa đăng nhập mà vào `/admin` → bị chuyển về đăng nhập, đăng nhập xong quay lại đúng trang
-- [ ] Đăng xuất (nút góc phải header) → các trang admin không vào được nữa
+- [ ] Đăng xuất (nút góc phải header) → về trang chủ đăng ký → các trang admin không vào được nữa
 
 ### 5. Trang Quản trị (`/admin`) và danh sách sự kiện (`/admin/events`)
 - [ ] `/admin` hiện 3 thẻ (Sự kiện, Quay số may mắn, Quản lý đơn vị), mỗi thẻ mở đúng trang; các trang con có nút ← Quay lại về `/admin`

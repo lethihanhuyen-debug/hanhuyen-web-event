@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
     } finally {
-      window.location.replace('/admin/login');
+      window.location.replace('/');
     }
   });
 });
