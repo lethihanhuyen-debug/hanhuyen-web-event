@@ -23,6 +23,7 @@
     </div>
     <div class="panel-head__side">
       <div class="panel-actions panel-actions--row">
+        <a class="btn btn--back" href="{{ url_for('admin.index') }}">← Quay lại</a>
         {% if unset_count %}
           <a class="btn btn--primary" href="{{ url_for('lucky.lucky_setup_new') }}">+ Thiết lập sự kiện mới</a>
         {% else %}

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Quản trị | Event Check-in{% endblock %}
+
+{% block content %}
+<section class="admin-panel">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Quản trị</p>
+      <h1>Chọn chức năng</h1>
+      <p class="muted">Chọn nội dung cần quản lý.</p>
+    </div>
+  </div>
+
+  <div class="hub-grid">
+    <a class="hub-card" href="{{ url_for('admin.events_page') }}">
+      <span class="hub-card__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M3 10h18"></path></svg>
+      </span>
+      <span class="hub-card__body">
+        <strong>Sự kiện</strong>
+        <span>Tạo, sửa, xóa sự kiện; xem người tham dự, check-in và gửi chứng chỉ.</span>
+      </span>
+    </a>
+    <a class="hub-card" href="{{ url_for('lucky.lucky_list') }}">
+      <span class="hub-card__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13"></path><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"></path></svg>
+      </span>
+      <span class="hub-card__body">
+        <strong>Quay số may mắn</strong>
+        <span>Thiết lập giải thưởng, mở màn hình quay và xem kết quả.</span>
+      </span>
+    </a>
+    <a class="hub-card" href="{{ url_for('admin.don_vi_page') }}">
+      <span class="hub-card__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M3 21h18"></path><path d="M5 21V7l7-4 7 4v14"></path><path d="M9 21v-4h6v4"></path><path d="M9 11h.01M12 11h.01M15 11h.01M9 14h.01M12 14h.01M15 14h.01"></path></svg>
+      </span>
+      <span class="hub-card__body">
+        <strong>Quản lý đơn vị</strong>
+        <span>Thêm, sửa, ẩn/hiện hoặc xóa các đơn vị trong danh sách đăng ký.</span>
+      </span>
+    </a>
+  </div>
+</section>
+{% endblock %}

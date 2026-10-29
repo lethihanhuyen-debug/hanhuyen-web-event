@@ -191,6 +191,19 @@ def _dashboard_payload():
 @admin_bp.get("/admin")
 @admin_required
 def index():
+    """Trang tổng "Quản trị": thẻ chọn chức năng (Sự kiện, Quay số may mắn, Quản lý đơn vị)."""
+    return render_template("admin/hub.html")
+
+
+@admin_bp.get("/admin/don-vi")
+@admin_required
+def don_vi_page():
+    return render_template("admin/don_vi.html")
+
+
+@admin_bp.get("/admin/events")
+@admin_required
+def events_page():
     events = Event.query.order_by(Event.ngay_bat_dau.desc()).all()
     return render_template(
         "admin/index.html",
@@ -401,7 +414,7 @@ def checkins_page_legacy():
     event_id = request.args.get("event_id", type=int)
     if event_id and Event.query.get(event_id):
         return redirect(url_for("admin.checkins_page", event_id=event_id))
-    return redirect(url_for("admin.index"))
+    return redirect(url_for("admin.events_page"))
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/checkins")
