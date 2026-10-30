@@ -394,31 +394,8 @@
     message.textContent = text;
   }
 
-  maInput.addEventListener('blur', async () => {
-    const value = maInput.value.trim();
-    if (!value) return;
-    try {
-      const response = await fetch('/api/lookup/' + encodeURIComponent(value));
-      const result = await response.json();
-      if (!result.success) {
-        // Mã chưa có trong hệ thống — không chặn hay báo lỗi, chỉ đơn giản là
-        // không tự động điền được thông tin. Người dùng vẫn tự nhập và đăng ký
-        // bình thường (backend /register tự tạo User mới nếu mã chưa tồn tại).
-        return;
-      }
-      const data = result.data;
-      hoTenInput.value = data.ho_ten || '';
-      const donViId = data.don_vi_id ? String(data.don_vi_id) : '';
-      if (donViId && !Array.from(donViInput.options).some((option) => option.value === donViId)) {
-        donViInput.add(new Option(data.don_vi || 'Đơn vị đã lưu', donViId));
-      }
-      donViInput.value = donViId;
-      // API tra mã chỉ trả họ tên + đơn vị (không lộ email/SĐT) -> người dùng tự nhập phần còn lại
-      showMessage('Đã tự động điền họ tên và đơn vị. Vui lòng nhập email để nhận chứng chỉ.', 'success');
-    } catch (error) {
-      showMessage('Không thể tra cứu dữ liệu.', 'error');
-    }
-  });
+  // TODO(Sierra): khi kết nối Sierra thì bật lại việc tra mã (GET /api/lookup/<ma_cbsv>) lúc rời ô Mã CB/SV
+  // để tự điền họ tên/đơn vị. Hiện chưa có dữ liệu nguồn nên người dùng tự nhập toàn bộ biểu mẫu.
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();

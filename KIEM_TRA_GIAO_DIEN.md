@@ -24,7 +24,7 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 - [ ] Tìm sự kiện theo tên (có bỏ dấu), nhóm theo tháng, "Xem thêm"
 - [ ] Lọc/nhãn trạng thái: Sắp diễn ra, Đang diễn ra, Đã kết thúc
 - [ ] Sự kiện chưa mở / đã đóng đăng ký: hiện thông báo đúng, không gửi được
-- [ ] Biểu mẫu đăng ký: người dùng tự nhập Mã CB/SV, Họ tên, Email, Số điện thoại, Chức vụ và chọn Đơn vị (chưa kết nối Sierra nên không có dữ liệu có sẵn; mã **chưa từng đăng ký** thì không tự điền và không báo lỗi, người dùng nhập tay bình thường. Mã **đã từng đăng ký** trong hệ thống này thì khi rời ô Mã sẽ tự điền Họ tên + Đơn vị; Email, SĐT, Chức vụ vẫn tự nhập)
+- [ ] Biểu mẫu đăng ký: người dùng tự nhập Mã CB/SV, Họ tên, Email, Số điện thoại, Chức vụ và chọn Đơn vị (chưa kết nối Sierra nên **không có tự điền** theo mã; nhập mã xong rời ô thì các ô khác vẫn trống)
 - [ ] Báo lỗi từng ô (bỏ trống, email sai, SĐT sai), đăng ký trùng, hết chỗ
 - [ ] Đăng ký thành công: thông báo + nút "Chọn sự kiện khác"
 - [ ] Hiệu ứng mở đầu (intro) không che nội dung
