@@ -271,6 +271,7 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 - [ ] `http://<domain>/` tự động redirect sang `https://`
 - [ ] Đăng nhập `/admin/login` bằng tài khoản admin đã đổi mật khẩu (không phải `admin123`)
 - [ ] Đăng ký thử 1 sự kiện bằng mã CB/SV test, check-in thử tại `/checkin`
+- [ ] `python -m event_checkin.migrations.m005_cau_hoi_dang_ky --check` báo `OK` (sau khi chạy m005)
 - [ ] Menu **Quay số may mắn** (`/admin/lucky-draw`) mở được; thiết lập thử 1 sự kiện (giải + ảnh nền), quay thử, Lưu, rồi xóa thiết lập thử (sau khi chạy m004)
 - [ ] Chứng chỉ PDF/PNG tạo và tải được sau check-in (nếu event bật cấp chứng chỉ)
 - [ ] Email xác nhận gửi được (kiểm tra hộp thư, và `C:\apps\eventcheckin\logs\app.log` không có lỗi SMTP)
@@ -307,5 +308,26 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
     ```
     Với SQLite xem thử (`instance/preview.db`): `sqlite3 instance/preview.db ".tables"`, rồi `DROP TABLE lucky_winners; DROP TABLE lucky_prizes; DROP TABLE lucky_configs;`. Sau đó chạy lại `python -m event_checkin.migrations.m004_lucky_draw`.
   - Ảnh nền do admin tải lên được lưu ở `event_checkin\static\lucky\uploads\` — tài khoản chạy service `EventCheckinApp` cần có quyền ghi thư mục này (và nên đưa vào lịch sao lưu cùng `static\events`). Hướng dẫn cho admin: mục 8 của `HUONG_DAN_ADMIN.md`.
+- **Bản cập nhật ô "câu hỏi" ở form đăng ký (11/2026)**: thêm 3 cột mới (`events.cho_phep_cau_hoi`, `events.tieu_de_cau_hoi`, `registrations.cau_hoi`), không sửa/xóa dữ liệu cũ; sự kiện cũ mặc định tắt, đăng ký cũ có câu hỏi rỗng. **Làm đúng thứ tự** (đừng khởi động lại app trước khi chạy m005 — code mới đọc các cột này, thiếu cột thì app không khởi động được):
+  1. **Backup database**: `Start-ScheduledTask -TaskName "CheckinEvent-DB-Backup"`, rồi kiểm tra `C:\backups\` có file `checkin_event_<ngày>.sql` mới nhất.
+  2. **Chép code mới**: `git pull` trong `C:\apps\eventcheckin` (app đang chạy vẫn dùng code cũ, chưa ảnh hưởng).
+  3. **Chạy m005** (chạy lại nhiều lần vẫn an toàn):
+     ```powershell
+     .venv\Scripts\python -m event_checkin.migrations.m005_cau_hoi_dang_ky
+     ```
+  4. **Khởi động lại app**: `Restart-Service EventCheckinApp`.
+
+  **Kiểm tra m005 đã chạy thành công** (mã thoát `0` và dòng bắt đầu bằng `OK` là đạt; nếu in `CHƯA ĐỦ` thì quay lại bước 3):
+  ```powershell
+  .venv\Scripts\python -m event_checkin.migrations.m005_cau_hoi_dang_ky --check
+  ```
+  Hoặc kiểm tra trực tiếp trong MySQL/MariaDB (phải thấy đủ 3 dòng):
+  ```sql
+  SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND ((TABLE_NAME = 'events' AND COLUMN_NAME IN ('cho_phep_cau_hoi', 'tieu_de_cau_hoi'))
+       OR (TABLE_NAME = 'registrations' AND COLUMN_NAME = 'cau_hoi'));
+  ```
+  Câu hỏi có thể chứa emoji: cột/bảng cần bộ ký tự `utf8mb4` (mặc định của MySQL 8 và `?charset=utf8mb4` trong chuỗi kết nối). Kiểm tra: `SHOW FULL COLUMNS FROM registrations LIKE 'cau_hoi';` cột `Collation` phải bắt đầu bằng `utf8mb4`.
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.

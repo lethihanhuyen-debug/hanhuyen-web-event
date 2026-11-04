@@ -24,6 +24,9 @@ class Event(db.Model):
     certificate_enabled = db.Column(db.Boolean, nullable=False, default=True)
     certificate_template = db.Column(db.String(255))
     certificate_layout = db.Column(db.Text)
+    # Ô "câu hỏi" tuỳ chọn ở form đăng ký (m005): công tắc theo từng sự kiện + tiêu đề admin tự đặt
+    cho_phep_cau_hoi = db.Column(db.Boolean, nullable=False, default=False)
+    tieu_de_cau_hoi = db.Column(db.String(255))
     created_by = db.Column(db.Integer, db.ForeignKey("admins.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime)
