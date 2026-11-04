@@ -130,3 +130,26 @@ Vào **Sửa thiết lập**, mục *Kết quả trúng thưởng*: bấm **Hủ
 
 ### 8.5. Xóa thiết lập
 Ở danh sách **Quay số may mắn** bấm **Xóa thiết lập**. Sẽ xóa giải thưởng, kết quả trúng (kể cả bản hủy) và ảnh nền của sự kiện đó; **không** xóa sự kiện và dữ liệu check-in. Nếu đã có kết quả, hộp xác nhận ghi rõ số kết quả sẽ mất và bạn phải **gõ lại đúng tên sự kiện**. Nên xuất Excel trước. Xóa xong, sự kiện quay lại danh sách "chưa thiết lập".
+
+## 9. Ô "câu hỏi" ở form đăng ký (tuỳ chọn theo sự kiện)
+
+Dùng khi muốn thu câu hỏi của người tham dự gửi đến diễn giả/MC.
+
+### 9.1. Bật cho một sự kiện
+1. Quản trị → **Sự kiện** → **Thêm sự kiện** hoặc **Sửa** sự kiện.
+2. Bật công tắc **"Cho phép người đăng ký đặt câu hỏi"** (mặc định tắt).
+3. Ô **"Tiêu đề câu hỏi"** hiện ra, điền sẵn *"Câu hỏi bạn muốn gửi đến diễn giả"*; sửa nếu muốn nhãn khác (tối đa 255 ký tự). Lưu sự kiện.
+
+Form đăng ký của sự kiện đó sẽ có thêm ô nhiều dòng với nhãn là tiêu đề bạn đặt kèm "(không bắt buộc)". Người đăng ký được bỏ trống; tối đa **1000 ký tự** (có bộ đếm). Sự kiện khác không bị ảnh hưởng.
+
+### 9.2. Xem và xuất câu hỏi
+Mở sự kiện → trang chi tiết:
+- Bảng "Danh sách tham dự" có cột **Câu hỏi** (câu dài được rút gọn, **bấm vào** để xem đầy đủ).
+- Chip **"Có câu hỏi · n"**: chỉ hiện người có gửi câu hỏi; n là số câu hỏi đã nhận. Ô tìm kiếm cũng tìm được theo nội dung câu hỏi.
+- **Xuất Excel**: file danh sách đăng ký có thêm cột "Câu hỏi".
+- **Xuất câu hỏi**: file Excel riêng gồm Họ tên, Đơn vị, Câu hỏi, Thời gian đăng ký (chỉ những người có câu hỏi), dùng để gửi cho diễn giả/MC.
+
+### 9.3. Lưu ý
+- Câu hỏi được lưu cùng lượt đăng ký; người đăng ký **không sửa lại** sau khi đã gửi.
+- Nếu bạn **tắt công tắc** sau khi đã có người gửi câu hỏi: câu hỏi **không bị xóa**, chỉ ẩn ô trên form đăng ký; cột, chip và nút xuất ở trang admin vẫn còn để bạn xem và xuất.
+- Triển khai bản này lên server cần chạy migration m005 theo đúng thứ tự trong `DEPLOYMENT.md` (backup → chép code → m005 → khởi động lại app).

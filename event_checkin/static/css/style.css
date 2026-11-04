@@ -4067,3 +4067,37 @@ td.col-num {
   color: var(--danger);
   font-weight: 600;
 }
+
+/* ---- Câu hỏi đăng ký ở trang admin ---- */
+.app-dialog--wide {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.app-dialog__text--pre {
+  white-space: pre-wrap;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.cell-question {
+  max-width: 260px;
+}
+
+.cell-question__btn {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.cell-question__btn:hover {
+  text-decoration: underline;
+}

@@ -64,6 +64,42 @@ window.confirmAsync = function (message, options) {
   });
 };
 
+/* Hộp xem nội dung dài, chỉ có nút Đóng (vd. câu hỏi đăng ký). Nội dung gán bằng textContent (không chèn HTML),
+   giữ nguyên xuống dòng.  Dùng:  window.infoDialog('Tiêu đề', 'Nội dung...') */
+window.infoDialog = function (title, text) {
+  if (typeof HTMLDialogElement === 'undefined') {
+    window.alert(String(title || '') + '\n\n' + String(text || ''));
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'app-dialog app-dialog--wide';
+    const body = document.createElement('div');
+    body.className = 'app-dialog__body';
+    const heading = document.createElement('h2');
+    heading.className = 'app-dialog__title';
+    heading.textContent = String(title || '');
+    const content = document.createElement('p');
+    content.className = 'app-dialog__text app-dialog__text--pre';
+    content.textContent = String(text || '');
+    const actions = document.createElement('div');
+    actions.className = 'app-dialog__actions';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'btn btn--primary';
+    close.textContent = 'Đóng';
+    actions.append(close);
+    body.append(heading, content, actions);
+    dialog.append(body);
+    document.body.append(dialog);
+    close.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+    dialog.addEventListener('close', () => { dialog.remove(); resolve(); });
+    dialog.showModal();
+    close.focus();
+  });
+};
+
 window.appUtils = {
   formatDateTimeVN(dateTimeString) {
     if (!dateTimeString) return '';

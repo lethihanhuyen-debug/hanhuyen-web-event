@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 from flask import Blueprint, Response, current_app, jsonify, make_response, redirect, render_template, request, session, url_for
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font
+from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
@@ -276,11 +276,15 @@ def event_detail(event_id):
             "cert_error": (primary.error_msg or "") if primary else "",
             "cert_sent_at": format_local(primary.cert_sent_at) if primary and primary.cert_sent_at else "",
             "send_count": primary.send_count if primary else 0,
+            "cau_hoi": (registration.cau_hoi or "").strip(),
         })
 
+    question_count = sum(1 for row in rows if row["cau_hoi"])
     return render_template(
         "admin/event_detail.html",
         event=_event_payload(event),
+        # Cột/nút câu hỏi hiện khi sự kiện đang bật công tắc HOẶC đã từng nhận câu hỏi (tắt công tắc không làm mất câu hỏi đã lưu)
+        show_questions=bool(event.cho_phep_cau_hoi) or question_count > 0,
         lucky_ready=db.session.get(LuckyConfig, event_id) is not None,  # đã thiết lập quay số thì mới hiện nút
         rows=rows,
         totals={
@@ -288,6 +292,7 @@ def event_detail(event_id):
             "checkins": len(checkin_map),
             "pending": max(len(rows) - len(checkin_map), 0),
             "emails_sent": sum(1 for info in checkin_map.values() if info["primary"].cert_status == "sent"),
+            "questions": question_count,
         },
     )
 
@@ -989,7 +994,10 @@ def export_event_registrations(event_id):
     sheet = workbook.active
     sheet.title = "Danh sach dang ky"
 
+    include_questions = bool(event.cho_phep_cau_hoi) or any((item.cau_hoi or "").strip() for item in registrations)
     headers = ["STT", "Mã CB/SV", "Họ tên", "Email", "Số điện thoại", "Đơn vị", "Thời gian đăng ký", "Trạng thái"]
+    if include_questions:
+        headers.append("Câu hỏi")
     sheet.append(headers)
     for cell in sheet[1]:
         cell.font = Font(bold=True)
@@ -1006,8 +1014,12 @@ def export_event_registrations(event_id):
             format_utc_as_vn(registration.thoi_gian_dang_ky),
             "Đã check-in" if registration.ma_cbsv in checked_in_codes else "Chưa check-in",
         ])
+        if include_questions:
+            _set_text_cell(sheet.cell(row=position + 1, column=len(headers)), (registration.cau_hoi or "").strip())
 
     column_widths = [6, 16, 26, 28, 16, 24, 20, 16]
+    if include_questions:
+        column_widths.append(60)
     for index, width in enumerate(column_widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
 
@@ -1016,6 +1028,61 @@ def export_event_registrations(event_id):
         workbook,
         f"DanhSachDangKy_{event.ten_su_kien}_{today}.xlsx",
         f"DanhSachDangKy_{_ascii_filename_component(event.ten_su_kien)}_{today}.xlsx",
+    )
+
+
+def _set_text_cell(cell, text):
+    """Ghi văn bản người dùng nhập vào ô Excel dưới dạng CHUỖI thuần, tự xuống dòng.
+    openpyxl coi chuỗi bắt đầu bằng "=" là công thức -> ép kiểu chuỗi để câu hỏi như
+    '=HYPERLINK(...)' không bị Excel chạy như công thức."""
+    cell.value = text
+    cell.data_type = "s"
+    cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+
+@admin_bp.get("/api/admin/events/<int:event_id>/export-questions")
+@admin_required
+def export_event_questions(event_id):
+    """Danh sách câu hỏi (họ tên, đơn vị, câu hỏi, thời gian) để gửi diễn giả/MC."""
+    event = Event.query.get_or_404(event_id)
+    registrations = [
+        item for item in (
+            Registration.query
+            .filter_by(event_id=event_id)
+            .order_by(Registration.thoi_gian_dang_ky.asc())
+            .all()
+        )
+        if (item.cau_hoi or "").strip()
+    ]
+    if not registrations:
+        return jsonify({"success": False, "message": "Chưa có người đăng ký nào gửi câu hỏi."}), 400
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Cau hoi"
+    sheet.append(["STT", "Họ tên", "Đơn vị", "Câu hỏi", "Thời gian đăng ký"])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+
+    for position, registration in enumerate(registrations, start=1):
+        user = registration.user
+        sheet.append([
+            position,
+            user.ho_ten if user else "",
+            user.ten_don_vi if user else "",
+            "",
+            format_utc_as_vn(registration.thoi_gian_dang_ky),
+        ])
+        _set_text_cell(sheet.cell(row=position + 1, column=4), registration.cau_hoi.strip())
+
+    for index, width in enumerate([6, 26, 28, 80, 20], start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+
+    today = now_vn_naive().strftime("%d-%m-%Y")
+    return _xlsx_response(
+        workbook,
+        f"CauHoi_{event.ten_su_kien}_{today}.xlsx",
+        f"CauHoi_{_ascii_filename_component(event.ten_su_kien)}_{today}.xlsx",
     )
 
 

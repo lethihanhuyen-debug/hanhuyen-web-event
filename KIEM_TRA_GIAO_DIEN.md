@@ -69,6 +69,15 @@ Tài liệu cho 2 người kiểm tra. Mỗi người làm hết phần của m�
 - [ ] Mã sai: thông báo không tìm thấy (không lộ lỗi hệ thống)
 - [ ] Mở bằng mã QR/đường dẫn trong email
 
+### 8. Ô câu hỏi ở form đăng ký (sự kiện bật công tắc)
+- [ ] Tạo/sửa sự kiện: công tắc "Cho phép người đăng ký đặt câu hỏi" mặc định **tắt**; bật thì hiện ô "Tiêu đề câu hỏi" (điền sẵn "Câu hỏi bạn muốn gửi đến diễn giả"); lưu rồi mở lại sửa vẫn đúng
+- [ ] Form đăng ký: sự kiện **tắt** không có ô câu hỏi; sự kiện **bật** có ô nhiều dòng, nhãn là tiêu đề admin đặt + "(không bắt buộc)", có bộ đếm x/1000
+- [ ] Để trống vẫn đăng ký được; nhập đúng 1000 ký tự được; dán dài hơn 1000 thì bị cắt về 1000; emoji, tiếng Việt có dấu, ký tự đặc biệt lưu và hiện đúng
+- [ ] Câu hỏi có thẻ HTML (vd. `<script>alert(1)</script>`) hiện nguyên chữ ở trang admin, không chạy
+- [ ] Trang chi tiết sự kiện: cột "Câu hỏi" (rút gọn, bấm xem đầy đủ), chip "Có câu hỏi · n", tìm theo nội dung câu hỏi
+- [ ] "Xuất Excel" có cột "Câu hỏi"; "Xuất câu hỏi" ra file riêng (Họ tên, Đơn vị, Câu hỏi, Thời gian); mở bằng Excel tiếng Việt không lỗi font
+- [ ] Tắt công tắc sau khi đã có câu hỏi: ô biến mất khỏi form đăng ký nhưng admin vẫn xem/xuất được câu hỏi cũ
+
 ---
 
 ## NGƯỜI 2 — Danh sách check-in, chứng chỉ (thiết kế + gửi mail), quay số, quản lý đơn vị
