@@ -61,6 +61,21 @@
         <span>Mô tả</span>
         <textarea name="mo_ta" rows="3"></textarea>
       </label>
+      <div class="field-wide question-setting">
+        <label class="switch-field">
+          <input type="checkbox" id="allowQuestion" name="cho_phep_cau_hoi" role="switch">
+          <span class="switch-field__track" aria-hidden="true"></span>
+          <span class="switch-field__text">
+            <strong>Cho phép người đăng ký đặt câu hỏi</strong>
+            <small>Khi bật, form đăng ký có thêm một ô câu hỏi (không bắt buộc, tối đa 1000 ký tự).</small>
+          </span>
+        </label>
+        <label id="questionTitleField" class="question-setting__title" hidden>
+          <span>Tiêu đề câu hỏi</span>
+          <input name="tieu_de_cau_hoi" id="questionTitle" maxlength="255" value="Câu hỏi bạn muốn gửi đến diễn giả">
+          <small>Nội dung này hiện làm nhãn của ô câu hỏi trên form đăng ký.</small>
+        </label>
+      </div>
       <label class="field-wide event-image-field">
         <span>Hình sự kiện</span>
         <input id="eventImageInput" class="template-input" name="event_image" type="file" accept="image/png,image/jpeg,image/webp">
@@ -317,11 +332,20 @@
     return local.toISOString().slice(0, 16);
   }
 
+  // Công tắc "cho phép đặt câu hỏi": bật mới hiện ô tiêu đề
+  const allowQuestion = document.getElementById('allowQuestion');
+  const questionTitleField = document.getElementById('questionTitleField');
+  function syncQuestionSetting() {
+    questionTitleField.hidden = !allowQuestion.checked;
+  }
+  allowQuestion.addEventListener('change', syncQuestionSetting);
+
   function resetForm() {
     editingEventId = null;
     editingEventData = null;
     submitButton.textContent = 'Lưu sự kiện';
     form.reset();
+    syncQuestionSetting();
     eventImagePreview.hidden = true;
     eventImagePreview.removeAttribute('src');
     message.hidden = true;
@@ -376,6 +400,7 @@
     event.preventDefault();
     const formData = new FormData(form);
     const payload = Object.fromEntries(formData.entries());
+    payload.cho_phep_cau_hoi = allowQuestion.checked ? '1' : '0';  // checkbox bỏ chọn không có trong FormData
     message.hidden = true;
 
     try {
@@ -425,6 +450,9 @@
         input.removeAttribute('min');
       });
       form.mo_ta.value = event.mo_ta || '';
+      allowQuestion.checked = !!event.cho_phep_cau_hoi;
+      form.tieu_de_cau_hoi.value = event.tieu_de_cau_hoi || '';
+      syncQuestionSetting();
       eventImageInput.value = '';
       setImagePreview(event.hinh_url);
       message.hidden = true;

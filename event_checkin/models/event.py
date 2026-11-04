@@ -31,6 +31,13 @@ class Event(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime)
 
+    DEFAULT_QUESTION_TITLE = "Câu hỏi bạn muốn gửi đến diễn giả"
+
+    @property
+    def question_title(self):
+        """Tiêu đề hiển thị của ô câu hỏi: admin tự đặt, trống thì dùng mặc định."""
+        return (self.tieu_de_cau_hoi or "").strip() or self.DEFAULT_QUESTION_TITLE
+
     @property
     def computed_status(self):
         """Live event status derived from the schedule, not the stored `trang_thai`

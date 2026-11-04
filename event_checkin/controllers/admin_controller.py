@@ -94,6 +94,29 @@ def _parse_capacity(raw_value):
     return value
 
 
+QUESTION_TITLE_MAX = 255
+
+
+def _parse_question_settings(payload, current=None):
+    """Đọc công tắc "cho phép đặt câu hỏi" + tiêu đề từ payload tạo/sửa sự kiện.
+    Trả (cho_phep, tieu_de) hoặc ném ValueError(thông báo). Khóa không có trong payload thì giữ giá trị
+    hiện tại (current) -- để một lần sửa sự kiện không liên quan không vô tình tắt công tắc."""
+    if "cho_phep_cau_hoi" in payload:
+        raw = payload.get("cho_phep_cau_hoi")
+        enabled = raw is True or str(raw).strip().lower() in {"1", "true", "yes", "on"}
+    else:
+        enabled = bool(current.cho_phep_cau_hoi) if current else False
+
+    if "tieu_de_cau_hoi" in payload:
+        title = " ".join(str(payload.get("tieu_de_cau_hoi") or "").split())  # gọn khoảng trắng thừa
+        if len(title) > QUESTION_TITLE_MAX:
+            raise ValueError(f"Tiêu đề câu hỏi tối đa {QUESTION_TITLE_MAX} ký tự.")
+        title = title or Event.DEFAULT_QUESTION_TITLE
+    else:
+        title = (current.tieu_de_cau_hoi if current else None) or Event.DEFAULT_QUESTION_TITLE
+    return enabled, title
+
+
 def _event_payload(event):
     certificate_layout = json.loads(event.certificate_layout) if event.certificate_layout else {}
     for config in certificate_layout.values():
@@ -124,6 +147,8 @@ def _event_payload(event):
         "certificate_template": event.certificate_template,
         "certificate_template_url": url_for("static", filename=event.certificate_template) if event.certificate_template else None,
         "certificate_layout": certificate_layout,
+        "cho_phep_cau_hoi": bool(event.cho_phep_cau_hoi),
+        "tieu_de_cau_hoi": event.question_title,
     }
 
 
@@ -1257,6 +1282,11 @@ def create_event():
     except ValueError:
         return jsonify({"success": False, "message": "Số lượng tham gia phải là số nguyên dương."}), 400
 
+    try:
+        cho_phep_cau_hoi, tieu_de_cau_hoi = _parse_question_settings(payload)
+    except ValueError as error:
+        return jsonify({"success": False, "message": str(error)}), 400
+
     event = Event(
         ten_su_kien=ten_su_kien,
         hinh=(payload.get("hinh") or "").strip() or None,
@@ -1264,6 +1294,8 @@ def create_event():
         dia_diem=(payload.get("dia_diem") or "").strip() or None,
         co_so=co_so,
         so_luong_toi_da=so_luong_toi_da,
+        cho_phep_cau_hoi=cho_phep_cau_hoi,
+        tieu_de_cau_hoi=tieu_de_cau_hoi,
         ngay_bat_dau=ngay_bat_dau,
         ngay_ket_thuc=ngay_ket_thuc,
         thang=ngay_bat_dau.month,
@@ -1323,6 +1355,11 @@ def update_event(event_id):
     except ValueError:
         return jsonify({"success": False, "message": "Số lượng tham gia phải là số nguyên dương."}), 400
 
+    try:
+        cho_phep_cau_hoi, tieu_de_cau_hoi = _parse_question_settings(payload, current=event)
+    except ValueError as error:
+        return jsonify({"success": False, "message": str(error)}), 400
+
     event.ten_su_kien = ten_su_kien
     if "hinh" in payload:
         event.hinh = (payload.get("hinh") or "").strip() or None
@@ -1330,6 +1367,9 @@ def update_event(event_id):
     event.dia_diem = (payload.get("dia_diem") or "").strip() or None
     event.co_so = co_so
     event.so_luong_toi_da = so_luong_toi_da
+    # Tắt công tắc chỉ ẩn ô trên form đăng ký, KHÔNG xóa câu hỏi đã lưu ở các lượt đăng ký
+    event.cho_phep_cau_hoi = cho_phep_cau_hoi
+    event.tieu_de_cau_hoi = tieu_de_cau_hoi
     event.ngay_bat_dau = ngay_bat_dau
     event.ngay_ket_thuc = ngay_ket_thuc
     event.thang = ngay_bat_dau.month
