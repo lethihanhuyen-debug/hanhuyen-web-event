@@ -15,6 +15,8 @@ from event_checkin.models.user import User
 register_bp = Blueprint("register", __name__)
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 PHONE_PATTERN = re.compile(r"^\d{9,11}$")
+QUESTION_MAX_LENGTH = 1000
+CRLF, CR, LF = chr(13) + chr(10), chr(13), chr(10)  # chuẩn hoá xuống dòng của câu hỏi về LF
 MONTH_GROUPS_PER_PAGE = 3
 CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
 
@@ -291,6 +293,17 @@ def register():
     if not event.is_registration_open:
         return jsonify({"success": False, "message": event.registration_block_reason}), 400
 
+    # Ô câu hỏi (tuỳ chọn, chỉ khi sự kiện bật): bỏ khoảng trắng thừa, chuẩn hoá xuống dòng, tối đa 1000 ký tự.
+    # Trống thì lưu NULL. Sự kiện đang tắt công tắc thì bỏ qua giá trị gửi lên. Kiểm tra trước khi động tới
+    # User/Registration để đăng ký bị từ chối không để lại tác dụng phụ nào.
+    cau_hoi = None
+    if event.cho_phep_cau_hoi:
+        cau_hoi_raw = payload.get("cau_hoi")
+        cau_hoi_text = (str(cau_hoi_raw).replace(CRLF, LF).replace(CR, LF).strip()) if cau_hoi_raw else ""
+        if len(cau_hoi_text) > QUESTION_MAX_LENGTH:
+            return jsonify({"success": False, "message": f"Câu hỏi tối đa {QUESTION_MAX_LENGTH} ký tự (hiện có {len(cau_hoi_text)})."}), 400
+        cau_hoi = cau_hoi_text or None
+
     # Checked before touching User/Registration so a duplicate-registration attempt
     # (which is rejected below) never has the side effect of overwriting the
     # already-registered user's profile fields.
@@ -351,6 +364,7 @@ def register():
         ma_cbsv=ma_cbsv,
         event_id=event_id,
         thoi_gian_dang_ky=now,
+        cau_hoi=cau_hoi,
     )
     db.session.add(registration)
     try:

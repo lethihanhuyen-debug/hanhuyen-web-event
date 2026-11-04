@@ -4040,3 +4040,30 @@ td.col-num {
 .question-setting__title[hidden] {
   display: none;
 }
+
+/* ---- Ô câu hỏi ở form đăng ký ---- */
+.question-field {
+  grid-column: 1 / -1;
+}
+
+.question-field__optional {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.question-field textarea {
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+}
+
+.question-field__counter {
+  justify-self: end;
+  color: var(--muted);
+}
+
+.question-field__counter.is-limit {
+  color: var(--danger);
+  font-weight: 600;
+}
