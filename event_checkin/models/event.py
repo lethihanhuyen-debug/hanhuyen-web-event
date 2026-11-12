@@ -65,7 +65,7 @@ class Event(db.Model):
     @property
     def checkin_deadline(self):
         """Mốc cuối staff còn check-in được = giờ kết thúc + CHECKIN_GRACE_HOURS (config.py)."""
-        hours = current_app.config.get("CHECKIN_GRACE_HOURS", 2)
+        hours = current_app.config.get("CHECKIN_GRACE_HOURS", 5)
         return self.ngay_ket_thuc + timedelta(hours=hours)
 
     @property

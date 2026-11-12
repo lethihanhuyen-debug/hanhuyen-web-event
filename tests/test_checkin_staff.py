@@ -189,7 +189,7 @@ class GracePeriodTest(AppTestCase):
             User.query.filter(User.ma_cbsv.in_([v[1] for v in cls.events.values()])).delete(synchronize_session=False)
             Event.query.filter(Event.id.in_(ids)).delete(synchronize_session=False)
             db.session.commit()
-        app.config["CHECKIN_GRACE_HOURS"] = cls.old_grace if cls.old_grace is not None else 2
+        app.config["CHECKIN_GRACE_HOURS"] = cls.old_grace if cls.old_grace is not None else 5
         super().tearDownClass()
 
     def test_within_grace_staff_can_checkin_and_sees_notice(self):
