@@ -27,6 +27,8 @@ class CheckinRecord(db.Model):
     # Không ràng buộc khoá ngoại sang users: sau này tra Sierra thì người chưa
     # đăng ký trên web vẫn check-in được.
     patron_code = db.Column(db.String(50), nullable=False)
+    # Ai bấm check-in (m006). NULL với lượt check-in cũ, lượt import và lượt admin thêm tay trước khi có phân quyền.
+    checked_in_by = db.Column(db.Integer, db.ForeignKey("admins.id"))
     checkin_at = db.Column(db.DateTime, nullable=False, default=now_vn_naive)
     cert_status = db.Column(db.String(20), nullable=False, default="pending")
     patron_name = db.Column(db.String(255))

@@ -30,6 +30,8 @@ class Event(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey("admins.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime)
+    # Ai sửa gần nhất (m006); NULL với sự kiện chưa từng sửa sau khi có phân quyền.
+    updated_by = db.Column(db.Integer, db.ForeignKey("admins.id"))
 
     DEFAULT_QUESTION_TITLE = "Câu hỏi bạn muốn gửi đến diễn giả"
 

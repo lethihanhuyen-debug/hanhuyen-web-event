@@ -4,6 +4,8 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 from event_checkin.models.admin import Admin  # noqa: E402,F401
+from event_checkin.models.audit_log import AuditLog  # noqa: E402,F401
+from event_checkin.models.password_reset import PasswordReset  # noqa: E402,F401
 from event_checkin.models.certificate import Certificate  # noqa: E402,F401
 from event_checkin.models.checkin import CheckIn  # noqa: E402,F401
 from event_checkin.models.checkin_record import CheckinRecord  # noqa: E402,F401

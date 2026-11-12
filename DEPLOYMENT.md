@@ -329,5 +329,10 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
        OR (TABLE_NAME = 'registrations' AND COLUMN_NAME = 'cau_hoi'));
   ```
   Câu hỏi có thể chứa emoji: cột/bảng cần bộ ký tự `utf8mb4` (mặc định của MySQL 8 và `?charset=utf8mb4` trong chuỗi kết nối). Kiểm tra: `SHOW FULL COLUMNS FROM registrations LIKE 'cau_hoi';` cột `Collation` phải bắt đầu bằng `utf8mb4`.
+- **Bản cập nhật phân quyền 3 cấp (11/2026, đang triển khai theo từng bước — đợt này mới có migration m006 + model)**: thêm cột `admins.email/must_change_password/session_version/last_login_at`, `events.updated_by`, `checkin_records.checked_in_by` và 2 bảng `audit_logs`, `password_resets`; không sửa/xóa dữ liệu cũ. Tài khoản hiện có mà `role` không thuộc `super_admin/admin/staff` được gán `super_admin`. Làm đúng thứ tự như m005 (backup DB → `git pull` → chạy m006 → `Restart-Service EventCheckinApp`; **không khởi động lại app trước khi chạy m006**):
+  ```powershell
+  .venv\Scripts\python -m event_checkin.migrations.m006_phan_quyen
+  .venv\Scripts\python -m event_checkin.migrations.m006_phan_quyen --check   # mã thoát 0 + dòng "OK" là đạt
+  ```
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.
