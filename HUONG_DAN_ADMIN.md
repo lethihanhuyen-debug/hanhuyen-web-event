@@ -185,4 +185,4 @@ Vào **Quản trị → Quản lý tài khoản**.
 Chỉ quản trị cao cấp thấy nút **Xóa**. Hộp xác nhận ghi rõ số người đăng ký, số lượt check-in và chứng chỉ sẽ mất vĩnh viễn.
 
 ### 10.5. Check-in
-Check-in cần đăng nhập (nhân viên check-in trở lên); người tham dự không tự check-in. Quét một mã đã check-in thì trang cảnh báo "đã check-in lúc … bởi …" nhưng lượt quét vẫn được ghi, người đó chỉ nhận một chứng chỉ. Sự kiện đã kết thúc vẫn check-in được trong một khoảng thời gian ngắn (mặc định 2 giờ), sau đó chỉ quản trị viên thêm tay.
+Check-in cần đăng nhập (nhân viên check-in trở lên); người tham dự không tự check-in. Quét một mã đã check-in thì trang cảnh báo "đã check-in lúc … bởi …" nhưng lượt quét vẫn được ghi, người đó chỉ nhận một chứng chỉ. Sự kiện đã kết thúc vẫn check-in được trong một khoảng thời gian ngắn (mặc định 5 giờ), sau đó chỉ quản trị viên thêm tay.

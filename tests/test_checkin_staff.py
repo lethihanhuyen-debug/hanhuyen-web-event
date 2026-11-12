@@ -232,6 +232,10 @@ class GracePeriodTest(AppTestCase):
         r = admin.post(f"/api/admin/events/{event_id}/checkins", json={"patron_code": code})
         self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
 
+    def test_default_is_5_hours(self):
+        from config import Config
+        self.assertEqual(Config.CHECKIN_GRACE_HOURS, 5)   # mặc định khi .env không đặt CHECKIN_GRACE_HOURS
+
     def test_grace_hours_is_configurable(self):
         event_id, code, end = self.events["closed"]         # đã kết thúc 3 giờ trước
         app.config["CHECKIN_GRACE_HOURS"] = 76
