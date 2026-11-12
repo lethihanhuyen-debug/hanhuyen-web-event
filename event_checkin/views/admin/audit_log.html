@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}Nhật ký hoạt động | Quản trị{% endblock %}
+
+{% block head %}
+<style>
+  .audit-filters { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: end; margin-bottom: var(--space-4); }
+  .audit-filters label { display: grid; gap: var(--space-1); font-weight: 600; font-size: var(--text-sm); }
+  .audit-detail { max-width: 340px; overflow-wrap: anywhere; font-size: var(--text-xs); color: var(--soft-taupe); }
+  .audit-pager { display: flex; gap: var(--space-3); align-items: center; justify-content: flex-end; padding: var(--space-3) 0; }
+</style>
+{% endblock %}
+
+{% block container_class %}container--wide{% endblock %}
+
+{% block content %}
+<section class="admin-panel admin-panel--wide">
+  <div class="staff-titlebar">
+    <p class="eyebrow">Quản trị</p>
+    <a class="btn btn--back" href="{{ url_for('admin.index') }}">← Quay lại</a>
+  </div>
+  <div class="panel-head">
+    <div>
+      <h1>Nhật ký hoạt động</h1>
+      <p class="muted">Ai đã làm gì, lúc nào, từ địa chỉ IP nào. Giờ hiển thị theo giờ Việt Nam. Nhật ký chỉ xem, không sửa hay xóa được.</p>
+    </div>
+  </div>
+
+  <form id="filterForm" class="audit-filters">
+    <label>Người thực hiện
+      <input name="user" type="search" placeholder="Tên đăng nhập" autocomplete="off">
+    </label>
+    <label>Loại thao tác
+      <select name="action">
+        <option value="">Tất cả</option>
+        {% for value, label in actions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Từ ngày <input name="from" type="date"></label>
+    <label>Đến ngày <input name="to" type="date"></label>
+    <button class="btn btn--primary" type="submit">Lọc</button>
+    <button class="btn btn--ghost" type="button" id="clearButton">Xóa bộ lọc</button>
+  </form>
+
+  <div id="pageMessage" class="message message--error" hidden></div>
+
+  <div class="table-card">
+    <div class="table-scroll">
+      <table class="list-table list-table--people">
+        <thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Thao tác</th><th>Đối tượng</th><th>Chi tiết</th><th>IP</th></tr></thead>
+        <tbody id="auditRows"><tr><td colspan="6" class="table-empty">Đang tải…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="audit-pager">
+      <span id="pagerInfo" class="muted"></span>
+      <button class="btn btn--ghost btn--sm" id="prevButton" type="button">← Trước</button>
+      <button class="btn btn--ghost btn--sm" id="nextButton" type="button">Sau →</button>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const form = $('filterForm');
+  const body = $('auditRows');
+  let page = 1;
+  let pages = 1;
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  async function load() {
+    const params = new URLSearchParams({ page });
+    ['user', 'action', 'from', 'to'].forEach((name) => { if (form[name].value) params.set(name, form[name].value); });
+    // apiFetchQuiet: 401 xử lý chung; lỗi khác hiện ngay trong trang
+    const response = await apiFetchQuiet('/api/admin/audit-logs?' + params.toString());
+    const data = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
+    $('pageMessage').hidden = data.success;
+    if (!data.success) { $('pageMessage').textContent = data.message || 'Không tải được nhật ký.'; return; }
+    pages = Math.max(Math.ceil(data.total / data.page_size), 1);
+    body.replaceChildren();
+    if (!data.data.length) {
+      const tr = el('tr'); const td = el('td', 'table-empty', 'Không có dòng nhật ký nào khớp bộ lọc.'); td.colSpan = 6; tr.append(td); body.append(tr);
+    }
+    data.data.forEach((row) => {
+      const tr = el('tr');
+      const detail = el('td', 'audit-detail', row.detail);
+      tr.append(el('td', '', row.time), el('td', '', row.username), el('td', '', row.action_label), el('td', '', row.target), detail, el('td', '', row.ip));
+      body.append(tr);
+    });
+    $('pagerInfo').textContent = 'Trang ' + page + '/' + pages + ' · ' + data.total + ' dòng';
+    $('prevButton').disabled = page <= 1;
+    $('nextButton').disabled = page >= pages;
+  }
+
+  form.addEventListener('submit', (event) => { event.preventDefault(); page = 1; load(); });
+  $('clearButton').addEventListener('click', () => { form.reset(); page = 1; load(); });
+  $('prevButton').addEventListener('click', () => { if (page > 1) { page -= 1; load(); } });
+  $('nextButton').addEventListener('click', () => { if (page < pages) { page += 1; load(); } });
+  load();
+})();
+</script>
+{% endblock %}

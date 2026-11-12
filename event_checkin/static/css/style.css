@@ -4157,3 +4157,18 @@ td.col-num {
     padding: 0 var(--space-3);
   }
 }
+
+/* Liên kết phụ dưới nút chính của trang đăng nhập / quên mật khẩu */
+.auth-forgot {
+  margin: var(--space-3) 0 0;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+
+.auth-forgot a {
+  color: var(--color-primary-dark);
+}
+
+/* Tên + vai trò là liên kết sang trang Đổi mật khẩu */
+.header-user { text-decoration: none; }
+.header-user:hover .header-user__name { text-decoration: underline; }

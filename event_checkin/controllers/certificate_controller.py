@@ -2,6 +2,7 @@ from flask import Blueprint, abort, jsonify, render_template, request, send_file
 
 from event_checkin import permissions as perm
 from event_checkin.access import access
+from event_checkin.audit import audited
 from event_checkin.certificates.service import (
     CertificateError,
     DEFAULT_EVENT_ID,
@@ -16,6 +17,7 @@ certificate_bp = Blueprint("certificates", __name__)
 
 @certificate_bp.post("/api/certificates/generate")
 @access(perm.CERTIFICATE_MANAGE)
+@audited("certificate.generate")
 def generate():
     payload = request.get_json(silent=True) or request.form
     ma_cbsv = (payload.get("ma_cbsv") or "").strip()

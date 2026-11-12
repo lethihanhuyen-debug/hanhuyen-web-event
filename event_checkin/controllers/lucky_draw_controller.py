@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from event_checkin import permissions as perm
 from event_checkin.access import access
+from event_checkin.audit import audited
 from event_checkin.controllers.admin_controller import (
     _ascii_filename_component,
     _xlsx_response,
@@ -418,6 +419,7 @@ def _read_background(file):
 
 @lucky_bp.put("/api/admin/lucky-draw/<int:event_id>/setup")
 @access(perm.LUCKY_MANAGE)
+@audited("lucky.setup", "event", "event_id")
 def lucky_save_setup(event_id):
     """Lưu cả thiết lập (giải, tuỳ chọn, ảnh nền) trong 1 transaction: lỗi thì không đổi gì trong DB."""
     event = Event.query.get_or_404(event_id)
@@ -522,6 +524,7 @@ def lucky_save_setup(event_id):
 
 @lucky_bp.delete("/api/admin/lucky-draw/<int:event_id>")
 @access(perm.LUCKY_MANAGE)
+@audited("lucky.delete", "event", "event_id")
 def lucky_delete_setup(event_id):
     """Xóa thiết lập: giải thưởng, kết quả (kể cả bản hủy), ảnh nền -- trong 1 transaction.
     KHÔNG xóa sự kiện và dữ liệu check-in. Đã có kết quả thì phải gõ lại đúng tên sự kiện."""
@@ -562,6 +565,7 @@ def _get_prize(event_id, prize_id):
 
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/draw")
 @access(perm.LUCKY_MANAGE)
+@audited("lucky.draw", "event", "event_id")
 def lucky_draw(event_id):
     """Quay 1 người cho giải prize_id. Kết quả ở trạng thái chờ (pending) đến khi Lưu hoặc Quay lại."""
     Event.query.get_or_404(event_id)
@@ -610,6 +614,7 @@ def lucky_draw(event_id):
 
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/confirm")
 @access(perm.LUCKY_MANAGE)
+@audited("lucky.confirm", "event", "event_id")
 def lucky_confirm(event_id):
     """Lưu: chốt kết quả đang chờ."""
     Event.query.get_or_404(event_id)
@@ -625,6 +630,7 @@ def lucky_confirm(event_id):
 
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/reject")
 @access(perm.LUCKY_MANAGE)
+@audited("lucky.reject", "event", "event_id")
 def lucky_reject(event_id):
     """Quay lại: bỏ kết quả đang chờ (chưa Lưu nên xóa hẳn, người đó quay lại danh sách quay)."""
     Event.query.get_or_404(event_id)
@@ -638,6 +644,7 @@ def lucky_reject(event_id):
 
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/winners/<int:winner_id>/cancel")
 @access(perm.LUCKY_MANAGE)
+@audited("lucky.cancel_winner", "event", "event_id")
 def lucky_cancel(event_id, winner_id):
     """Hủy người vắng mặt: giữ bản ghi để đối chiếu, người này quay lại danh sách quay."""
     Event.query.get_or_404(event_id)
@@ -658,6 +665,7 @@ def lucky_cancel(event_id, winner_id):
 
 @lucky_bp.get("/api/admin/lucky-draw/<int:event_id>/export")
 @access(perm.LUCKY_MANAGE)
+@audited("export.lucky", "event", "event_id")
 def lucky_export(event_id):
     event = Event.query.get_or_404(event_id)
     _require_config(event_id)

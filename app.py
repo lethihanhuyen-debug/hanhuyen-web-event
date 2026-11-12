@@ -8,10 +8,12 @@ from werkzeug.security import generate_password_hash
 
 from config import Config
 from event_checkin.access import init_access
+from event_checkin.controllers.account_controller import account_bp
 from event_checkin.controllers.admin_controller import admin_bp
 from event_checkin.controllers.certificate_controller import certificate_bp
 from event_checkin.controllers.checkin_controller import checkin_bp
 from event_checkin.controllers.lucky_draw_controller import lucky_bp
+from event_checkin.controllers.password_controller import password_bp
 from event_checkin.controllers.register_controller import register_bp
 from event_checkin.controllers.staff_controller import staff_bp
 from event_checkin.extensions import mail
@@ -156,6 +158,8 @@ def create_app():
     app.register_blueprint(certificate_bp)
     app.register_blueprint(lucky_bp)
     app.register_blueprint(staff_bp)
+    app.register_blueprint(password_bp)
+    app.register_blueprint(account_bp)
 
     with app.app_context():
         db.create_all()

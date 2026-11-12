@@ -7,6 +7,7 @@ Cách chạy (PowerShell, tại thư mục gốc dự án):
 import secrets
 import sys
 import unittest
+from datetime import datetime, timedelta
 
 from werkzeug.security import generate_password_hash
 
@@ -24,6 +25,8 @@ if not Config.MYSQL_DATABASE.endswith("_test"):
 from app import app  # noqa: E402  (phải import SAU khi kiểm tra tên DB)
 from event_checkin.models import db  # noqa: E402
 from event_checkin.models.admin import Admin  # noqa: E402
+from event_checkin.models.audit_log import AuditLog  # noqa: E402
+from event_checkin.models.password_reset import PasswordReset  # noqa: E402
 
 TEST_PASSWORD = "Test1234x"
 
@@ -38,6 +41,8 @@ class AppTestCase(unittest.TestCase):
         cls.app = app
         cls.suffix = secrets.token_hex(3)
         cls.accounts = {}
+        cls.extra_admin_ids = []          # tài khoản tạo thêm trong test, xóa ở tearDownClass
+        cls.started_at = datetime.utcnow() - timedelta(seconds=2)
         with app.app_context():
             for role in ("super_admin", "admin", "staff"):
                 username = f"t_{role}_{cls.suffix}"
@@ -50,8 +55,12 @@ class AppTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         with app.app_context():
-            for admin_id, _username in cls.accounts.values():
-                Admin.query.filter_by(id=admin_id).delete()
+            ids = [admin_id for admin_id, _username in cls.accounts.values()] + list(cls.extra_admin_ids)
+            PasswordReset.query.filter(PasswordReset.admin_id.in_(ids)).delete(synchronize_session=False)
+            # tài khoản do tài khoản khác tạo trỏ created_by về nhau: gỡ liên kết trước khi xóa
+            Admin.query.filter(Admin.created_by.in_(ids)).update({"created_by": None}, synchronize_session=False)
+            Admin.query.filter(Admin.id.in_(ids)).delete(synchronize_session=False)
+            AuditLog.query.filter(AuditLog.created_at >= cls.started_at).delete(synchronize_session=False)  # dọn nhật ký do test sinh ra
             db.session.commit()
 
     def client_for(self, role=None):

@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+{% block title %}Quản lý tài khoản | Quản trị{% endblock %}
+
+{% block head %}
+<style>
+  .acc-dialog { max-width: min(520px, 94vw); width: 100%; }
+  .acc-dialog__body { padding: var(--space-5); display: grid; gap: var(--space-3); }
+  .acc-dialog h2 { margin: 0; font-size: var(--text-xl); }
+  .acc-dialog label { display: grid; gap: var(--space-1); font-weight: 600; }
+  .acc-dialog input, .acc-dialog select { width: 100%; }
+  .acc-dialog__actions { display: flex; gap: var(--space-3); justify-content: flex-end; flex-wrap: wrap; }
+  .acc-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+  .acc-you { margin-left: var(--space-2); }
+</style>
+{% endblock %}
+
+{% block container_class %}container--wide{% endblock %}
+
+{% block content %}
+<section class="admin-panel admin-panel--wide">
+  <div class="staff-titlebar">
+    <p class="eyebrow">Quản trị</p>
+    <a class="btn btn--back" href="{{ url_for('admin.index') }}">← Quay lại</a>
+  </div>
+  <div class="panel-head">
+    <div>
+      <h1>Quản lý tài khoản</h1>
+      <p class="muted">Tạo, khóa, xóa tài khoản và đổi vai trò. Mật khẩu tạm chỉ hiện một lần khi tạo hoặc đặt lại; người dùng phải đổi mật khẩu ở lần đăng nhập đầu.</p>
+    </div>
+    <div class="panel-actions panel-actions--row">
+      <button id="addButton" class="btn btn--primary" type="button">+ Thêm tài khoản</button>
+    </div>
+  </div>
+
+  <div id="pageMessage" class="message" hidden role="status"></div>
+
+  <div class="table-card">
+    <div class="list-toolbar">
+      <label class="list-search">
+        <span class="sr-only">Tìm theo tên đăng nhập hoặc email</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"></path><path d="m21 21-4.3-4.3"></path></svg>
+        <input id="searchInput" type="search" placeholder="Tìm tên đăng nhập, email…" autocomplete="off">
+      </label>
+    </div>
+    <div class="table-scroll">
+      <table class="list-table list-table--people">
+        <thead>
+          <tr>
+            <th>Tài khoản</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Đăng nhập gần nhất</th>
+            <th class="col-actions"><span class="sr-only">Thao tác</span></th>
+          </tr>
+        </thead>
+        <tbody id="accountRows"><tr><td colspan="6" class="table-empty">Đang tải…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<dialog id="createDialog" class="acc-dialog app-dialog">
+  <form method="dialog" class="acc-dialog__body" id="createForm">
+    <h2>Thêm tài khoản</h2>
+    <label>Tên đăng nhập
+      <input name="username" type="text" autocomplete="off" maxlength="50" required placeholder="vd. nv_checkin_1">
+    </label>
+    <label>Vai trò
+      <select name="role" required>
+        {% for value, label in roles %}<option value="{{ value }}" {{ 'selected' if value == 'staff' }}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Email (tùy chọn, dùng cho “Quên mật khẩu”)
+      <input name="email" type="email" autocomplete="off" placeholder="ten@truong.edu.vn">
+    </label>
+    <div id="createError" class="message message--error" hidden></div>
+    <div class="acc-dialog__actions">
+      <button type="button" class="btn btn--ghost" id="createCancel">Hủy</button>
+      <button type="submit" class="btn btn--primary">Tạo tài khoản</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="editDialog" class="acc-dialog app-dialog">
+  <form method="dialog" class="acc-dialog__body" id="editForm">
+    <h2 id="editTitle">Sửa tài khoản</h2>
+    <label>Vai trò
+      <select name="role" required>
+        {% for value, label in roles %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Email
+      <input name="email" type="email" autocomplete="off" placeholder="ten@truong.edu.vn">
+    </label>
+    <div id="editError" class="message message--error" hidden></div>
+    <div class="acc-dialog__actions">
+      <button type="button" class="btn btn--ghost" id="editCancel">Hủy</button>
+      <button type="submit" class="btn btn--primary">Lưu</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const body = $('accountRows');
+  const pageMessage = $('pageMessage');
+  let accounts = [];
+  let editing = null;
+  let searchTimer = null;
+
+  function say(text, kind) {
+    pageMessage.hidden = !text;
+    pageMessage.className = 'message message--' + (kind || 'success');
+    pageMessage.textContent = text || '';
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  async function call(url, options) {
+    // apiFetchQuiet: 401 xử lý chung; message lỗi (kể cả 403/409) hiện ngay trong trang bằng say()
+    const response = await apiFetchQuiet(url, options);
+    return response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
+  }
+  const send = (method, url, data) => call(url, {
+    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}),
+  });
+
+  async function load() {
+    const query = $('searchInput').value.trim();
+    const data = await call('/api/admin/accounts' + (query ? '?q=' + encodeURIComponent(query) : ''));
+    if (!data.success) { say(data.message || 'Không tải được danh sách.', 'error'); return; }
+    accounts = data.data;
+    render();
+  }
+
+  function render() {
+    body.replaceChildren();
+    if (!accounts.length) {
+      const tr = el('tr'); const td = el('td', 'table-empty', 'Không có tài khoản nào khớp.'); td.colSpan = 6; tr.append(td); body.append(tr);
+      return;
+    }
+    accounts.forEach((acc) => {
+      const tr = el('tr');
+      const who = el('td'); const name = el('strong', '', acc.username); who.append(name);
+      if (acc.is_self) who.append(el('span', 'badge badge--success acc-you', 'Bạn'));
+      const email = el('td', '', acc.email || '—');
+      const role = el('td'); role.append(el('span', 'badge ' + (acc.role === 'super_admin' ? 'badge--warning' : (acc.role === 'admin' ? 'badge--success' : 'badge--muted')), acc.role_label));
+      const state = el('td');
+      state.append(el('span', 'badge ' + (acc.is_active ? 'badge--success' : 'badge--danger'), acc.is_active ? 'Hoạt động' : 'Đã khóa'));
+      if (acc.must_change_password) { state.append(document.createTextNode(' ')); state.append(el('span', 'badge badge--warning', 'Chờ đổi mật khẩu')); }
+      const last = el('td', '', acc.last_login_at || 'Chưa đăng nhập');
+      const actions = el('td', 'col-actions'); const box = el('div', 'acc-row-actions');
+      const mk = (label, cls, handler) => { const b = el('button', 'btn btn--sm ' + cls, label); b.type = 'button'; b.addEventListener('click', handler); return b; };
+      box.append(mk('Sửa', 'btn--ghost', () => openEdit(acc)));
+      if (!acc.is_self) {
+        box.append(mk('Đặt lại mật khẩu', 'btn--ghost', () => resetPassword(acc)));
+        box.append(mk(acc.is_active ? 'Khóa' : 'Mở khóa', 'btn--ghost', () => toggleLock(acc)));
+        box.append(mk('Xóa', 'btn--danger', () => removeAccount(acc)));
+      }
+      actions.append(box);
+      tr.append(who, email, role, state, last, actions);
+      body.append(tr);
+    });
+  }
+
+  function showTempPassword(title, username, password) {
+    return infoDialog(title,
+      'Tên đăng nhập: ' + username + '\nMật khẩu tạm: ' + password + '\n\nMật khẩu này CHỈ HIỆN MỘT LẦN, hãy chép và gửi cho người dùng. ' +
+      'Họ sẽ phải đổi mật khẩu ngay ở lần đăng nhập đầu tiên.');
+  }
+
+  // ---- Thêm
+  $('addButton').addEventListener('click', () => { $('createForm').reset(); $('createError').hidden = true; $('createDialog').showModal(); });
+  $('createCancel').addEventListener('click', () => $('createDialog').close());
+  $('createForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = await send('POST', '/api/admin/accounts', { username: form.username.value, role: form.role.value, email: form.email.value });
+    if (!data.success) { $('createError').textContent = data.message || 'Không tạo được tài khoản.'; $('createError').hidden = false; return; }
+    $('createDialog').close();
+    say(data.message, 'success');
+    await showTempPassword('Đã tạo tài khoản', data.data.username, data.temp_password);
+    load();
+  });
+
+  // ---- Sửa vai trò / email
+  function openEdit(acc) {
+    editing = acc;
+    const form = $('editForm');
+    $('editTitle').textContent = 'Sửa tài khoản ' + acc.username;
+    form.role.value = acc.role;
+    form.role.disabled = acc.is_self;      // không tự đổi vai trò của chính mình
+    form.email.value = acc.email || '';
+    $('editError').hidden = true;
+    $('editDialog').showModal();
+  }
+  $('editCancel').addEventListener('click', () => $('editDialog').close());
+  $('editForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const payload = { email: form.email.value };
+    if (!editing.is_self && form.role.value !== editing.role) {
+      const labelOf = (value) => form.role.querySelector('option[value="' + value + '"]').textContent;
+      if (!await confirmAsync('Đổi vai trò của ' + editing.username + ' từ “' + labelOf(editing.role) + '” sang “' + labelOf(form.role.value) + '”?\nTài khoản này sẽ bị đăng xuất khỏi mọi thiết bị và phải đăng nhập lại.', { okText: 'Đổi vai trò', danger: true })) return;
+      payload.role = form.role.value;
+    }
+    const data = await send('PUT', '/api/admin/accounts/' + editing.id, payload);
+    if (!data.success) { $('editError').textContent = data.message || 'Không lưu được.'; $('editError').hidden = false; return; }
+    $('editDialog').close();
+    say(data.message, 'success');
+    load();
+  });
+
+  // ---- Đặt lại mật khẩu / khóa / xóa
+  async function resetPassword(acc) {
+    if (!await confirmAsync('Đặt lại mật khẩu cho ' + acc.username + '?\nMật khẩu cũ sẽ không dùng được nữa và tài khoản bị đăng xuất khỏi mọi thiết bị.', { okText: 'Đặt lại', danger: true })) return;
+    const data = await send('POST', '/api/admin/accounts/' + acc.id + '/reset-password');
+    if (!data.success) { say(data.message || 'Không đặt lại được.', 'error'); return; }
+    say(data.message, 'success');
+    await showTempPassword('Mật khẩu tạm mới', acc.username, data.temp_password);
+    load();
+  }
+  async function toggleLock(acc) {
+    if (acc.is_active && !await confirmAsync('Khóa tài khoản ' + acc.username + '?\nHọ sẽ bị đăng xuất ngay và không đăng nhập được cho đến khi mở khóa.', { okText: 'Khóa', danger: true })) return;
+    const data = await send('POST', '/api/admin/accounts/' + acc.id + (acc.is_active ? '/lock' : '/unlock'));
+    say(data.message || (data.success ? 'Đã cập nhật.' : 'Không thực hiện được.'), data.success ? 'success' : 'error');
+    load();
+  }
+  async function removeAccount(acc) {
+    if (!await confirmAsync('Xóa tài khoản ' + acc.username + '?\nHành động này không thể hoàn tác. Tài khoản đã gắn với dữ liệu (sự kiện, lượt check-in) sẽ không xóa được, khi đó hãy khóa tài khoản.')) return;
+    const data = await call('/api/admin/accounts/' + acc.id, { method: 'DELETE' });
+    say(data.message || (data.success ? 'Đã xóa.' : 'Không xóa được.'), data.success ? 'success' : 'error');
+    load();
+  }
+
+  $('searchInput').addEventListener('input', () => { window.clearTimeout(searchTimer); searchTimer = window.setTimeout(load, 250); });
+  load();
+})();
+</script>
+{% endblock %}

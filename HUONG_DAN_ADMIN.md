@@ -153,3 +153,36 @@ Mở sự kiện → trang chi tiết:
 - Câu hỏi được lưu cùng lượt đăng ký; người đăng ký **không sửa lại** sau khi đã gửi.
 - Nếu bạn **tắt công tắc** sau khi đã có người gửi câu hỏi: câu hỏi **không bị xóa**, chỉ ẩn ô trên form đăng ký; cột, chip và nút xuất ở trang admin vẫn còn để bạn xem và xuất.
 - Triển khai bản này lên server cần chạy migration m005 theo đúng thứ tự trong `DEPLOYMENT.md` (backup → chép code → m005 → khởi động lại app).
+
+## 10. Tài khoản, vai trò và mật khẩu
+
+Hệ thống có 3 vai trò:
+
+| Vai trò | Làm được |
+|---|---|
+| **Nhân viên check-in** (staff) | Xem danh sách sự kiện và người đăng ký (không thấy email, số điện thoại, câu hỏi); mở trang check-in và check-in cho người tham dự. Không sửa/xóa/xuất/gửi chứng chỉ. |
+| **Quản trị viên** (admin) | Tạo, sửa sự kiện; check-in; gửi chứng chỉ; xuất Excel; quản lý đơn vị; quay số. **Không** xóa sự kiện, không quản lý tài khoản. |
+| **Quản trị cao cấp** (super_admin) | Toàn quyền: thêm việc xóa sự kiện, quản lý tài khoản, xem nhật ký hoạt động. |
+
+### 10.1. Quản lý tài khoản (chỉ quản trị cao cấp)
+Vào **Quản trị → Quản lý tài khoản**.
+- **Thêm tài khoản**: nhập tên đăng nhập, chọn vai trò (email tùy chọn, cần nếu muốn dùng "Quên mật khẩu"). Hệ thống sinh **mật khẩu tạm và chỉ hiện một lần**: hãy chép và gửi cho người dùng. Người đó phải đổi mật khẩu ngay ở lần đăng nhập đầu tiên.
+- **Sửa**: đổi vai trò hoặc email. Đổi vai trò thì tài khoản đó bị đăng xuất khỏi mọi thiết bị và phải đăng nhập lại.
+- **Đặt lại mật khẩu**: sinh mật khẩu tạm mới (người dùng quên mật khẩu mà chưa có email).
+- **Khóa / Mở khóa**: tài khoản bị khóa bị đăng xuất ngay và không đăng nhập được.
+- **Xóa**: chỉ xóa được tài khoản chưa gắn với dữ liệu nào. Tài khoản đã tạo sự kiện hoặc check-in thì hãy **khóa** thay vì xóa.
+- Không thể tự khóa, tự xóa, tự đổi vai trò của chính mình, và luôn phải còn ít nhất một quản trị cao cấp đang hoạt động.
+
+### 10.2. Đổi mật khẩu, quên mật khẩu
+- Bấm vào **tên của bạn ở góc phải màn hình** để đổi mật khẩu. Mật khẩu tối thiểu 8 ký tự, gồm cả chữ và số. Đổi xong, các thiết bị khác bị đăng xuất.
+- Quên mật khẩu: ở trang đăng nhập bấm **Quên mật khẩu?**, nhập email của tài khoản. Nếu email đúng, hệ thống gửi liên kết đặt lại (hiệu lực 30 phút, dùng được một lần). Hệ thống luôn báo "Nếu email tồn tại, link đặt lại đã được gửi" để không lộ email nào có trong hệ thống, và chỉ cho yêu cầu tối đa 3 lần trong 15 phút. Tài khoản chưa có email hoặc đã bị khóa thì không nhận được liên kết, hãy nhờ quản trị cao cấp đặt lại.
+- Chính quản trị cao cấp quên mật khẩu: nhờ người quản trị kỹ thuật chạy trên máy chủ `scripts\reset-superadmin.py <tên_đăng_nhập>` (xem `DEPLOYMENT.md`).
+
+### 10.3. Nhật ký hoạt động (chỉ quản trị cao cấp)
+**Quản trị → Nhật ký hoạt động** cho biết ai đã làm gì, lúc nào (giờ Việt Nam), từ địa chỉ IP nào: đăng nhập (kể cả thất bại), tạo/sửa/xóa sự kiện, gửi chứng chỉ, xuất dữ liệu, đổi vai trò, khóa/xóa tài khoản... Lọc theo người, loại thao tác, khoảng ngày. Nhật ký chỉ xem, không sửa hay xóa được.
+
+### 10.4. Xóa sự kiện
+Chỉ quản trị cao cấp thấy nút **Xóa**. Hộp xác nhận ghi rõ số người đăng ký, số lượt check-in và chứng chỉ sẽ mất vĩnh viễn.
+
+### 10.5. Check-in
+Check-in cần đăng nhập (nhân viên check-in trở lên); người tham dự không tự check-in. Quét một mã đã check-in thì trang cảnh báo "đã check-in lúc … bởi …" nhưng lượt quét vẫn được ghi, người đó chỉ nhận một chứng chỉ. Sự kiện đã kết thúc vẫn check-in được trong một khoảng thời gian ngắn (mặc định 2 giờ), sau đó chỉ quản trị viên thêm tay.

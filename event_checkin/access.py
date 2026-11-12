@@ -21,6 +21,10 @@ from event_checkin import permissions as perm
 from event_checkin.models import db
 from event_checkin.models.admin import Admin
 
+# Khi tài khoản đang bị bắt đổi mật khẩu (mật khẩu tạm do super_admin cấp), CHỈ các endpoint này được dùng.
+# (Đăng xuất và /api/admin/me là công khai nên không bị chặn ở đây.)
+MUST_CHANGE_ALLOWED = {"password.change_page", "password.change_api"}
+MUST_CHANGE_MESSAGE = "Bạn cần đổi mật khẩu tạm trước khi tiếp tục."
 
 NOT_LOGGED_IN_MESSAGE = "Vui lòng đăng nhập admin."
 NO_PERMISSION_MESSAGE = "Bạn không có quyền thực hiện thao tác này."
@@ -88,6 +92,12 @@ def _unauthenticated_response():
     return redirect(url_for("admin.login_page", next=next_url))
 
 
+def _must_change_response():
+    if _wants_json():
+        return jsonify({"success": False, "code": "must_change_password", "message": MUST_CHANGE_MESSAGE}), 403
+    return redirect(url_for("password.change_page"))
+
+
 def _forbidden_response(admin, required=None):
     if _wants_json():
         return jsonify({"success": False, "message": DENIED_MESSAGES.get(required, NO_PERMISSION_MESSAGE)}), 403
@@ -113,6 +123,8 @@ def enforce_access():
     admin = get_current_admin()
     if admin is None:
         return _unauthenticated_response()
+    if admin.must_change_password and endpoint not in MUST_CHANGE_ALLOWED:
+        return _must_change_response()
     if required is None:
         current_app.logger.error("Route %s chưa khai báo quyền (@access) -> mặc định từ chối.", endpoint)
         return _forbidden_response(admin)

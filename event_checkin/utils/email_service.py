@@ -171,3 +171,27 @@ def send_checkin_email(
         logger.error(f"Gửi email thất bại tới {email}: {type(error).__name__}: {error}")
         friendly = describe_mail_error(error, email)
         return (False, friendly) if return_error else False
+
+
+def send_system_email(email, subject, text_body, html_body=None):
+    """Gửi một thư hệ thống đơn giản (vd. link đặt lại mật khẩu) bằng cấu hình SMTP sẵn có. Trả (ok, lỗi_dễ_hiểu)."""
+    if not email:
+        return False, "Không có địa chỉ email."
+    config = current_app.config
+    if not config.get("MAIL_USERNAME") or not config.get("MAIL_PASSWORD"):
+        return False, (
+            "Chưa cài đặt tài khoản gửi thư (thiếu MAIL_USERNAME hoặc MAIL_PASSWORD trong file .env). "
+            "Hãy nhờ người quản trị kỹ thuật điền rồi khởi động lại web."
+        )
+    try:
+        mail.send(Message(
+            subject=subject,
+            sender=config.get("MAIL_SENDER") or config.get("MAIL_USERNAME"),
+            recipients=[email],
+            body=text_body,
+            html=html_body,
+        ))
+        return True, None
+    except Exception as error:  # noqa: BLE001
+        logger.error(f"Gửi email hệ thống thất bại tới {email}: {type(error).__name__}: {error}")
+        return False, describe_mail_error(error, email)

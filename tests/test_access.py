@@ -20,7 +20,10 @@ EXPECTED_PUBLIC = {
     "register.public_events", "register.public_don_vi", "register.register",
     "certificates.download", "certificates.view_certificate", "certificates.verify",
     "admin.login_page", "admin.me", "admin.login", "admin.logout",
+    "password.forgot_page", "password.forgot_api", "password.reset_page", "password.reset_api",
 }
+# Mọi tài khoản đã đăng nhập (kể cả đang bị bắt đổi mật khẩu tạm)
+EXPECTED_AUTHENTICATED = {"password.change_page", "password.change_api"}
 
 
 class UrlMapTest(unittest.TestCase):
@@ -42,6 +45,17 @@ class UrlMapTest(unittest.TestCase):
     def test_public_set_is_exactly_expected(self):
         public = {r.endpoint for r in self.rules() if app.view_functions[r.endpoint].required_access == perm.PUBLIC}
         self.assertEqual(public, EXPECTED_PUBLIC)
+
+    def test_authenticated_set_is_exactly_expected(self):
+        authed = {r.endpoint for r in self.rules() if app.view_functions[r.endpoint].required_access == perm.AUTHENTICATED}
+        self.assertEqual(authed, EXPECTED_AUTHENTICATED)
+
+    def test_super_admin_only_routes(self):
+        """Quản lý tài khoản / nhật ký / xóa sự kiện / reset chỉ khai báo cho quyền của super_admin."""
+        only_super = perm.ROLE_PERMISSIONS[perm.ROLE_SUPER_ADMIN] - perm.ROLE_PERMISSIONS[perm.ROLE_ADMIN]
+        for r in self.rules():
+            if r.endpoint.startswith("account.") and r.endpoint not in ():
+                self.assertIn(app.view_functions[r.endpoint].required_access, only_super, r.rule)
 
     def test_old_decorator_is_gone(self):
         text = "".join(p.read_text(encoding="utf-8") for p in pathlib.Path("event_checkin/controllers").glob("*.py"))
