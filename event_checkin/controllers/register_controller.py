@@ -5,6 +5,8 @@ from flask import Blueprint, jsonify, render_template, request, url_for
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 
+from event_checkin import permissions as perm
+from event_checkin.access import access
 from event_checkin.models import db
 from event_checkin.models.don_vi import DonVi
 from event_checkin.models.event import Event
@@ -139,6 +141,7 @@ def _month_groups_page(offset, limit=MONTH_GROUPS_PER_PAGE):
 
 
 @register_bp.get("/")
+@access(perm.PUBLIC)
 def index():
     event_groups, next_offset, has_more = _month_groups_page(0)
     don_vi_items = DonVi.query.filter_by(is_active=True).order_by(DonVi.ten_don_vi.asc()).all()
@@ -156,6 +159,7 @@ def index():
 
 
 @register_bp.get("/events/<int:event_id>/register")
+@access(perm.PUBLIC)
 def event_register(event_id):
     event = Event.query.get_or_404(event_id)
     don_vi_items = DonVi.query.filter_by(is_active=True).order_by(DonVi.ten_don_vi.asc()).all()
@@ -163,6 +167,7 @@ def event_register(event_id):
 
 
 @register_bp.get("/api/events/month-groups")
+@access(perm.PUBLIC)
 def events_month_groups():
     try:
         offset = int(request.args.get("offset", 0))
@@ -183,6 +188,7 @@ def events_month_groups():
 
 
 @register_bp.get("/api/events/search")
+@access(perm.PUBLIC)
 def search_events():
     """Lọc sự kiện theo từ khoá + tháng + cơ sở + trạng thái -- trả về TOÀN BỘ
     kết quả khớp (không phân trang) vì đây là tìm kiếm chủ động, khác với
@@ -217,6 +223,7 @@ def search_events():
 
 
 @register_bp.get("/api/lookup/<ma_cbsv>")
+@access(perm.PATRON_LOOKUP)
 def lookup(ma_cbsv):
     ma_cbsv = (ma_cbsv or "").strip()
     user = User.query.filter_by(ma_cbsv=ma_cbsv).first()
@@ -233,6 +240,7 @@ def lookup(ma_cbsv):
 
 
 @register_bp.get("/api/events")
+@access(perm.PUBLIC)
 def public_events():
     events = Event.query.order_by(Event.ngay_bat_dau.desc()).all()
     return jsonify({
@@ -257,6 +265,7 @@ def public_events():
 
 
 @register_bp.get("/api/don-vi")
+@access(perm.PUBLIC)
 def public_don_vi():
     items = DonVi.query.filter_by(is_active=True).order_by(DonVi.ten_don_vi.asc()).all()
     return jsonify({"success": True, "data": [item.to_dict() for item in items]})
@@ -264,6 +273,7 @@ def public_don_vi():
 
 @register_bp.post("/register")
 @register_bp.post("/api/register")
+@access(perm.PUBLIC)
 def register():
     payload = request.get_json(silent=True) or request.form
     ma_cbsv = (payload.get("ma_cbsv") or "").strip()

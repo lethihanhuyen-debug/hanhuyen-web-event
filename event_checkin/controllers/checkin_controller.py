@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
+from event_checkin import permissions as perm
+from event_checkin.access import access
 from event_checkin.models import db
 from event_checkin.models.checkin_record import CheckinRecord
 from event_checkin.models.event import Event
@@ -23,6 +25,7 @@ def _events_open_for_checkin():
 
 
 @checkin_bp.get("/checkin")
+@access(perm.PUBLIC)
 def index():
     # Không còn suy đoán event_id=1 khi thiếu -- nếu chỉ có đúng 1 sự kiện đang
     # diễn ra/sắp diễn ra thì vào thẳng luôn cho tiện, nếu có nhiều hơn (nhiều
@@ -34,12 +37,14 @@ def index():
 
 
 @checkin_bp.get("/checkin/<int:event_id>")
+@access(perm.PUBLIC)
 def event_index(event_id):
     event = Event.query.get_or_404(event_id)
     return render_template("checkin/index.html", event=event)
 
 
 @checkin_bp.post("/api/checkin")
+@access(perm.PUBLIC)
 def checkin():
     payload = request.get_json(silent=True) or request.form
     ma_cbsv = (payload.get("ma_cbsv") or "").strip()

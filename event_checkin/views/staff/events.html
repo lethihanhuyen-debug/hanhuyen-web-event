@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Sự kiện | Event Check-in{% endblock %}
+
+{% block content %}
+<section class="checkin-stage">
+  <div class="checkin-card">
+    <p class="eyebrow">Nhân viên check-in</p>
+    <h1>Danh sách sự kiện</h1>
+    {% if events %}
+      <p class="muted">Chọn sự kiện rồi bấm “Check-in” để mở trang check-in của sự kiện đó.</p>
+      <div class="checkin-event-list">
+        {% for event in events %}
+          {% set status = event.computed_status %}
+          <a class="checkin-event-item" href="{{ url_for('checkin.event_index', event_id=event.id) }}">
+            <span class="badge {{ 'badge--warning' if status == 'ongoing' else 'badge--success' }}">{{ status_labels.get(status, status) }}</span>
+            <strong>{{ event.ten_su_kien }}</strong>
+            <span class="muted">{{ event.ngay_bat_dau.strftime('%d/%m/%Y %H:%M') }}{% if event.co_so %} · {{ event.co_so }}{% endif %} · Check-in</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Chưa có sự kiện nào.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

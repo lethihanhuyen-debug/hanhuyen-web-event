@@ -7,11 +7,13 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash
 
 from config import Config
+from event_checkin.access import init_access
 from event_checkin.controllers.admin_controller import admin_bp
 from event_checkin.controllers.certificate_controller import certificate_bp
 from event_checkin.controllers.checkin_controller import checkin_bp
 from event_checkin.controllers.lucky_draw_controller import lucky_bp
 from event_checkin.controllers.register_controller import register_bp
+from event_checkin.controllers.staff_controller import staff_bp
 from event_checkin.extensions import mail
 from event_checkin.models import db
 from event_checkin.models.admin import Admin
@@ -139,17 +141,21 @@ def create_app():
         # Templates and APIs are served same-origin (no separate cross-origin
         # frontend is deployed), so no CORS headers are needed here. Only
         # keep admin pages from being cached by the browser/back button.
-        if request.path.startswith("/admin"):
+        if request.path.startswith(("/admin", "/staff")):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         return response
+
+    # Kiểm tra quyền cho MỌI route (route chưa khai báo @access thì bị từ chối) -- xem event_checkin/access.py
+    init_access(app)
 
     app.register_blueprint(register_bp)
     app.register_blueprint(checkin_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(certificate_bp)
     app.register_blueprint(lucky_bp)
+    app.register_blueprint(staff_bp)
 
     with app.app_context():
         db.create_all()

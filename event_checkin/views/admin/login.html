@@ -77,7 +77,7 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (even
   }
   message.style.display = 'block';
   if (data.success) {
-    window.location.href = nextUrl || '/admin';
+    window.location.href = nextUrl || data.home_path || '/admin';
     return;
   }
   submit.classList.remove('is-loading');

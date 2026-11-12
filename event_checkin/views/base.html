@@ -34,13 +34,13 @@
         </button>
         <ul class="primary-nav__list">
           <li><a class="{% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng ký</a></li>
-          {% if session.get('admin_id') %}
-          <li><a class="{% if request.path.startswith('/admin') and request.path != '/admin/login' %}is-active{% endif %}" href="{{ url_for('admin.index') }}">Quản trị</a></li>
+          {% if current_admin %}
+          <li><a class="{% if request.path.startswith(('/admin', '/staff')) and request.path != '/admin/login' %}is-active{% endif %}" href="{{ admin_home_path }}">{{ 'Sự kiện' if admin_home_path == '/staff/events' else 'Quản trị' }}</a></li>
           {% endif %}
         </ul>
       </nav>
 
-      {% if session.get('admin_id') %}
+      {% if current_admin %}
         <button type="button" class="header-auth" data-admin-logout>Đăng xuất</button>
       {% elif request.path != '/admin/login' %}
         <a class="header-auth" href="{{ url_for('admin.login_page') }}">Đăng nhập</a>
@@ -51,6 +51,8 @@
 
   <main class="page-shell">
     <div class="container {% block container_class %}{% endblock %}">
+      {% set access_notice = pop_access_notice() %}
+      {% if access_notice %}<div class="message message--warning" role="alert">{{ access_notice }}</div>{% endif %}
       {% block content %}{% endblock %}
     </div>
   </main>

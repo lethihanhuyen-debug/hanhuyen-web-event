@@ -3,7 +3,6 @@ import json
 import re
 import unicodedata
 import zipfile
-from functools import wraps
 from io import BytesIO, StringIO
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +15,9 @@ from openpyxl.utils import get_column_letter
 from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
 
+from event_checkin import permissions as perm
+from event_checkin.permissions import home_path_for_role, role_label
+from event_checkin.access import access, get_current_admin
 from event_checkin.certificates import mailer
 from event_checkin.certificates.generator import CERTIFICATE_FIELDS, effective_layout
 from event_checkin.certificates.service import CertificateError, get_certificate_file_path, render_preview_png
@@ -40,26 +42,12 @@ EVENT_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
 
 
-def admin_required(view):
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        admin_id = session.get("admin_id")
-        admin = Admin.query.get(admin_id) if admin_id else None
-        if admin and admin.is_active:
-            return view(*args, **kwargs)
-        if request.path.startswith("/api/"):
-            return jsonify({"success": False, "message": "Vui lòng đăng nhập admin."}), 401
-        next_url = request.full_path if request.query_string else request.path
-        return redirect(url_for("admin.login_page", next=next_url))
-
-    return wrapped
-
-
 def _admin_payload(admin):
     return {
         "id": admin.id,
         "username": admin.username,
         "role": admin.role,
+        "role_label": role_label(admin.role),
     }
 
 
@@ -214,20 +202,20 @@ def _dashboard_payload():
 
 
 @admin_bp.get("/admin")
-@admin_required
+@access(perm.ADMIN_AREA)
 def index():
     """Trang tổng "Quản trị": thẻ chọn chức năng (Sự kiện, Quay số may mắn, Quản lý đơn vị)."""
     return render_template("admin/hub.html")
 
 
 @admin_bp.get("/admin/don-vi")
-@admin_required
+@access(perm.DONVI_MANAGE)
 def don_vi_page():
     return render_template("admin/don_vi.html")
 
 
 @admin_bp.get("/admin/events")
-@admin_required
+@access(perm.ADMIN_AREA)
 def events_page():
     events = Event.query.order_by(Event.ngay_bat_dau.desc()).all()
     return render_template(
@@ -238,7 +226,7 @@ def events_page():
 
 
 @admin_bp.get("/admin/events/<int:event_id>")
-@admin_required
+@access(perm.REGISTRATION_VIEW_FULL)
 def event_detail(event_id):
     event = Event.query.get_or_404(event_id)
     registrations = (
@@ -298,7 +286,7 @@ def event_detail(event_id):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/send-certificates")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def send_certificates(event_id):
     """Bắt đầu 1 đợt gửi chứng chỉ chạy nền, trả về ngay.
     Body: ids -- chỉ gửi các dòng đang chọn (bỏ trống = mọi dòng 'pending');
@@ -331,7 +319,7 @@ def send_certificates(event_id):
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/send-certificates/status")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def send_certificates_status(event_id):
     return jsonify({"success": True, "job": mailer.get_job(event_id)})
 
@@ -417,7 +405,7 @@ def _saved_layout(event):
 
 
 @admin_bp.get("/admin/events/<int:event_id>/checkins")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def checkins_page(event_id):
     """Trang Danh sách check-in riêng của 1 sự kiện (mỗi sự kiện 1 trang, không có
     ô chọn sự kiện). Nút Quay lại về trang trước; mở link trực tiếp thì về trang
@@ -438,7 +426,7 @@ def checkins_page(event_id):
 
 
 @admin_bp.get("/admin/checkins")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def checkins_page_legacy():
     """Link cũ /admin/checkins?event_id=... -> trang riêng của sự kiện đó."""
     event_id = request.args.get("event_id", type=int)
@@ -448,7 +436,7 @@ def checkins_page_legacy():
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/checkins")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def list_checkins(event_id):
     Event.query.get_or_404(event_id)
     return jsonify({
@@ -459,7 +447,7 @@ def list_checkins(event_id):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/checkins/dedupe")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def dedupe_checkins(event_id):
     """Mỗi mã xuất hiện nhiều lần: giữ dòng checkin_at sớm nhất, các dòng còn lại
     chuyển 'duplicate' (không xoá cứng). Nếu một dòng sẽ bị đánh dấu trùng đã gửi
@@ -497,7 +485,7 @@ def dedupe_checkins(event_id):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/checkins")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def add_checkin_manually(event_id):
     event = Event.query.get_or_404(event_id)
     payload = request.get_json(silent=True) or {}
@@ -650,7 +638,7 @@ def _parse_checkin_imports(files, event_id):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/checkins/import")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def import_checkins(event_id):
     """Nhập danh sách check-in từ 1 hoặc nhiều file Excel (trường "file", gửi lặp lại).
     dry_run=1: chỉ kiểm tra và báo số dòng hợp lệ/lỗi, không ghi gì. Không có dry_run:
@@ -693,7 +681,7 @@ def import_checkins(event_id):
 
 
 @admin_bp.get("/api/admin/checkins/import-template")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def checkin_import_template():
     workbook = Workbook()
     sheet = workbook.active
@@ -717,7 +705,7 @@ def checkin_import_template():
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/checkins/delete")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def delete_checkin_rows(event_id):
     event = Event.query.get_or_404(event_id)
     payload = request.get_json(silent=True) or {}
@@ -759,7 +747,7 @@ def _clean_display_name(value):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/certificate-preview")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def certificate_preview(event_id):
     """Ảnh PNG xem trước chứng chỉ (vẽ trong bộ nhớ, không lưu, không tốn mã).
     Body (đều tuỳ chọn): patron_code -- xem cho 1 người (bỏ trống = dữ liệu mẫu);
@@ -787,7 +775,7 @@ def certificate_preview(event_id):
 
 
 @admin_bp.put("/api/admin/events/<int:event_id>/checkins/<patron_code>/display-name")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def save_display_name(event_id, patron_code):
     """Lưu họ tên in trên chứng chỉ cho 1 người (ghi trên dòng chính của người đó).
     display_name rỗng = Khôi phục mặc định (dùng lại tên Sierra/đăng ký)."""
@@ -814,7 +802,7 @@ def save_display_name(event_id, patron_code):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/checkins/<int:record_id>/resend")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def fix_and_resend_checkin(event_id, record_id):
     """Dòng gửi lỗi: admin sửa mã SV/CB (quét/nhập sai) và/hoặc nhập email tay,
     rồi gửi lại riêng dòng đó (chạy nền như một đợt 1 người)."""
@@ -867,7 +855,7 @@ def _size_label(size):
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/certificates/storage")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def certificate_storage(event_id):
     """Số file chứng chỉ của sự kiện đang nằm trên server và dung lượng của chúng."""
     Event.query.get_or_404(event_id)
@@ -877,7 +865,7 @@ def certificate_storage(event_id):
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/certificates/archive")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def certificate_archive(event_id):
     """Tải về 1 file ZIP gồm các chứng chỉ của sự kiện đang có trên server."""
     event = Event.query.get_or_404(event_id)
@@ -903,7 +891,7 @@ def certificate_archive(event_id):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/certificates/purge")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def certificate_purge(event_id):
     """Xoá các file chứng chỉ của sự kiện khỏi server cho nhẹ. Chỉ xoá FILE: thông tin
     chứng chỉ trong cơ sở dữ liệu giữ nguyên, và khi có người mở / tải lại thì hệ thống
@@ -930,7 +918,7 @@ def certificate_purge(event_id):
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/checkins/export")
-@admin_required
+@access(perm.DATA_EXPORT)
 def export_checkins(event_id):
     event = Event.query.get_or_404(event_id)
     rows = _checkin_rows(event_id, _status_filter_arg())
@@ -974,7 +962,7 @@ def _ascii_filename_component(text):
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/export-registrations")
-@admin_required
+@access(perm.DATA_EXPORT)
 def export_event_registrations(event_id):
     event = Event.query.get_or_404(event_id)
     registrations = (
@@ -1041,7 +1029,7 @@ def _set_text_cell(cell, text):
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/export-questions")
-@admin_required
+@access(perm.DATA_EXPORT)
 def export_event_questions(event_id):
     """Danh sách câu hỏi (họ tên, đơn vị, câu hỏi, thời gian) để gửi diễn giả/MC."""
     event = Event.query.get_or_404(event_id)
@@ -1104,27 +1092,29 @@ def _xlsx_response(workbook, utf8_filename, ascii_filename):
 
 
 @admin_bp.get("/admin/login")
+@access(perm.PUBLIC)
 def login_page():
-    admin_id = session.get("admin_id")
-    admin = Admin.query.get(admin_id) if admin_id else None
-    next_url = request.args.get("next") or url_for("admin.index")
-    if not next_url.startswith("/") or next_url.startswith("//"):
-        next_url = url_for("admin.index")
-    if admin and admin.is_active:
-        return redirect(next_url)
+    next_url = request.args.get("next") or ""
+    # Chỉ nhận đường dẫn nội bộ (chặn "//host" và "/\host" -> chuyển hướng ra ngoài)
+    if not next_url.startswith("/") or next_url.startswith("//") or "\\" in next_url:
+        next_url = ""
+    admin = get_current_admin()
+    if admin:
+        return redirect(next_url or home_path_for_role(admin.role))
     return render_template("admin/login.html", next_url=next_url)
 
 
 @admin_bp.get("/api/admin/me")
+@access(perm.PUBLIC)
 def me():
-    admin_id = session.get("admin_id")
-    admin = Admin.query.get(admin_id) if admin_id else None
-    if not admin or not admin.is_active:
+    admin = get_current_admin()
+    if not admin:
         return jsonify({"success": False, "admin": None}), 401
     return jsonify({"success": True, "admin": _admin_payload(admin)})
 
 
 @admin_bp.post("/api/admin/login")
+@access(perm.PUBLIC)
 def login():
     payload = request.get_json(silent=True) or request.form
     username = (payload.get("username") or "").strip()
@@ -1138,11 +1128,21 @@ def login():
     session.clear()
     session.permanent = remember
     session["admin_id"] = admin.id
+    # Phiên chỉ hợp lệ khi số này khớp admins.session_version (đổi mật khẩu/quyền sẽ làm phiên cũ mất hiệu lực).
+    session["sv"] = admin.session_version
     session["remember_device"] = remember
-    return jsonify({"success": True, "admin": _admin_payload(admin), "remember": remember})
+    admin.last_login_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "admin": _admin_payload(admin),
+        "remember": remember,
+        "home_path": home_path_for_role(admin.role),  # trang đích theo vai trò khi không có ?next=
+    })
 
 
 @admin_bp.post("/api/admin/logout")
+@access(perm.PUBLIC)
 def logout():
     session.clear()
     session.modified = True
@@ -1155,28 +1155,28 @@ def logout():
 
 
 @admin_bp.get("/api/admin/summary")
-@admin_required
+@access(perm.ADMIN_AREA)
 def summary():
     payload = _dashboard_payload()
     return jsonify({"success": True, **payload})
 
 
 @admin_bp.get("/api/admin/events")
-@admin_required
+@access(perm.ADMIN_AREA)
 def list_events():
     events = Event.query.order_by(Event.ngay_bat_dau.desc()).all()
     return jsonify({"success": True, "data": [_event_payload(event) for event in events]})
 
 
 @admin_bp.get("/api/admin/don-vi")
-@admin_required
+@access(perm.DONVI_MANAGE)
 def list_don_vi():
     items = DonVi.query.order_by(DonVi.ten_don_vi.asc()).all()
     return jsonify({"success": True, "data": [item.to_dict() for item in items]})
 
 
 @admin_bp.post("/api/admin/don-vi")
-@admin_required
+@access(perm.DONVI_MANAGE)
 def create_don_vi():
     payload = request.get_json(silent=True) or request.form
     ten_don_vi = (payload.get("ten_don_vi") or "").strip()
@@ -1199,7 +1199,7 @@ def create_don_vi():
 
 @admin_bp.put("/api/admin/don-vi/<int:item_id>")
 @admin_bp.patch("/api/admin/don-vi/<int:item_id>")
-@admin_required
+@access(perm.DONVI_MANAGE)
 def update_don_vi(item_id):
     item = DonVi.query.get_or_404(item_id)
     payload = request.get_json(silent=True) or request.form
@@ -1222,7 +1222,7 @@ def update_don_vi(item_id):
 
 
 @admin_bp.delete("/api/admin/don-vi/<int:item_id>")
-@admin_required
+@access(perm.DONVI_MANAGE)
 def delete_don_vi(item_id):
     item = DonVi.query.get_or_404(item_id)
     usage_count = User.query.filter_by(don_vi_id=item.id).count()
@@ -1238,7 +1238,7 @@ def delete_don_vi(item_id):
 
 
 @admin_bp.post("/api/admin/don-vi/an-hang-loat")
-@admin_required
+@access(perm.DONVI_MANAGE)
 def bulk_hide_don_vi():
     payload = request.get_json(silent=True) or {}
     ids = [int(item_id) for item_id in (payload.get("ids") or []) if str(item_id).isdigit()]
@@ -1258,7 +1258,7 @@ def bulk_hide_don_vi():
 
 
 @admin_bp.post("/api/admin/don-vi/hien-hang-loat")
-@admin_required
+@access(perm.DONVI_MANAGE)
 def bulk_show_don_vi():
     payload = request.get_json(silent=True) or {}
     ids = [int(item_id) for item_id in (payload.get("ids") or []) if str(item_id).isdigit()]
@@ -1278,7 +1278,7 @@ def bulk_show_don_vi():
 
 
 @admin_bp.post("/api/admin/don-vi/xoa-hang-loat")
-@admin_required
+@access(perm.DONVI_MANAGE)
 def bulk_delete_don_vi():
     payload = request.get_json(silent=True) or {}
     ids = [int(item_id) for item_id in (payload.get("ids") or []) if str(item_id).isdigit()]
@@ -1304,7 +1304,7 @@ def bulk_delete_don_vi():
 
 
 @admin_bp.post("/api/admin/events")
-@admin_required
+@access(perm.EVENT_MANAGE)
 def create_event():
     payload = request.get_json(silent=True) or request.form
     ten_su_kien = (payload.get("ten_su_kien") or "").strip()
@@ -1384,7 +1384,7 @@ def create_event():
 
 @admin_bp.put("/api/admin/events/<int:event_id>")
 @admin_bp.patch("/api/admin/events/<int:event_id>")
-@admin_required
+@access(perm.EVENT_MANAGE)
 def update_event(event_id):
     event = Event.query.get_or_404(event_id)
     payload = request.get_json(silent=True) or request.form
@@ -1451,7 +1451,7 @@ def update_event(event_id):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/image")
-@admin_required
+@access(perm.EVENT_MANAGE)
 def upload_event_image(event_id):
     event = Event.query.get_or_404(event_id)
     file = request.files.get("event_image")
@@ -1485,7 +1485,7 @@ def upload_event_image(event_id):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/certificate-template")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def upload_certificate_template(event_id):
     event = Event.query.get_or_404(event_id)
     file = request.files.get("certificate_template")
@@ -1515,7 +1515,7 @@ def upload_certificate_template(event_id):
 
 
 @admin_bp.get("/api/admin/events/<int:event_id>/certificate-layout")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def get_certificate_layout(event_id):
     event = Event.query.get_or_404(event_id)
     return jsonify({"success": True, "data": _event_payload(event)})
@@ -1644,7 +1644,7 @@ def _build_layout(event, payload):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/certificate-layout")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def save_certificate_layout(event_id):
     event = Event.query.get_or_404(event_id)
     layout, error = _build_layout(event, request.get_json(silent=True) or {})
@@ -1658,7 +1658,7 @@ def save_certificate_layout(event_id):
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/certificate-font")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def upload_certificate_font(event_id):
     event = Event.query.get_or_404(event_id)
     field = (request.form.get("field") or "").strip()
@@ -1698,7 +1698,7 @@ def upload_certificate_font(event_id):
 
 
 @admin_bp.delete("/api/admin/events/<int:event_id>/certificate-font/<field>")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
 def delete_certificate_font(event_id, field):
     event = Event.query.get_or_404(event_id)
     allowed_fields = set(CERTIFICATE_FIELDS)
@@ -1725,7 +1725,7 @@ def delete_certificate_font(event_id, field):
 
 
 @admin_bp.delete("/api/admin/events/<int:event_id>")
-@admin_required
+@access(perm.EVENT_DELETE)
 def delete_event(event_id):
     # Deleting an event with existing registrations/check-ins/certificates is
     # allowed -- the admin UI warns and asks for confirmation before calling
@@ -1764,7 +1764,7 @@ def delete_event(event_id):
 
 
 @admin_bp.delete("/api/admin/events/<int:event_id>/checkins/<ma_cbsv>")
-@admin_required
+@access(perm.CHECKIN_MANAGE)
 def delete_event_checkin(event_id, ma_cbsv):
     event = Event.query.get_or_404(event_id)
     records = CheckinRecord.query.filter_by(event_id=event_id, patron_code=ma_cbsv).all()
@@ -1804,7 +1804,7 @@ def delete_event_checkin(event_id, ma_cbsv):
 
 
 @admin_bp.get("/admin/export/csv")
-@admin_required
+@access(perm.DATA_EXPORT)
 def export_csv():
     registrations = Registration.query.order_by(Registration.thoi_gian_dang_ky.asc()).all()
     today_checkin_map = _today_checkin_map()
@@ -1832,7 +1832,7 @@ def export_csv():
 
 
 @admin_bp.post("/admin/reset")
-@admin_required
+@access(perm.SYSTEM_RESET)
 def reset_data():
     payload = request.get_json(silent=True) or request.form
     confirmed = str(payload.get("confirm", "")).lower() in {"1", "true", "yes", "on"}

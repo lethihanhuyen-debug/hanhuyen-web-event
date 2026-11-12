@@ -9,10 +9,11 @@ from openpyxl.utils import get_column_letter
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy.exc import IntegrityError
 
+from event_checkin import permissions as perm
+from event_checkin.access import access
 from event_checkin.controllers.admin_controller import (
     _ascii_filename_component,
     _xlsx_response,
-    admin_required,
 )
 from event_checkin.models import db
 from event_checkin.models.checkin_record import CheckinRecord
@@ -72,7 +73,7 @@ def _lock_config(event_id):
     quay/lưu/hủy/sửa/xóa thiết lập đều đi qua đây nên chạy tuần tự theo từng sự kiện.
 
     MySQL mặc định REPEATABLE READ: ảnh chụp dữ liệu được lấy ở lần đọc đầu tiên của transaction.
-    admin_required đã đọc bảng admins từ trước, nên nếu cứ khoá tiếp trong transaction đó thì sau
+    Bước kiểm tra quyền (before_request) đã đọc bảng admins từ trước, nên nếu cứ khoá tiếp trong transaction đó thì sau
     khi chờ được khoá, tab thứ hai vẫn thấy dữ liệu CŨ (không thấy kết quả chờ của tab thứ nhất).
     Vì vậy: kết thúc transaction đọc, mở transaction mới ở mức READ COMMITTED rồi mới khoá --
     mọi lần đọc sau khoá đều thấy dữ liệu mới nhất."""
@@ -244,7 +245,7 @@ def _checkin_counts():
 # ---------- Trang ----------
 
 @lucky_bp.get("/admin/lucky-draw")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_list():
     """Danh sách sự kiện đã thiết lập quay số."""
     configs = LuckyConfig.query.all()
@@ -288,7 +289,7 @@ def lucky_list():
 
 
 @lucky_bp.get("/admin/lucky-draw/setup")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_setup_new():
     """Thiết lập cho một sự kiện CHƯA có thiết lập (chọn sự kiện ở đây)."""
     configured = {row[0] for row in db.session.query(LuckyConfig.event_id).all()}
@@ -314,7 +315,7 @@ def lucky_setup_new():
 
 
 @lucky_bp.get("/admin/lucky-draw/<int:event_id>/setup")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_setup_edit(event_id):
     event = Event.query.get_or_404(event_id)
     config = _get_config(event_id)
@@ -332,7 +333,7 @@ def lucky_setup_edit(event_id):
 
 
 @lucky_bp.get("/admin/lucky-draw/<int:event_id>/screen")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_screen(event_id):
     event = Event.query.get_or_404(event_id)
     if not _get_config(event_id):
@@ -416,7 +417,7 @@ def _read_background(file):
 
 
 @lucky_bp.put("/api/admin/lucky-draw/<int:event_id>/setup")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_save_setup(event_id):
     """Lưu cả thiết lập (giải, tuỳ chọn, ảnh nền) trong 1 transaction: lỗi thì không đổi gì trong DB."""
     event = Event.query.get_or_404(event_id)
@@ -520,7 +521,7 @@ def lucky_save_setup(event_id):
 # ---------- Xóa thiết lập ----------
 
 @lucky_bp.delete("/api/admin/lucky-draw/<int:event_id>")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_delete_setup(event_id):
     """Xóa thiết lập: giải thưởng, kết quả (kể cả bản hủy), ảnh nền -- trong 1 transaction.
     KHÔNG xóa sự kiện và dữ liệu check-in. Đã có kết quả thì phải gõ lại đúng tên sự kiện."""
@@ -542,7 +543,7 @@ def lucky_delete_setup(event_id):
 # ---------- Trạng thái ----------
 
 @lucky_bp.get("/api/admin/lucky-draw/<int:event_id>")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_state(event_id):
     event = Event.query.get_or_404(event_id)
     config = _require_config(event_id)
@@ -560,7 +561,7 @@ def _get_prize(event_id, prize_id):
 
 
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/draw")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_draw(event_id):
     """Quay 1 người cho giải prize_id. Kết quả ở trạng thái chờ (pending) đến khi Lưu hoặc Quay lại."""
     Event.query.get_or_404(event_id)
@@ -608,7 +609,7 @@ def lucky_draw(event_id):
 
 
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/confirm")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_confirm(event_id):
     """Lưu: chốt kết quả đang chờ."""
     Event.query.get_or_404(event_id)
@@ -623,7 +624,7 @@ def lucky_confirm(event_id):
 
 
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/reject")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_reject(event_id):
     """Quay lại: bỏ kết quả đang chờ (chưa Lưu nên xóa hẳn, người đó quay lại danh sách quay)."""
     Event.query.get_or_404(event_id)
@@ -636,7 +637,7 @@ def lucky_reject(event_id):
 
 
 @lucky_bp.post("/api/admin/lucky-draw/<int:event_id>/winners/<int:winner_id>/cancel")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_cancel(event_id, winner_id):
     """Hủy người vắng mặt: giữ bản ghi để đối chiếu, người này quay lại danh sách quay."""
     Event.query.get_or_404(event_id)
@@ -656,7 +657,7 @@ def lucky_cancel(event_id, winner_id):
 # ---------- Xuất Excel ----------
 
 @lucky_bp.get("/api/admin/lucky-draw/<int:event_id>/export")
-@admin_required
+@access(perm.LUCKY_MANAGE)
 def lucky_export(event_id):
     event = Event.query.get_or_404(event_id)
     _require_config(event_id)
