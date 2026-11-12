@@ -410,4 +410,5 @@ class PageScriptOrderTest(AppTestCase):
             html = self.client_for("super_admin").get("/admin/accounts" if name == "accounts" else "/admin/audit-log").get_data(as_text=True)
             script = html.split("<script>")[-1]
             self.assertIn("addEventListener('DOMContentLoaded', load)", script, name)
-            self.assertNotRegex(script, r"(?m)^\s*load\(\);\s*$", name + ": còn gọi load() ngay lúc nạp trang")
+            # câu lệnh CUỐI của script trang không được là load(); gọi thẳng (các load() trong hàm xử lý sự kiện thì không sao)
+            self.assertNotRegex(script, r"load\(\);\s*\}\)\(\);", name + ": còn gọi load() ngay lúc nạp trang")
