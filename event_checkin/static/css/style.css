@@ -883,25 +883,6 @@ textarea:focus {
   color: var(--color-primary-dark);
 }
 
-/* Nút quay lại trên trang check-in: góc trên bên phải trang, ngoài khung check-in */
-.checkin-stage:has(.checkin-back) {
-  position: relative;
-}
-
-.checkin-back {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-@media (max-width: 640px) {
-  .checkin-back {
-    position: static;
-    justify-self: end;
-    margin-bottom: var(--space-4);
-  }
-}
-
 /* Nút Check-in / Danh sách check-in (trang chi tiết sự kiện) */
 .btn--green {
   background: var(--color-accent-strong);
@@ -4143,4 +4124,36 @@ td.col-num {
 /* Thẻ sự kiện của staff: hàng nút dưới tiêu đề */
 .checkin-event-item .btn-row {
   margin-top: var(--space-2);
+}
+
+/* ---- Thanh tiêu đề trang staff: nhãn (eyebrow) bên trái + nút "Quay lại" bên phải, CÙNG MỘT HÀNG, canh giữa theo
+   chiều dọc, không xuống dòng ở mọi cỡ màn hình. Dùng cho /staff/events/<id> và trang check-in. ---- */
+.staff-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.staff-titlebar .eyebrow {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-titlebar .btn--back {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .staff-titlebar .btn--back {
+    min-height: 40px;
+    padding: 0 var(--space-3);
+  }
 }

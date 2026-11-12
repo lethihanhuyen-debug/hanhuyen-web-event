@@ -11,8 +11,8 @@
       <div class="checkin-event-list">
         {% for event in events %}
           <a class="checkin-event-item" href="{{ url_for('checkin.event_index', event_id=event.id) }}">
-            <span class="badge {{ 'badge--warning' if event.computed_status == 'ongoing' else 'badge--success' }}">
-              {{ 'Đang diễn ra' if event.computed_status == 'ongoing' else 'Sắp diễn ra' }}
+            <span class="badge {{ 'badge--warning' if event.checkin_state == 'open' else ('badge--muted' if event.checkin_state == 'grace' else 'badge--success') }}">
+              {{ 'Đang diễn ra' if event.checkin_state == 'open' else ('Đã kết thúc · còn nhận check-in' if event.checkin_state == 'grace' else 'Sắp diễn ra') }}
             </span>
             <strong>{{ event.ten_su_kien }}</strong>
             <span class="muted">{{ event.ngay_bat_dau.strftime('%d/%m/%Y %H:%M') }}{% if event.co_so %} · {{ event.co_so }}{% endif %}</span>

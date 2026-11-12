@@ -334,5 +334,10 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
   .venv\Scripts\python -m event_checkin.migrations.m006_phan_quyen
   .venv\Scripts\python -m event_checkin.migrations.m006_phan_quyen --check   # mã thoát 0 + dòng "OK" là đạt
   ```
+  - **Tài khoản thử và sự kiện thử chỉ dùng trên DB THỬ (`checkin_event_test`), KHÔNG tạo trên DB thật `checkin_event`.** Gồm tài khoản `nv_staff`, `nv_admin` (mật khẩu thử đơn giản), sự kiện `[DEMO] Sự kiện thử phân quyền` và các mã `DEMO001`–`DEMO003`. Test tự động (`tests/`) cũng tự từ chối chạy nếu tên DB không kết thúc bằng `_test`. Trên DB thật chỉ tạo tài khoản thật, mật khẩu mạnh, bằng `scripts	ao_tai_khoan.py` (có in tên DB đang dùng; kiểm tra kỹ trước khi nhấn Enter) hoặc, sau khi xong bước (d), bằng trang Quản lý tài khoản.
+  - Sau khi nâng cấp, **mọi phiên đăng nhập cũ bị đăng xuất một lần** (phiên mới lưu thêm `session_version`); admin chỉ cần đăng nhập lại.
+  - Từ bước (c): `/checkin`, `/checkin/<id>`, `/api/checkin` **bắt buộc đăng nhập** (staff trở lên); người tham dự không tự check-in. Trang đăng ký sự kiện vẫn công khai.
+  - **Thời gian check-in sau khi sự kiện kết thúc**: biến `CHECKIN_GRACE_HOURS` trong `.env` (mặc định `2` giờ; đặt `76` nếu muốn 76 giờ). Trong khoảng này staff vẫn thấy nút Check-in và check-in được; quá mốc thì staff chỉ xem danh sách, admin thêm check-in tay. Đổi giá trị xong cần `Restart-Service EventCheckinApp`.
+  - Chạy test (trên máy dev, DB thử): `$env:MYSQL_DATABASE = "checkin_event_test"` rồi `.venv\Scripts\python -m unittest discover -s . -t . -p "test_*.py" -v`.
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.

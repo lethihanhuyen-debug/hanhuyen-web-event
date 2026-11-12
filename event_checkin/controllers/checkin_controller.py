@@ -20,8 +20,10 @@ def _events_open_for_checkin():
     chọn sự kiện ở /checkin khi không có event_id trong URL. computed_status là
     property tính từ giờ hiện tại, không phải cột DB nên phải lọc ở Python."""
     events = Event.query.order_by(Event.ngay_bat_dau.asc()).all()
-    open_events = [e for e in events if e.computed_status in ("ongoing", "upcoming")]
-    open_events.sort(key=lambda e: (e.computed_status != "ongoing", e.ngay_bat_dau))
+    # Gồm cả sự kiện vừa kết thúc còn trong thời gian cho phép check-in (CHECKIN_GRACE_HOURS)
+    order = {"open": 0, "grace": 1, "upcoming": 2}
+    open_events = [e for e in events if e.checkin_state in order]
+    open_events.sort(key=lambda e: (order[e.checkin_state], e.ngay_bat_dau))
     return open_events
 
 
@@ -90,11 +92,16 @@ def checkin():
     if not registration:
         return jsonify({"success": False, "message": f"Mã {ma_cbsv} chưa đăng ký sự kiện này."}), 404
 
-    event_status = registration.event.computed_status if registration.event else None
-    if event_status == "upcoming":
+    # Cùng quy tắc với giao diện (Event.checkin_state): kết thúc rồi vẫn check-in được đến CHECKIN_GRACE_HOURS sau;
+    # quá mốc đó chỉ admin thêm tay (POST /api/admin/events/<id>/checkins).
+    state = registration.event.checkin_state if registration.event else None
+    if state == "upcoming":
         return jsonify({"success": False, "message": "Sự kiện chưa bắt đầu, chưa thể check-in."}), 400
-    if event_status == "ended":
-        return jsonify({"success": False, "message": "Sự kiện đã kết thúc, không thể check-in."}), 400
+    if state == "closed":
+        return jsonify({"success": False, "message": (
+            f"Sự kiện đã kết thúc lúc {registration.event.ended_label} và đã quá thời gian cho phép check-in "
+            f"(đến {registration.event.checkin_deadline_label}). Vui lòng báo admin để thêm check-in thủ công."
+        )}), 400
 
     # Chỉ INSERT 1 dòng, KHÔNG chặn quét trùng (dòng trùng được đánh dấu 'duplicate' lúc gửi chứng chỉ), không
     # tạo chứng chỉ, không gửi email -- việc đó do admin bấm "Gửi chứng chỉ" (certificates/mailer.py).

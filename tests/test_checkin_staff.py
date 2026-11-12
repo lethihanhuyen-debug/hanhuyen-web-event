@@ -148,3 +148,114 @@ class CheckinFlowTest(AppTestCase):
         self.assertIn("Quản trị viên", admin_html)
         anon_html = self.client_for(None).get("/").get_data(as_text=True)
         self.assertNotIn("header-user", anon_html)
+
+
+class GracePeriodTest(AppTestCase):
+    """Sự kiện đã kết thúc: staff vẫn check-in đến CHECKIN_GRACE_HOURS sau giờ kết thúc; quá mốc thì chỉ xem."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.old_grace = app.config.get("CHECKIN_GRACE_HOURS")
+        app.config["CHECKIN_GRACE_HOURS"] = 2          # cố định, không phụ thuộc .env
+        now = now_vn_naive()
+        cls.events = {}
+        with app.app_context():
+            # đã kết thúc 30 phút trước (còn trong thời gian cho phép) / 3 giờ trước (quá mốc)
+            for key, ended_ago in (("grace", timedelta(minutes=30)), ("closed", timedelta(hours=3))):
+                end = now - ended_ago
+                event = Event(
+                    ten_su_kien=f"Sự kiện {key} {cls.suffix}", dia_diem="Phòng thử",
+                    ngay_bat_dau=end - timedelta(hours=2), ngay_ket_thuc=end,
+                    thang=now.month, nam=now.year,
+                    thoi_gian_mo_dang_ky=now - timedelta(days=3), thoi_gian_dong_dang_ky=now - timedelta(days=1),
+                    trang_thai="ended", created_by=cls.accounts["super_admin"][0],
+                )
+                db.session.add(event)
+                db.session.flush()
+                code = f"G{key[0].upper()}{cls.suffix}".upper()
+                db.session.add(User(ma_cbsv=code, ho_ten=f"Người {key}", email=f"{code.lower()}@example.com"))
+                db.session.flush()
+                db.session.add(Registration(ma_cbsv=code, event_id=event.id))
+                cls.events[key] = (event.id, code, end)
+            db.session.commit()
+
+    @classmethod
+    def tearDownClass(cls):
+        with app.app_context():
+            ids = [v[0] for v in cls.events.values()]
+            CheckinRecord.query.filter(CheckinRecord.event_id.in_(ids)).delete(synchronize_session=False)
+            Registration.query.filter(Registration.event_id.in_(ids)).delete(synchronize_session=False)
+            User.query.filter(User.ma_cbsv.in_([v[1] for v in cls.events.values()])).delete(synchronize_session=False)
+            Event.query.filter(Event.id.in_(ids)).delete(synchronize_session=False)
+            db.session.commit()
+        app.config["CHECKIN_GRACE_HOURS"] = cls.old_grace if cls.old_grace is not None else 2
+        super().tearDownClass()
+
+    def test_within_grace_staff_can_checkin_and_sees_notice(self):
+        event_id, code, end = self.events["grace"]
+        staff = self.client_for("staff")
+        listing = staff.get("/staff/events").get_data(as_text=True)
+        self.assertIn(f'href="/checkin/{event_id}"', listing)                   # nút Check-in vẫn hiện
+        self.assertIn(f'href="/staff/events/{event_id}"', listing)
+        page = staff.get(f"/checkin/{event_id}").get_data(as_text=True)
+        self.assertIn(f"Sự kiện đã kết thúc lúc {end.strftime('%H:%M')}", page)  # dòng nhắc
+        self.assertNotIn("disabled", page.split('id="checkinInput"')[1].split(">")[0])
+        r = staff.post("/api/checkin", json={"ma_cbsv": code, "event_id": event_id})
+        self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
+        self.assertTrue(r.get_json()["success"])
+
+    def test_past_grace_staff_view_only(self):
+        event_id, code, end = self.events["closed"]
+        staff = self.client_for("staff")
+        listing = staff.get("/staff/events").get_data(as_text=True)
+        self.assertNotIn(f'href="/checkin/{event_id}"', listing)                # không còn nút Check-in
+        self.assertIn(f'href="/staff/events/{event_id}"', listing)              # vẫn bấm "Xem danh sách" được
+        detail = staff.get(f"/staff/events/{event_id}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertNotIn(f'href="/checkin/{event_id}"', detail.get_data(as_text=True))
+        self.assertIn(code, detail.get_data(as_text=True))
+        with app.app_context():
+            before = CheckinRecord.query.filter_by(event_id=event_id).count()
+        r = staff.post("/api/checkin", json={"ma_cbsv": code, "event_id": event_id})   # server chặn theo cùng quy tắc
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("quá thời gian cho phép check-in", r.get_json()["message"])
+        page = staff.get(f"/checkin/{event_id}").get_data(as_text=True)         # vào thẳng URL: form bị khóa + giải thích
+        self.assertIn("quá thời gian cho phép check-in", page)
+        self.assertIn("disabled", page.split('id="checkinInput"')[1].split(">")[0])
+        with app.app_context():
+            self.assertEqual(CheckinRecord.query.filter_by(event_id=event_id).count(), before)  # không ghi thêm dòng nào
+
+    def test_admin_can_still_add_manually_after_grace(self):
+        event_id, code, end = self.events["closed"]
+        admin = self.client_for("admin")
+        r = admin.post(f"/api/admin/events/{event_id}/checkins", json={"patron_code": code})
+        self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
+
+    def test_grace_hours_is_configurable(self):
+        event_id, code, end = self.events["closed"]         # đã kết thúc 3 giờ trước
+        app.config["CHECKIN_GRACE_HOURS"] = 76
+        try:
+            staff = self.client_for("staff")
+            r = staff.post("/api/checkin", json={"ma_cbsv": code, "event_id": event_id})
+            self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
+        finally:
+            app.config["CHECKIN_GRACE_HOURS"] = 2
+
+
+class TitlebarLayoutTest(AppTestCase):
+    """Nút Quay lại và nhãn tiêu đề cùng một thanh (staff-titlebar) ở mọi trang staff có nút Quay lại."""
+
+    def test_back_button_is_in_titlebar(self):
+        c = self.client_for("staff")
+        with app.app_context():
+            event = Event.query.first()
+            self.assertIsNotNone(event)
+            event_id = event.id
+        for url in (f"/staff/events/{event_id}", f"/checkin/{event_id}"):
+            html = c.get(url).get_data(as_text=True)
+            bar = re.search(r'<div class="staff-titlebar">(.*?)</div>', html, re.S)
+            self.assertIsNotNone(bar, url)
+            self.assertIn('class="eyebrow"', bar.group(1), url)
+            self.assertIn("btn--back", bar.group(1), url)
+            self.assertNotIn("checkin-back", html, url)

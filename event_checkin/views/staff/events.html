@@ -15,8 +15,11 @@
             <span class="badge {{ 'badge--warning' if status == 'ongoing' else ('badge--success' if status == 'upcoming' else 'badge--muted') }}">{{ status_labels.get(status, status) }}</span>
             <strong>{{ event.ten_su_kien }}</strong>
             <span class="muted">{{ event.ngay_bat_dau.strftime('%d/%m/%Y %H:%M') }}{% if event.co_so %} · {{ event.co_so }}{% endif %}</span>
+            {% if event.checkin_state == 'grace' %}
+              <span class="muted">Đã kết thúc lúc {{ event.ended_label }} · còn nhận check-in đến {{ event.checkin_deadline_label }}</span>
+            {% endif %}
             <span class="btn-row">
-              {% if status != 'ended' %}
+              {% if event.checkin_state != 'closed' %}
                 <a class="btn btn--primary btn--sm" href="{{ url_for('checkin.event_index', event_id=event.id) }}">Check-in</a>
               {% endif %}
               <a class="btn btn--ghost btn--sm" href="{{ url_for('staff.event_page', event_id=event.id) }}">Xem danh sách</a>

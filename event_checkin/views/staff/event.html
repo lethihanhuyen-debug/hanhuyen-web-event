@@ -5,25 +5,32 @@
 
 {% block content %}
 <section class="admin-panel admin-panel--wide">
-  <div class="panel-head panel-head--top">
+  {# Nhãn bên trái, Quay lại bên phải, cùng một hàng và canh giữa theo chiều dọc (cả điện thoại) #}
+  <div class="staff-titlebar">
+    <p class="eyebrow">Sự kiện · {{ status_label }}</p>
+    <a class="btn btn--back" href="{{ url_for('staff.events_page') }}">← Quay lại</a>
+  </div>
+  <div class="panel-head">
     <div>
-      <p class="eyebrow">Sự kiện · {{ status_label }}</p>
       <h1>{{ event.ten_su_kien }}</h1>
       <p class="muted">
         {{ event.dia_diem or 'Chưa có địa điểm' }} -
         {{ event.ngay_bat_dau.strftime('%d/%m/%Y %H:%M') }}{% if event.ngay_ket_thuc %} - {{ event.ngay_ket_thuc.strftime('%d/%m/%Y %H:%M') }}{% endif %}
       </p>
     </div>
-    <div class="panel-head__side">
-      <a class="btn btn--back" href="{{ url_for('staff.events_page') }}">← Quay lại</a>
-      <div class="panel-actions panel-actions--row">
-        {% if event.computed_status != 'ended' %}
-          <a class="btn btn--primary" href="{{ url_for('checkin.event_index', event_id=event.id) }}">Check-in</a>
-        {% endif %}
-        <button class="btn btn--ghost" type="button" onclick="window.location.reload()">Tải lại danh sách</button>
-      </div>
+    <div class="panel-actions panel-actions--row">
+      {% if event.checkin_state != 'closed' %}
+        <a class="btn btn--primary" href="{{ url_for('checkin.event_index', event_id=event.id) }}">Check-in</a>
+      {% endif %}
+      <button class="btn btn--ghost" type="button" onclick="window.location.reload()">Tải lại danh sách</button>
     </div>
   </div>
+
+  {% if event.checkin_state == 'grace' %}
+    <div class="message message--warning">Sự kiện đã kết thúc lúc {{ event.ended_label }}. Vẫn nhận check-in đến {{ event.checkin_deadline_label }}.</div>
+  {% elif event.checkin_state == 'closed' %}
+    <div class="message message--warning">Sự kiện đã kết thúc lúc {{ event.ended_label }}, đã quá thời gian check-in: chỉ xem danh sách. Cần bổ sung check-in thì báo admin.</div>
+  {% endif %}
 
   <div class="stat-grid">
     <div class="stat-card"><span>Đã đăng ký</span><strong>{{ totals.registrations }}</strong></div>

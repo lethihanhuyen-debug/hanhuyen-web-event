@@ -3,20 +3,31 @@
 
 {% block content %}
 <section class="checkin-stage">
-  {# Quay lại trang trước; href là đường dự phòng khi mở trang trực tiếp -- xem script cuối trang. #}
-  <a id="backButton" class="btn btn--back checkin-back" href="{{ url_for('checkin.index') }}">← Quay lại</a>
   <div class="checkin-card">
-    <p class="eyebrow">Check-in sự kiện</p>
+    {# Thanh tiêu đề: nhãn bên trái, nút Quay lại bên phải, canh giữa theo chiều dọc, luôn cùng một hàng (kể cả điện thoại).
+       Quay lại trang trước; href là đường dự phòng khi mở trang trực tiếp -- xem script cuối trang. #}
+    <div class="staff-titlebar">
+      <p class="eyebrow">Check-in sự kiện</p>
+      <a id="backButton" class="btn btn--back" href="{{ url_for('staff.events_page') }}">← Quay lại</a>
+    </div>
     <h1>{{ event.ten_su_kien }}</h1>
+    {% set state = event.checkin_state %}
+    {% if state == 'grace' %}
+      <div class="message message--warning">Sự kiện đã kết thúc lúc {{ event.ended_label }}. Vẫn nhận check-in đến {{ event.checkin_deadline_label }}.</div>
+    {% elif state == 'closed' %}
+      <div class="message message--error">Sự kiện đã kết thúc lúc {{ event.ended_label }} và đã quá thời gian cho phép check-in (đến {{ event.checkin_deadline_label }}). Vui lòng báo admin để thêm check-in thủ công.</div>
+    {% elif state == 'upcoming' %}
+      <div class="message message--warning">Sự kiện bắt đầu lúc {{ event.started_label }}, chưa thể check-in.</div>
+    {% endif %}
     <p class="muted">Quét hoặc nhập mã CB/SV. Hệ thống sẽ phản hồi ngay phía dưới và tự động sẵn sàng cho lần quét tiếp theo.</p>
 
     <div class="checkin-form">
-      <input id="checkinInput" type="text" placeholder="Nhập hoặc quét Mã CB/SV" autocomplete="off" autofocus>
-      <button id="checkinBtn" class="btn btn--primary" type="button">Check-in</button>
+      <input id="checkinInput" type="text" placeholder="Nhập hoặc quét Mã CB/SV" autocomplete="off" {% if state == 'closed' %}disabled{% else %}autofocus{% endif %}>
+      <button id="checkinBtn" class="btn btn--primary" type="button" {% if state == 'closed' %}disabled{% endif %}>Check-in</button>
     </div>
 
     <div id="checkinResult" class="checkin-result" aria-live="polite"></div>
-    <p class="muted"><a href="{{ url_for('checkin.index') }}">Chọn sự kiện khác</a></p>
+    <p class="muted"><a href="{{ url_for('staff.events_page') }}">Chọn sự kiện khác</a></p>
   </div>
 </section>
 {% endblock %}

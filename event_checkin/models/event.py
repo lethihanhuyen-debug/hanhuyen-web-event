@@ -1,4 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from flask import current_app
 
 from event_checkin.models import db
 from event_checkin.utils.timezone import now_vn_naive
@@ -51,6 +53,46 @@ class Event(db.Model):
         if now <= self.ngay_ket_thuc:
             return "ongoing"
         return "ended"
+
+    @staticmethod
+    def _clock_label(moment):
+        """"HH:mm" nếu cùng ngày hôm nay, ngược lại "HH:mm dd/mm/YYYY" (giờ Việt Nam)."""
+        label = moment.strftime("%H:%M")
+        if moment.date() != now_vn_naive().date():
+            label += " " + moment.strftime("%d/%m/%Y")
+        return label
+
+    @property
+    def checkin_deadline(self):
+        """Mốc cuối staff còn check-in được = giờ kết thúc + CHECKIN_GRACE_HOURS (config.py)."""
+        hours = current_app.config.get("CHECKIN_GRACE_HOURS", 2)
+        return self.ngay_ket_thuc + timedelta(hours=hours)
+
+    @property
+    def checkin_state(self):
+        """Trạng thái check-in cho staff, MỘT quy tắc dùng chung cho server và giao diện:
+        'upcoming' chưa bắt đầu | 'open' đang diễn ra | 'grace' đã kết thúc nhưng còn trong thời gian cho phép |
+        'closed' quá mốc, chỉ admin thêm tay."""
+        now = now_vn_naive()
+        if now < self.ngay_bat_dau:
+            return "upcoming"
+        if now <= self.ngay_ket_thuc:
+            return "open"
+        if now <= self.checkin_deadline:
+            return "grace"
+        return "closed"
+
+    @property
+    def ended_label(self):
+        return self._clock_label(self.ngay_ket_thuc)
+
+    @property
+    def checkin_deadline_label(self):
+        return self._clock_label(self.checkin_deadline)
+
+    @property
+    def started_label(self):
+        return self._clock_label(self.ngay_bat_dau)
 
     @property
     def registration_count(self):
