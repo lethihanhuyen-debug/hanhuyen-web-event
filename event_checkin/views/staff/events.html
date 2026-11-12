@@ -7,15 +7,21 @@
     <p class="eyebrow">Nhân viên check-in</p>
     <h1>Danh sách sự kiện</h1>
     {% if events %}
-      <p class="muted">Chọn sự kiện rồi bấm “Check-in” để mở trang check-in của sự kiện đó.</p>
+      <p class="muted">Chọn sự kiện rồi bấm “Check-in” để mở trang check-in, hoặc “Xem danh sách” để xem người đăng ký và người đã check-in.</p>
       <div class="checkin-event-list">
         {% for event in events %}
           {% set status = event.computed_status %}
-          <a class="checkin-event-item" href="{{ url_for('checkin.event_index', event_id=event.id) }}">
-            <span class="badge {{ 'badge--warning' if status == 'ongoing' else 'badge--success' }}">{{ status_labels.get(status, status) }}</span>
+          <div class="checkin-event-item">
+            <span class="badge {{ 'badge--warning' if status == 'ongoing' else ('badge--success' if status == 'upcoming' else 'badge--muted') }}">{{ status_labels.get(status, status) }}</span>
             <strong>{{ event.ten_su_kien }}</strong>
-            <span class="muted">{{ event.ngay_bat_dau.strftime('%d/%m/%Y %H:%M') }}{% if event.co_so %} · {{ event.co_so }}{% endif %} · Check-in</span>
-          </a>
+            <span class="muted">{{ event.ngay_bat_dau.strftime('%d/%m/%Y %H:%M') }}{% if event.co_so %} · {{ event.co_so }}{% endif %}</span>
+            <span class="btn-row">
+              {% if status != 'ended' %}
+                <a class="btn btn--primary btn--sm" href="{{ url_for('checkin.event_index', event_id=event.id) }}">Check-in</a>
+              {% endif %}
+              <a class="btn btn--ghost btn--sm" href="{{ url_for('staff.event_page', event_id=event.id) }}">Xem danh sách</a>
+            </span>
+          </div>
         {% endfor %}
       </div>
     {% else %}

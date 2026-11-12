@@ -134,12 +134,15 @@
                 type="button"
                 data-event='{{ event|tojson }}'
               >Chứng chỉ</button>
+              {# Chỉ super_admin được xóa sự kiện: admin không thấy nút (server vẫn chặn nếu gọi thẳng API) #}
+              {% if can('event.delete') %}
               <button
                 class="btn btn--danger btn--sm js-delete-event"
                 type="button"
                 data-id="{{ event.id }}"
                 data-name="{{ event.ten_su_kien }}"
               >Xóa</button>
+              {% endif %}
             </div>
           </div>
           <div>

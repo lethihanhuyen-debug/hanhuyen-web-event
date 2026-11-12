@@ -41,6 +41,10 @@
       </nav>
 
       {% if current_admin %}
+        <span class="header-user" title="Đang đăng nhập: {{ current_admin.username }} ({{ admin_role_label }})">
+          <span class="header-user__name">{{ current_admin.username }}</span>
+          <span class="header-user__role">{{ admin_role_label }}</span>
+        </span>
         <button type="button" class="header-auth" data-admin-logout>Đăng xuất</button>
       {% elif request.path != '/admin/login' %}
         <a class="header-auth" href="{{ url_for('admin.login_page') }}">Đăng nhập</a>

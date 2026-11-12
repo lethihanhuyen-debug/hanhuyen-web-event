@@ -75,7 +75,8 @@
     paint('pending', 'Đang xử lý...');
 
     try {
-      const response = await fetch('/api/checkin', {
+      // apiFetchQuiet: hết phiên (401) tự chuyển về đăng nhập rồi quay lại đúng trang này; lỗi khác trang tự hiện bằng paint()
+      const response = await apiFetchQuiet('/api/checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ma_cbsv, event_id: EVENT_ID }),
@@ -85,6 +86,8 @@
 
       if (response.status === 404) {
         paint('error', '❌ Mã ' + ma_cbsv + ' chưa đăng ký tham gia chương trình');
+      } else if (data.success && data.already_checked_in) {
+        paint('warning', '⚠️ ' + data.message);
       } else if (data.success) {
         paint('success', '✅ ' + data.message);
       } else {

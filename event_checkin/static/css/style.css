@@ -204,7 +204,7 @@ a {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   line-height: 1.2;
-  color: var(--cocoa-brown); /* xanh ngọc: tách khỏi dòng tên trường */
+  color: #0f4c81;            /* cùng màu với dòng tên trường */
   white-space: nowrap;
 }
 
@@ -4100,4 +4100,47 @@ td.col-num {
 
 .cell-question__btn:hover {
   text-decoration: underline;
+}
+
+/* ---- Tên + vai trò người đang đăng nhập (header) ---- */
+.header-user {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  line-height: 1.15;
+  flex-shrink: 0;
+  max-width: 200px;
+  font-family: var(--font-sans);
+  color: var(--color-primary-dark);
+}
+
+.header-user__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.header-user__role {
+  font-size: var(--text-xs);
+  color: var(--soft-taupe);
+}
+
+@media (max-width: 960px) {
+  .header-user { order: 1; margin-left: auto; }
+  .header-auth { margin-left: var(--space-2); }
+}
+
+@media (max-width: 640px) {
+  /* điện thoại hẹp: chỉ giữ tên, bỏ dòng vai trò cho đỡ chật */
+  .header-user__role { display: none; }
+  .header-user { max-width: 110px; }
+}
+
+/* Thẻ sự kiện của staff: hàng nút dưới tiêu đề */
+.checkin-event-item .btn-row {
+  margin-top: var(--space-2);
 }

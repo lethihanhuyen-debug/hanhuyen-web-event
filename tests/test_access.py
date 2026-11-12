@@ -20,8 +20,6 @@ EXPECTED_PUBLIC = {
     "register.public_events", "register.public_don_vi", "register.register",
     "certificates.download", "certificates.view_certificate", "certificates.verify",
     "admin.login_page", "admin.me", "admin.login", "admin.logout",
-    # Tạm công khai đến bước (c) (khi đó chuyển sang staff):
-    "checkin.index", "checkin.event_index", "checkin.checkin",
 }
 
 
