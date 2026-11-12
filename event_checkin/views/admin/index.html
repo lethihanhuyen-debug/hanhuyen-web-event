@@ -365,7 +365,7 @@
     if (!eventImageInput.files.length) return null;
     const formData = new FormData();
     formData.append('event_image', eventImageInput.files[0]);
-    const response = await fetch(`/api/admin/events/${eventId}/image`, {
+    const response = await apiFetchQuiet(`/api/admin/events/${eventId}/image`, {
       method: 'POST',
       body: formData,
     });
@@ -404,7 +404,7 @@
     message.hidden = true;
 
     try {
-      const response = await fetch(editingEventId ? `/api/admin/events/${editingEventId}` : '/api/admin/events', {
+      const response = await apiFetchQuiet(editingEventId ? `/api/admin/events/${editingEventId}` : '/api/admin/events', {
         method: editingEventId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -472,7 +472,7 @@
       const eventName = button.dataset.name || 'sự kiện này';
       if (!await confirmAsync(`Xóa ${eventName}?\n\nToàn bộ dữ liệu đăng ký, check-in, chứng chỉ và email log của sự kiện này (nếu có) sẽ bị xóa vĩnh viễn theo. Hành động này không thể hoàn tác.`)) return;
       try {
-        const response = await fetch(`/api/admin/events/${button.dataset.id}`, {
+        const response = await apiFetch(`/api/admin/events/${button.dataset.id}`, {
           method: 'DELETE',
         });
         const data = await response.json();
@@ -820,7 +820,7 @@
     formData.append('field', field);
     formData.append('certificate_font', toolbarFontUpload.files[0]);
     toolbarFontUpload.value = '';
-    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-font`, {
+    const response = await apiFetchQuiet(`/api/admin/events/${designingEventId}/certificate-font`, {
       method: 'POST',
       body: formData,
     });
@@ -842,7 +842,7 @@
   toolbarFontRemove.addEventListener('click', async () => {
     if (!selectedField || !designingEventId) return;
     const field = selectedField;
-    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-font/${field}`, { method: 'DELETE' });
+    const response = await apiFetchQuiet(`/api/admin/events/${designingEventId}/certificate-font/${field}`, { method: 'DELETE' });
     const data = await response.json();
     if (!data.success) {
       setTemplateStatus(data.message || 'Không thể xóa font.');
@@ -897,7 +897,7 @@
     const formData = new FormData();
     formData.append('certificate_template', pendingTemplateFile, pendingTemplateFile.name || 'certificate.png');
     setTemplateStatus('Đang tải ảnh...');
-    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-template`, { method: 'POST', body: formData });
+    const response = await apiFetchQuiet(`/api/admin/events/${designingEventId}/certificate-template`, { method: 'POST', body: formData });
     const data = await response.json();
     if (!data.success) {
       setTemplateStatus(data.message || 'Không thể tải ảnh chứng chỉ lên.');
@@ -998,7 +998,7 @@
   saveLayout.addEventListener('click', async () => {
     if (!designingEventId) return;
     if (pendingTemplateFile && !(await commitPendingTemplate())) return;
-    const response = await fetch(`/api/admin/events/${designingEventId}/certificate-layout`, {
+    const response = await apiFetchQuiet(`/api/admin/events/${designingEventId}/certificate-layout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1047,7 +1047,7 @@
     realPreviewContent.textContent = 'Đang vẽ chứng chỉ...';
     realPreviewButton.disabled = true;
     try {
-      const response = await fetch(`/api/admin/events/${designingEventId}/certificate-preview`, {
+      const response = await apiFetchQuiet(`/api/admin/events/${designingEventId}/certificate-preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ layout: certificateLayout, base_width: naturalWidth, base_height: naturalHeight }),

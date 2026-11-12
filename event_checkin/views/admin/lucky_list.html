@@ -167,11 +167,10 @@
     if (!current) return;
     confirmBtn.disabled = true;
     try {
-      const response = await fetch(`/api/admin/lucky-draw/${current.id}`, {
+      const response = await apiFetchQuiet(`/api/admin/lucky-draw/${current.id}`, {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xac_nhan_ten: typed.value }),
       });
-      if (response.status === 401) { location.href = '/admin/login?next=' + encodeURIComponent(location.pathname); return; }
       const data = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
       if (data.success) { location.reload(); return; }
       errorBox.textContent = data.message || 'Không xóa được.';

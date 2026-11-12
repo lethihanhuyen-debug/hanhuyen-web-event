@@ -25,7 +25,12 @@
     if (body !== undefined) { options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body); }
     const response = await fetch(base + path, options);
     const data = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
-    if (response.status === 401) { location.href = '/admin/login?next=' + encodeURIComponent(location.pathname); }
+    if (response.status === 401) {
+      // Trang này không dùng base.html/main.js nên tự báo rồi chuyển về đăng nhập (giống apiFetch)
+      showMsg('Phiên đăng nhập đã hết, vui lòng đăng nhập lại.');
+      setTimeout(() => { location.href = '/admin/login?next=' + encodeURIComponent(location.pathname + location.search); }, 1500);
+      return new Promise(() => {});
+    }
     return data;
   }
 

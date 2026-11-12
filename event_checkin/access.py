@@ -24,6 +24,19 @@ from event_checkin.models.admin import Admin
 
 NOT_LOGGED_IN_MESSAGE = "Vui lòng đăng nhập admin."
 NO_PERMISSION_MESSAGE = "Bạn không có quyền thực hiện thao tác này."
+# Câu báo 403 cụ thể theo thao tác bị cấm (giao diện hiện nguyên văn); quyền không có trong bảng dùng câu chung.
+DENIED_MESSAGES = {
+    perm.EVENT_DELETE: "Bạn không có quyền xóa sự kiện. Chỉ quản trị cao cấp được xóa sự kiện.",
+    perm.SYSTEM_RESET: "Bạn không có quyền xóa toàn bộ dữ liệu. Chỉ quản trị cao cấp được thực hiện.",
+    perm.ACCOUNT_MANAGE: "Bạn không có quyền quản lý tài khoản.",
+    perm.AUDIT_VIEW: "Bạn không có quyền xem nhật ký hoạt động.",
+    perm.EVENT_MANAGE: "Bạn không có quyền tạo hoặc sửa sự kiện.",
+    perm.CHECKIN_MANAGE: "Bạn không có quyền sửa dữ liệu check-in.",
+    perm.CERTIFICATE_MANAGE: "Bạn không có quyền quản lý hoặc gửi chứng chỉ.",
+    perm.DATA_EXPORT: "Bạn không có quyền xuất dữ liệu.",
+    perm.DONVI_MANAGE: "Bạn không có quyền quản lý đơn vị.",
+    perm.LUCKY_MANAGE: "Bạn không có quyền sử dụng chức năng quay số may mắn.",
+}
 NO_PAGE_PERMISSION_MESSAGE = "Bạn không có quyền truy cập trang đó nên đã được chuyển về trang của bạn."
 
 
@@ -75,9 +88,9 @@ def _unauthenticated_response():
     return redirect(url_for("admin.login_page", next=next_url))
 
 
-def _forbidden_response(admin):
+def _forbidden_response(admin, required=None):
     if _wants_json():
-        return jsonify({"success": False, "message": NO_PERMISSION_MESSAGE}), 403
+        return jsonify({"success": False, "message": DENIED_MESSAGES.get(required, NO_PERMISSION_MESSAGE)}), 403
     target = perm.home_path_for_role(admin.role)
     if target == request.path:
         # Trang đích của chính vai trò này cũng bị từ chối (cấu hình sai) -> không redirect vòng.
@@ -105,7 +118,7 @@ def enforce_access():
         return _forbidden_response(admin)
     if perm.has_permission(admin.role, required):
         return None
-    return _forbidden_response(admin)
+    return _forbidden_response(admin, required)
 
 
 def _pop_access_notice():

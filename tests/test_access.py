@@ -130,7 +130,10 @@ class RoleTest(AppTestCase):
                             ("get", "/api/admin/lucky-draw/1"), ("post", "/api/certificates/generate")):
             r = getattr(c, method)(url)
             self.assertEqual(r.status_code, 403, url)
-            self.assertEqual(r.get_json()["message"], "Bạn không có quyền thực hiện thao tác này.")
+            self.assertTrue(r.get_json()["message"].startswith("Bạn không có quyền"), url)
+        # Câu báo cụ thể theo thao tác (giao diện hiện nguyên văn)
+        self.assertIn("xóa sự kiện", c.delete("/api/admin/events/999999").get_json()["message"])
+        self.assertIn("xuất dữ liệu", c.get("/api/admin/events/1/checkins/export").get_json()["message"])
         self.assertEqual(c.get("/api/lookup/KHONG-CO").status_code, 404)  # được phép (staff), chỉ là không có mã
         self.assertEqual(c.get("/api/admin/me").status_code, 200)
 

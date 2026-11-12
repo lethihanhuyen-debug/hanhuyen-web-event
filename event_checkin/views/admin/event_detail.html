@@ -173,7 +173,7 @@
       message.hidden = true;
 
       try {
-        const response = await fetch(urlFor(eventId));
+        const response = await apiFetchQuiet(urlFor(eventId));
         if (!response.ok) {
           const data = await response.json().catch(() => null);
           showMessage('error', (data && data.message) || errorText);
@@ -212,9 +212,9 @@
     let activeFilter = 'all';
 
     async function api(url, options) {
-      const response = await fetch(url, options);
+      // 401 xử lý chung trong apiFetch; message lỗi (kể cả 403) do nơi gọi hiện bằng showMessage
+      const response = await apiFetchQuiet(url, options);
       const data = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
-      if (response.status === 401) window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
       return data;
     }
     function postJson(url, body) {
