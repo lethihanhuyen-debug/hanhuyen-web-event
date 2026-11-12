@@ -103,7 +103,8 @@
   $('clearButton').addEventListener('click', () => { form.reset(); page = 1; load(); });
   $('prevButton').addEventListener('click', () => { if (page > 1) { page -= 1; load(); } });
   $('nextButton').addEventListener('click', () => { if (page < pages) { page += 1; load(); } });
-  load();
+  // main.js (defer) chạy SAU script này nên apiFetchQuiet chưa có lúc này: chỉ tải dữ liệu khi DOM đã xong
+  window.addEventListener('DOMContentLoaded', load);
 })();
 </script>
 {% endblock %}

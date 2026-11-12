@@ -399,3 +399,15 @@ class AuditAndEventDeleteTest(AppTestCase):
         sup = self.client_for("super_admin")
         for method in ("put", "post", "delete", "patch"):
             self.assertIn(getattr(sup, method)("/api/admin/audit-logs").status_code, (404, 405), method)
+
+
+class PageScriptOrderTest(AppTestCase):
+    """main.js được nạp kiểu `defer` nên chạy SAU script nội tuyến cuối trang: lệnh tải dữ liệu ban đầu dùng
+    apiFetch/apiFetchQuiet (định nghĩa trong main.js) phải đợi DOMContentLoaded, nếu không trang kẹt ở "Đang tải…"."""
+
+    def test_initial_load_waits_for_dom_ready(self):
+        for name in ("accounts", "audit_log"):
+            html = self.client_for("super_admin").get("/admin/accounts" if name == "accounts" else "/admin/audit-log").get_data(as_text=True)
+            script = html.split("<script>")[-1]
+            self.assertIn("addEventListener('DOMContentLoaded', load)", script, name)
+            self.assertNotRegex(script, r"(?m)^\s*load\(\);\s*$", name + ": còn gọi load() ngay lúc nạp trang")

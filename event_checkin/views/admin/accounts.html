@@ -239,7 +239,8 @@
   }
 
   $('searchInput').addEventListener('input', () => { window.clearTimeout(searchTimer); searchTimer = window.setTimeout(load, 250); });
-  load();
+  // main.js (defer) chạy SAU script này nên apiFetchQuiet chưa có lúc này: chỉ tải danh sách khi DOM đã xong
+  window.addEventListener('DOMContentLoaded', load);
 })();
 </script>
 {% endblock %}
