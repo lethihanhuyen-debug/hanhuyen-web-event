@@ -5,6 +5,8 @@ from flask import Blueprint, jsonify, render_template, request, url_for
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 
+from event_checkin import permissions as perm
+from event_checkin.access import access
 from event_checkin.models import db
 from event_checkin.models.don_vi import DonVi
 from event_checkin.models.event import Event
@@ -15,6 +17,8 @@ from event_checkin.models.user import User
 register_bp = Blueprint("register", __name__)
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 PHONE_PATTERN = re.compile(r"^\d{9,11}$")
+QUESTION_MAX_LENGTH = 1000
+CRLF, CR, LF = chr(13) + chr(10), chr(13), chr(10)  # chuẩn hoá xuống dòng của câu hỏi về LF
 MONTH_GROUPS_PER_PAGE = 3
 CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
 
@@ -137,6 +141,7 @@ def _month_groups_page(offset, limit=MONTH_GROUPS_PER_PAGE):
 
 
 @register_bp.get("/")
+@access(perm.PUBLIC)
 def index():
     event_groups, next_offset, has_more = _month_groups_page(0)
     don_vi_items = DonVi.query.filter_by(is_active=True).order_by(DonVi.ten_don_vi.asc()).all()
@@ -154,6 +159,7 @@ def index():
 
 
 @register_bp.get("/events/<int:event_id>/register")
+@access(perm.PUBLIC)
 def event_register(event_id):
     event = Event.query.get_or_404(event_id)
     don_vi_items = DonVi.query.filter_by(is_active=True).order_by(DonVi.ten_don_vi.asc()).all()
@@ -161,6 +167,7 @@ def event_register(event_id):
 
 
 @register_bp.get("/api/events/month-groups")
+@access(perm.PUBLIC)
 def events_month_groups():
     try:
         offset = int(request.args.get("offset", 0))
@@ -181,6 +188,7 @@ def events_month_groups():
 
 
 @register_bp.get("/api/events/search")
+@access(perm.PUBLIC)
 def search_events():
     """Lọc sự kiện theo từ khoá + tháng + cơ sở + trạng thái -- trả về TOÀN BỘ
     kết quả khớp (không phân trang) vì đây là tìm kiếm chủ động, khác với
@@ -215,6 +223,7 @@ def search_events():
 
 
 @register_bp.get("/api/lookup/<ma_cbsv>")
+@access(perm.PATRON_LOOKUP)
 def lookup(ma_cbsv):
     ma_cbsv = (ma_cbsv or "").strip()
     user = User.query.filter_by(ma_cbsv=ma_cbsv).first()
@@ -231,6 +240,7 @@ def lookup(ma_cbsv):
 
 
 @register_bp.get("/api/events")
+@access(perm.PUBLIC)
 def public_events():
     events = Event.query.order_by(Event.ngay_bat_dau.desc()).all()
     return jsonify({
@@ -255,6 +265,7 @@ def public_events():
 
 
 @register_bp.get("/api/don-vi")
+@access(perm.PUBLIC)
 def public_don_vi():
     items = DonVi.query.filter_by(is_active=True).order_by(DonVi.ten_don_vi.asc()).all()
     return jsonify({"success": True, "data": [item.to_dict() for item in items]})
@@ -262,6 +273,7 @@ def public_don_vi():
 
 @register_bp.post("/register")
 @register_bp.post("/api/register")
+@access(perm.PUBLIC)
 def register():
     payload = request.get_json(silent=True) or request.form
     ma_cbsv = (payload.get("ma_cbsv") or "").strip()
@@ -290,6 +302,17 @@ def register():
 
     if not event.is_registration_open:
         return jsonify({"success": False, "message": event.registration_block_reason}), 400
+
+    # Ô câu hỏi (tuỳ chọn, chỉ khi sự kiện bật): bỏ khoảng trắng thừa, chuẩn hoá xuống dòng, tối đa 1000 ký tự.
+    # Trống thì lưu NULL. Sự kiện đang tắt công tắc thì bỏ qua giá trị gửi lên. Kiểm tra trước khi động tới
+    # User/Registration để đăng ký bị từ chối không để lại tác dụng phụ nào.
+    cau_hoi = None
+    if event.cho_phep_cau_hoi:
+        cau_hoi_raw = payload.get("cau_hoi")
+        cau_hoi_text = (str(cau_hoi_raw).replace(CRLF, LF).replace(CR, LF).strip()) if cau_hoi_raw else ""
+        if len(cau_hoi_text) > QUESTION_MAX_LENGTH:
+            return jsonify({"success": False, "message": f"Câu hỏi tối đa {QUESTION_MAX_LENGTH} ký tự (hiện có {len(cau_hoi_text)})."}), 400
+        cau_hoi = cau_hoi_text or None
 
     # Checked before touching User/Registration so a duplicate-registration attempt
     # (which is rejected below) never has the side effect of overwriting the
@@ -351,6 +374,7 @@ def register():
         ma_cbsv=ma_cbsv,
         event_id=event_id,
         thoi_gian_dang_ky=now,
+        cau_hoi=cau_hoi,
     )
     db.session.add(registration)
     try:

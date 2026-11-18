@@ -1,12 +1,14 @@
 from flask import Blueprint, abort, jsonify, render_template, request, send_file
 
+from event_checkin import permissions as perm
+from event_checkin.access import access
+from event_checkin.audit import audited
 from event_checkin.certificates.service import (
     CertificateError,
     DEFAULT_EVENT_ID,
     generate_certificate,
     get_certificate_file_path,
 )
-from event_checkin.controllers.admin_controller import admin_required
 from event_checkin.models.certificate import Certificate
 
 
@@ -14,7 +16,8 @@ certificate_bp = Blueprint("certificates", __name__)
 
 
 @certificate_bp.post("/api/certificates/generate")
-@admin_required
+@access(perm.CERTIFICATE_MANAGE)
+@audited("certificate.generate")
 def generate():
     payload = request.get_json(silent=True) or request.form
     ma_cbsv = (payload.get("ma_cbsv") or "").strip()
@@ -42,6 +45,7 @@ def generate():
 
 
 @certificate_bp.get("/api/certificates/<certificate_code>")
+@access(perm.PUBLIC)
 def download(certificate_code):
     certificate = Certificate.query.filter_by(certificate_code=certificate_code).first_or_404()
     try:
@@ -55,6 +59,7 @@ def download(certificate_code):
 
 
 @certificate_bp.get("/api/certificates/<certificate_code>/view")
+@access(perm.PUBLIC)
 def view_certificate(certificate_code):
     certificate = Certificate.query.filter_by(certificate_code=certificate_code).first_or_404()
     try:
@@ -68,6 +73,7 @@ def view_certificate(certificate_code):
 
 
 @certificate_bp.get("/verify/<certificate_code>")
+@access(perm.PUBLIC)
 def verify(certificate_code):
     certificate = Certificate.query.filter_by(certificate_code=certificate_code).first_or_404()
     return render_template("certificates/verify.html", certificate=certificate)

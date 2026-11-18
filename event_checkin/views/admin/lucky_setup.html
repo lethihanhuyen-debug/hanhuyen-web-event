@@ -323,8 +323,7 @@
     }));
     if (newFile) form.append('hinh_nen', newFile);
     try {
-      const response = await fetch(`/api/admin/lucky-draw/${id}/setup`, { method: 'PUT', body: form });
-      if (response.status === 401) { saving = false; location.href = '/admin/login?next=' + encodeURIComponent(location.pathname + location.search); return; }
+      const response = await apiFetchQuiet(`/api/admin/lucky-draw/${id}/setup`, { method: 'PUT', body: form });
       const result = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
       if (result.success) {
         say('Đã lưu.', 'success');
@@ -358,7 +357,7 @@
 
   if ($('exportButton')) {
     $('exportButton').addEventListener('click', async () => {
-      const response = await fetch(`/api/admin/lucky-draw/${data.event_id}/export`);
+      const response = await apiFetchQuiet(`/api/admin/lucky-draw/${data.event_id}/export`);
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
         say(result.message || 'Không xuất được file.', 'error');
@@ -375,7 +374,7 @@
   function cell(text, extra) { return el('td', Object.assign({ textContent: text }, extra || {})); }
   async function loadResults() {
     if (MODE !== 'edit') return;
-    const response = await fetch(`/api/admin/lucky-draw/${data.event_id}`);
+    const response = await apiFetch(`/api/admin/lucky-draw/${data.event_id}`);
     const result = await response.json().catch(() => null);
     if (!result || !result.success) return;
     const pending = $('pendingNote');
@@ -413,7 +412,7 @@
         danger: true,
         onClick: async () => {
           if (!await confirmAsync(`Hủy kết quả của ${w.patron_code}${w.ho_ten ? ' - ' + w.ho_ten : ''}? Người này sẽ được đưa lại vào danh sách quay.`)) return;
-          const r = await fetch(`/api/admin/lucky-draw/${data.event_id}/winners/${w.id}/cancel`, { method: 'POST' });
+          const r = await apiFetchQuiet(`/api/admin/lucky-draw/${data.event_id}/winners/${w.id}/cancel`, { method: 'POST' });
           const j = await r.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
           say(j.message, j.success ? 'success' : 'error');
           loadResults();

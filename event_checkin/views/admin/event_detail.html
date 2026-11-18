@@ -58,6 +58,9 @@
     </div>
     <div class="list-head__actions">
       <button id="exportRegistrations" class="btn btn--outline btn--lg" type="button" data-event-id="{{ event.id }}">Xuất Excel</button>
+      {% if show_questions %}
+      <button id="exportQuestions" class="btn btn--outline btn--lg" type="button" data-event-id="{{ event.id }}">Xuất câu hỏi</button>
+      {% endif %}
       {# TODO: gửi hàng loạt ngay tại trang này (POST send-certificates + GET send-certificates/status).
          Hiện dẫn sang Danh sách check-in, nơi đã có thanh tiến trình gửi. #}
       <a id="sendBulk" class="btn btn--green btn--lg" href="{{ url_for('admin.checkins_page', event_id=event.id) }}">Gửi chứng nhận hàng loạt</a>
@@ -71,6 +74,9 @@
         <button type="button" class="chip is-active" data-filter="all" aria-pressed="true">Tất cả · <span data-count="all">{{ totals.registrations }}</span></button>
         <button type="button" class="chip" data-filter="checked-in" aria-pressed="false">Đã check-in · <span data-count="checked-in">{{ totals.checkins }}</span></button>
         <button type="button" class="chip" data-filter="pending" aria-pressed="false">Chưa check-in · <span data-count="pending">{{ totals.pending }}</span></button>
+        {% if show_questions %}
+        <button type="button" class="chip" data-filter="has-question" aria-pressed="false" title="Chỉ người có gửi câu hỏi">Có câu hỏi · <span data-count="has-question">{{ totals.questions }}</span></button>
+        {% endif %}
         <button type="button" class="chip chip--danger" data-filter="failed" aria-pressed="false">Gửi lỗi · <span data-count="failed">{{ rows|selectattr('cert_status', 'equalto', 'failed')|list|length }}</span></button>
       </div>
       <label class="list-search">
@@ -85,13 +91,14 @@
           <tr>
             <th>Người tham dự</th>
             <th>Đơn vị</th>
+            {% if show_questions %}<th>Câu hỏi</th>{% endif %}
             <th>Check-in</th>
             <th>Chứng nhận</th>
             <th class="col-actions"><span class="sr-only">Thêm thao tác</span></th>
           </tr>
         </thead>
         <tbody id="regRows">
-          <tr><td colspan="5" class="table-empty">Đang tải…</td></tr>
+          <tr><td colspan="{{ 6 if show_questions else 5 }}" class="table-empty">Đang tải…</td></tr>
         </tbody>
       </table>
     </div>
@@ -154,25 +161,26 @@
     return fallback;
   }
 
-  if (exportButton) {
-    exportButton.addEventListener('click', async () => {
-      if (exportButton.disabled) return; // chặn bấm liên tục gây gọi API trùng lặp
-      const eventId = exportButton.dataset.eventId;
-      const originalText = exportButton.textContent;
-      exportButton.disabled = true;
-      exportButton.textContent = 'Đang xuất...';
+  // Nút xuất Excel dùng chung: tải file qua blob, giữ đúng tên file tiếng Việt từ header Content-Disposition
+  function wireExport(button, urlFor, fallbackPrefix, errorText) {
+    if (!button) return;
+    button.addEventListener('click', async () => {
+      if (button.disabled) return; // chặn bấm liên tục gây gọi API trùng lặp
+      const eventId = button.dataset.eventId;
+      const originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Đang xuất...';
       message.hidden = true;
 
       try {
-        const response = await fetch(`/api/admin/events/${eventId}/export-registrations`);
+        const response = await apiFetchQuiet(urlFor(eventId));
         if (!response.ok) {
           const data = await response.json().catch(() => null);
-          showMessage('error', (data && data.message) || 'Không thể xuất danh sách đăng ký.');
+          showMessage('error', (data && data.message) || errorText);
           return;
         }
         const blob = await response.blob();
-        const fallbackName = `DanhSachDangKy_${eventId}.xlsx`;
-        const filename = parseFilenameFromContentDisposition(response.headers.get('Content-Disposition'), fallbackName);
+        const filename = parseFilenameFromContentDisposition(response.headers.get('Content-Disposition'), `${fallbackPrefix}_${eventId}.xlsx`);
 
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -185,15 +193,18 @@
       } catch (error) {
         showMessage('error', 'Không thể kết nối máy chủ.');
       } finally {
-        exportButton.disabled = false;
-        exportButton.textContent = originalText;
+        button.disabled = false;
+        button.textContent = originalText;
       }
     });
   }
+  wireExport(exportButton, (id) => `/api/admin/events/${id}/export-registrations`, 'DanhSachDangKy', 'Không thể xuất danh sách đăng ký.');
+  wireExport(document.getElementById('exportQuestions'), (id) => `/api/admin/events/${id}/export-questions`, 'CauHoi', 'Không thể xuất danh sách câu hỏi.');
 
   // main.js (defer) chạy sau script này nên bảng chỉ khởi tạo khi DOM xong, lúc window.listUi đã có
   window.addEventListener('DOMContentLoaded', () => {
     const EVENT_ID = {{ event.id }};
+    const SHOW_QUESTIONS = {{ show_questions|tojson }};
     const tbody = document.getElementById('regRows');
     const searchInput = document.getElementById('regSearch');
     const chipButtons = Array.from(document.querySelectorAll('#checkinFilterTabs .chip'));
@@ -201,9 +212,9 @@
     let activeFilter = 'all';
 
     async function api(url, options) {
-      const response = await fetch(url, options);
+      // 401 xử lý chung trong apiFetch; message lỗi (kể cả 403) do nơi gọi hiện bằng showMessage
+      const response = await apiFetchQuiet(url, options);
       const data = await response.json().catch(() => ({ success: false, message: 'Phản hồi không hợp lệ từ máy chủ.' }));
-      if (response.status === 401) window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
       return data;
     }
     function postJson(url, body) {
@@ -219,8 +230,9 @@
         certCode: r.certificate_code || '', status: r.checked_in ? (r.cert_status || 'pending') : '',
         error: r.cert_error || '', sentAt: r.cert_sent_at || '', sendCount: r.send_count || 0,
         recordId: null, sending: false, tr: null,
+        question: r.cau_hoi || '',
       };
-      person.searchKey = normalize([person.name, person.code, person.email].join(' '));
+      person.searchKey = normalize([person.name, person.code, person.email, person.question].join(' '));
       return person;
     }
     const people = JSON.parse(document.getElementById('regData').textContent).map(toPerson);
@@ -309,6 +321,21 @@
       unit.appendChild(unitText);
       tr.appendChild(unit);
 
+      if (SHOW_QUESTIONS) {
+        const questionTd = el('td', 'cell-question');
+        if (p.question) {
+          // textContent (không HTML) + rút gọn 1 dòng; bấm để xem đầy đủ
+          const open = el('button', 'cell-question__btn', p.question);
+          open.type = 'button';
+          open.setAttribute('aria-label', `Xem đầy đủ câu hỏi của ${p.name || p.code}`);
+          open.addEventListener('click', () => window.infoDialog(`Câu hỏi của ${p.name || p.code}`, p.question));
+          questionTd.appendChild(open);
+        } else {
+          questionTd.appendChild(el('span', 'cell-muted', '—'));
+        }
+        tr.appendChild(questionTd);
+      }
+
       const checkin = el('td');
       if (p.checkedIn) {
         const tag = el('span', 'cell-checkin');
@@ -334,6 +361,7 @@
       if (activeFilter === 'checked-in') return p.checkedIn;
       if (activeFilter === 'pending') return !p.checkedIn;
       if (activeFilter === 'failed') return p.checkedIn && p.status === 'failed';
+      if (activeFilter === 'has-question') return !!p.question;
       return true;
     }
 
@@ -349,7 +377,7 @@
       if (!emptyRow) {
         emptyRow = document.createElement('tr');
         const td = el('td', 'table-empty');
-        td.colSpan = 5;
+        td.colSpan = SHOW_QUESTIONS ? 6 : 5;
         emptyRow.appendChild(td);
       }
       emptyRow.firstChild.textContent = people.length ? 'Không có ai phù hợp với bộ lọc hoặc từ khóa.' : 'Chưa có ai đăng ký sự kiện này.';
@@ -361,7 +389,7 @@
       const checked = people.filter((p) => p.checkedIn).length;
       const failed = people.filter((p) => p.checkedIn && p.status === 'failed').length;
       const sent = people.filter((p) => p.checkedIn && p.status === 'sent').length;
-      const counts = { all: people.length, 'checked-in': checked, pending: people.length - checked, failed };
+      const counts = { all: people.length, 'checked-in': checked, pending: people.length - checked, failed, 'has-question': people.filter((p) => p.question).length };
       document.querySelectorAll('#checkinFilterTabs [data-count]').forEach((node) => { node.textContent = counts[node.dataset.count]; });
       document.getElementById('statCheckins').textContent = checked;
       document.getElementById('statPending').textContent = people.length - checked;

@@ -13,6 +13,7 @@ class Registration(db.Model):
     ma_cbsv = db.Column(db.String(50), db.ForeignKey("users.ma_cbsv"), nullable=False, index=True)
     event_id = db.Column(db.Integer, db.ForeignKey("events.id"), nullable=False, index=True)
     thoi_gian_dang_ky = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    cau_hoi = db.Column(db.Text)  # câu hỏi gửi diễn giả (m005); NULL/rỗng = không hỏi, tối đa 1000 ký tự (kiểm tra ở server)
 
     user = db.relationship("User", lazy="joined")
     event = db.relationship("Event", lazy="joined")

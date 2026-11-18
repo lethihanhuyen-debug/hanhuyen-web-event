@@ -204,7 +204,7 @@ a {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   line-height: 1.2;
-  color: var(--cocoa-brown); /* xanh ngọc: tách khỏi dòng tên trường */
+  color: #0f4c81;            /* cùng màu với dòng tên trường */
   white-space: nowrap;
 }
 
@@ -881,25 +881,6 @@ textarea:focus {
 .btn--back:hover {
   background: var(--linen);
   color: var(--color-primary-dark);
-}
-
-/* Nút quay lại trên trang check-in: góc trên bên phải trang, ngoài khung check-in */
-.checkin-stage:has(.checkin-back) {
-  position: relative;
-}
-
-.checkin-back {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-@media (max-width: 640px) {
-  .checkin-back {
-    position: static;
-    justify-self: end;
-    margin-bottom: var(--space-4);
-  }
 }
 
 /* Nút Check-in / Danh sách check-in (trang chi tiết sự kiện) */
@@ -3959,3 +3940,235 @@ td.col-num {
 .panel-actions > .btn--back {
   order: 2;
 }
+
+/* ---- Công tắc "Cho phép người đăng ký đặt câu hỏi" (form tạo/sửa sự kiện) ---- */
+.question-setting {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+}
+
+.switch-field {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.switch-field input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.switch-field__track {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 28px;
+  margin-top: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  transition: background-color .18s ease;
+}
+
+.switch-field__track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform .18s ease;
+}
+
+.switch-field input:checked + .switch-field__track {
+  background: var(--color-primary);
+}
+
+.switch-field input:checked + .switch-field__track::after {
+  transform: translateX(20px);
+}
+
+.switch-field input:focus-visible + .switch-field__track {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.switch-field__text {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.switch-field__text small,
+.question-setting__title small {
+  color: var(--muted);
+}
+
+.question-setting__title {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.question-setting__title[hidden] {
+  display: none;
+}
+
+/* ---- Ô câu hỏi ở form đăng ký ---- */
+.question-field {
+  grid-column: 1 / -1;
+}
+
+.question-field__optional {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.question-field textarea {
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+}
+
+.question-field__counter {
+  justify-self: end;
+  color: var(--muted);
+}
+
+.question-field__counter.is-limit {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* ---- Câu hỏi đăng ký ở trang admin ---- */
+.app-dialog--wide {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.app-dialog__text--pre {
+  white-space: pre-wrap;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.cell-question {
+  max-width: 260px;
+}
+
+.cell-question__btn {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.cell-question__btn:hover {
+  text-decoration: underline;
+}
+
+/* ---- Tên + vai trò người đang đăng nhập (header) ---- */
+.header-user {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  line-height: 1.15;
+  flex-shrink: 0;
+  max-width: 200px;
+  font-family: var(--font-sans);
+  color: var(--color-primary-dark);
+}
+
+.header-user__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.header-user__role {
+  font-size: var(--text-xs);
+  color: var(--soft-taupe);
+}
+
+@media (max-width: 960px) {
+  .header-user { order: 1; margin-left: auto; }
+  .header-auth { margin-left: var(--space-2); }
+}
+
+@media (max-width: 640px) {
+  /* điện thoại hẹp: chỉ giữ tên, bỏ dòng vai trò cho đỡ chật */
+  .header-user__role { display: none; }
+  .header-user { max-width: 110px; }
+}
+
+/* Thẻ sự kiện của staff: hàng nút dưới tiêu đề */
+.checkin-event-item .btn-row {
+  margin-top: var(--space-2);
+}
+
+/* ---- Thanh tiêu đề trang staff: nhãn (eyebrow) bên trái + nút "Quay lại" bên phải, CÙNG MỘT HÀNG, canh giữa theo
+   chiều dọc, không xuống dòng ở mọi cỡ màn hình. Dùng cho /staff/events/<id> và trang check-in. ---- */
+.staff-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.staff-titlebar .eyebrow {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-titlebar .btn--back {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .staff-titlebar .btn--back {
+    min-height: 40px;
+    padding: 0 var(--space-3);
+  }
+}
+
+/* Liên kết phụ dưới nút chính của trang đăng nhập / quên mật khẩu */
+.auth-forgot {
+  margin: var(--space-3) 0 0;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+
+.auth-forgot a {
+  color: var(--color-primary-dark);
+}
+
+/* Tên + vai trò là liên kết sang trang Đổi mật khẩu */
+.header-user { text-decoration: none; }
+.header-user:hover .header-user__name { text-decoration: underline; }

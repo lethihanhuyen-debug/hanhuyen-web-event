@@ -54,6 +54,9 @@ class Config:
     ADMIN_DEFAULT_USERNAME = os.getenv("ADMIN_DEFAULT_USERNAME", "admin")
     ADMIN_DEFAULT_PASSWORD = os.getenv("ADMIN_DEFAULT_PASSWORD", "admin123")
     REMEMBER_LOGIN_DAYS = int(os.getenv("REMEMBER_LOGIN_DAYS", "30"))
+    # Số giờ SAU giờ kết thúc sự kiện mà staff vẫn check-in được (quá mốc này chỉ admin thêm tay). Server kiểm tra
+    # theo đúng mốc này và giao diện (nút Check-in, dòng nhắc) cũng dùng cùng mốc -- xem Event.checkin_state.
+    CHECKIN_GRACE_HOURS = float(os.getenv("CHECKIN_GRACE_HOURS", "5"))
     PERMANENT_SESSION_LIFETIME = timedelta(days=REMEMBER_LOGIN_DAYS)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"

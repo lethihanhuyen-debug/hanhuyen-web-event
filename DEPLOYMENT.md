@@ -271,6 +271,7 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 - [ ] `http://<domain>/` tự động redirect sang `https://`
 - [ ] Đăng nhập `/admin/login` bằng tài khoản admin đã đổi mật khẩu (không phải `admin123`)
 - [ ] Đăng ký thử 1 sự kiện bằng mã CB/SV test, check-in thử tại `/checkin`
+- [ ] `python -m event_checkin.migrations.m005_cau_hoi_dang_ky --check` báo `OK` (sau khi chạy m005)
 - [ ] Menu **Quay số may mắn** (`/admin/lucky-draw`) mở được; thiết lập thử 1 sự kiện (giải + ảnh nền), quay thử, Lưu, rồi xóa thiết lập thử (sau khi chạy m004)
 - [ ] Chứng chỉ PDF/PNG tạo và tải được sau check-in (nếu event bật cấp chứng chỉ)
 - [ ] Email xác nhận gửi được (kiểm tra hộp thư, và `C:\apps\eventcheckin\logs\app.log` không có lỗi SMTP)
@@ -307,5 +308,44 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
     ```
     Với SQLite xem thử (`instance/preview.db`): `sqlite3 instance/preview.db ".tables"`, rồi `DROP TABLE lucky_winners; DROP TABLE lucky_prizes; DROP TABLE lucky_configs;`. Sau đó chạy lại `python -m event_checkin.migrations.m004_lucky_draw`.
   - Ảnh nền do admin tải lên được lưu ở `event_checkin\static\lucky\uploads\` — tài khoản chạy service `EventCheckinApp` cần có quyền ghi thư mục này (và nên đưa vào lịch sao lưu cùng `static\events`). Hướng dẫn cho admin: mục 8 của `HUONG_DAN_ADMIN.md`.
+- **Bản cập nhật ô "câu hỏi" ở form đăng ký (11/2026)**: thêm 3 cột mới (`events.cho_phep_cau_hoi`, `events.tieu_de_cau_hoi`, `registrations.cau_hoi`), không sửa/xóa dữ liệu cũ; sự kiện cũ mặc định tắt, đăng ký cũ có câu hỏi rỗng. **Làm đúng thứ tự** (đừng khởi động lại app trước khi chạy m005 — code mới đọc các cột này, thiếu cột thì app không khởi động được):
+  1. **Backup database**: `Start-ScheduledTask -TaskName "CheckinEvent-DB-Backup"`, rồi kiểm tra `C:\backups\` có file `checkin_event_<ngày>.sql` mới nhất.
+  2. **Chép code mới**: `git pull` trong `C:\apps\eventcheckin` (app đang chạy vẫn dùng code cũ, chưa ảnh hưởng).
+  3. **Chạy m005** (chạy lại nhiều lần vẫn an toàn):
+     ```powershell
+     .venv\Scripts\python -m event_checkin.migrations.m005_cau_hoi_dang_ky
+     ```
+  4. **Khởi động lại app**: `Restart-Service EventCheckinApp`.
+
+  **Kiểm tra m005 đã chạy thành công** (mã thoát `0` và dòng bắt đầu bằng `OK` là đạt; nếu in `CHƯA ĐỦ` thì quay lại bước 3):
+  ```powershell
+  .venv\Scripts\python -m event_checkin.migrations.m005_cau_hoi_dang_ky --check
+  ```
+  Hoặc kiểm tra trực tiếp trong MySQL/MariaDB (phải thấy đủ 3 dòng):
+  ```sql
+  SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND ((TABLE_NAME = 'events' AND COLUMN_NAME IN ('cho_phep_cau_hoi', 'tieu_de_cau_hoi'))
+       OR (TABLE_NAME = 'registrations' AND COLUMN_NAME = 'cau_hoi'));
+  ```
+  Câu hỏi có thể chứa emoji: cột/bảng cần bộ ký tự `utf8mb4` (mặc định của MySQL 8 và `?charset=utf8mb4` trong chuỗi kết nối). Kiểm tra: `SHOW FULL COLUMNS FROM registrations LIKE 'cau_hoi';` cột `Collation` phải bắt đầu bằng `utf8mb4`.
+- **Bản cập nhật phân quyền 3 cấp (11/2026, đang triển khai theo từng bước — đợt này mới có migration m006 + model)**: thêm cột `admins.email/must_change_password/session_version/last_login_at`, `events.updated_by`, `checkin_records.checked_in_by` và 2 bảng `audit_logs`, `password_resets`; không sửa/xóa dữ liệu cũ. Tài khoản hiện có mà `role` không thuộc `super_admin/admin/staff` được gán `super_admin`. Làm đúng thứ tự như m005 (backup DB → `git pull` → chạy m006 → `Restart-Service EventCheckinApp`; **không khởi động lại app trước khi chạy m006**):
+  ```powershell
+  .venv\Scripts\python -m event_checkin.migrations.m006_phan_quyen
+  .venv\Scripts\python -m event_checkin.migrations.m006_phan_quyen --check   # mã thoát 0 + dòng "OK" là đạt
+  ```
+  - **Tài khoản thử và sự kiện thử chỉ dùng trên DB THỬ (`checkin_event_test`), KHÔNG tạo trên DB thật `checkin_event`.** Gồm tài khoản `nv_staff`, `nv_admin` (mật khẩu thử đơn giản), sự kiện `[DEMO] Sự kiện thử phân quyền` và các mã `DEMO001`–`DEMO003`. Test tự động (`tests/`) cũng tự từ chối chạy nếu tên DB không kết thúc bằng `_test`. Trên DB thật chỉ tạo tài khoản thật, mật khẩu mạnh, bằng `scripts\tao_tai_khoan.py` (có in tên DB đang dùng; kiểm tra kỹ trước khi nhấn Enter) hoặc, sau khi xong bước (d), bằng trang Quản lý tài khoản.
+  - Sau khi nâng cấp, **mọi phiên đăng nhập cũ bị đăng xuất một lần** (phiên mới lưu thêm `session_version`); admin chỉ cần đăng nhập lại.
+  - Từ bước (c): `/checkin`, `/checkin/<id>`, `/api/checkin` **bắt buộc đăng nhập** (staff trở lên); người tham dự không tự check-in. Trang đăng ký sự kiện vẫn công khai.
+  - **Thời gian check-in sau khi sự kiện kết thúc**: biến `CHECKIN_GRACE_HOURS` trong `.env` (mặc định `5` giờ; muốn khác thì đặt ví dụ `CHECKIN_GRACE_HOURS=2`). Trong khoảng này staff vẫn thấy nút Check-in và check-in được; quá mốc thì staff chỉ xem danh sách, admin thêm check-in tay. Đổi giá trị xong cần `Restart-Service EventCheckinApp`.
+  - Chạy test (trên máy dev, DB thử): `$env:MYSQL_DATABASE = "checkin_event_test"` rồi `.venv\Scripts\python -m unittest discover -s . -t . -p "test_*.py" -v`.
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.
+
+- **Tạo tài khoản đầu tiên / khôi phục super_admin (bước d phân quyền)**:
+  - Sau khi chạy m006, tài khoản cũ tự thành `super_admin`. Có thể tạo thêm tài khoản ngay trong web: đăng nhập super_admin → **Quản trị → Quản lý tài khoản**.
+  - Tạo tài khoản bằng dòng lệnh khi cần: `.venv\Scripts\python scripts\tao_tai_khoan.py <tên> <staff|admin|super_admin>` (tự in tên DB đang dùng; không có `--password` thì sinh mật khẩu ngẫu nhiên in một lần).
+  - **Super_admin quên mật khẩu hoặc bị khóa**: chạy trên máy chủ `.venv\Scripts\python scripts\reset-superadmin.py <tên_đăng_nhập>` — đặt mật khẩu tạm (in một lần), bật buộc đổi mật khẩu, mở khóa, đăng xuất mọi phiên cũ và ghi nhật ký.
+  - **Quên mật khẩu qua email** dùng đúng cấu hình gửi thư sẵn có (`MAIL_USERNAME`, `MAIL_PASSWORD` trong `.env`). Chưa cấu hình thì người dùng vẫn thấy câu "Nếu email tồn tại…" nhưng không có thư nào được gửi; khi đó dùng chức năng "Đặt lại mật khẩu" của super_admin. Ở môi trường dev (không phải production) liên kết đặt lại được in vào cửa sổ log để thử.
+  - Đường dẫn trong thư là địa chỉ tuyệt đối dựng từ domain mà người dùng đang truy cập; sau IIS/ARR cần giữ cấu hình `X-Forwarded-Proto/Host` hiện có thì liên kết mới đúng `https://…`.
+  - Chỉ mục `audit_logs (action, created_at)` dùng cho giới hạn quên mật khẩu **đã có sẵn trong m006**, không cần migration m007.

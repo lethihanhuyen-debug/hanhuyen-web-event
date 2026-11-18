@@ -31,6 +31,7 @@
         </label>
         <a class="auth-back" href="{{ url_for('register.index') }}">← Về trang chủ</a>
       </div>
+      <p class="auth-forgot"><a href="{{ url_for('password.forgot_page') }}">Quên mật khẩu?</a></p>
       <button class="btn btn--primary btn--full auth-submit" type="submit">Đăng nhập</button>
     </div>
   </form>
@@ -77,7 +78,7 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (even
   }
   message.style.display = 'block';
   if (data.success) {
-    window.location.href = nextUrl || '/admin';
+    window.location.href = nextUrl || data.home_path || '/admin';
     return;
   }
   submit.classList.remove('is-loading');

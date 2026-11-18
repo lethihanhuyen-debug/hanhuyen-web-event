@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}{{ event.ten_su_kien }} | Event Check-in{% endblock %}
+
+{% block container_class %}container--wide{% endblock %}
+
+{% block content %}
+<section class="admin-panel admin-panel--wide">
+  {# Nhãn bên trái, Quay lại bên phải, cùng một hàng và canh giữa theo chiều dọc (cả điện thoại) #}
+  <div class="staff-titlebar">
+    <p class="eyebrow">Sự kiện · {{ status_label }}</p>
+    <a class="btn btn--back" href="{{ url_for('staff.events_page') }}">← Quay lại</a>
+  </div>
+  <div class="panel-head">
+    <div>
+      <h1>{{ event.ten_su_kien }}</h1>
+      <p class="muted">
+        {{ event.dia_diem or 'Chưa có địa điểm' }} -
+        {{ event.ngay_bat_dau.strftime('%d/%m/%Y %H:%M') }}{% if event.ngay_ket_thuc %} - {{ event.ngay_ket_thuc.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+      </p>
+    </div>
+    <div class="panel-actions panel-actions--row">
+      {% if event.checkin_state != 'closed' %}
+        <a class="btn btn--primary" href="{{ url_for('checkin.event_index', event_id=event.id) }}">Check-in</a>
+      {% endif %}
+      <button class="btn btn--ghost" type="button" onclick="window.location.reload()">Tải lại danh sách</button>
+    </div>
+  </div>
+
+  {% if event.checkin_state == 'grace' %}
+    <div class="message message--warning">Sự kiện đã kết thúc lúc {{ event.ended_label }}. Vẫn nhận check-in đến {{ event.checkin_deadline_label }}.</div>
+  {% elif event.checkin_state == 'closed' %}
+    <div class="message message--warning">Sự kiện đã kết thúc lúc {{ event.ended_label }}, đã quá thời gian check-in: chỉ xem danh sách. Cần bổ sung check-in thì báo admin.</div>
+  {% endif %}
+
+  <div class="stat-grid">
+    <div class="stat-card"><span>Đã đăng ký</span><strong>{{ totals.registrations }}</strong></div>
+    <div class="stat-card"><span>Đã check-in</span><strong>{{ totals.checkins }}</strong></div>
+    <div class="stat-card"><span>Chưa check-in</span><strong>{{ totals.pending }}</strong></div>
+  </div>
+
+  <div class="table-card">
+    <div class="list-toolbar">
+      <div class="chips" id="staffFilterTabs" role="group" aria-label="Lọc theo trạng thái">
+        <button type="button" class="chip is-active" data-filter="all" aria-pressed="true">Tất cả · {{ totals.registrations }}</button>
+        <button type="button" class="chip" data-filter="checked-in" aria-pressed="false">Đã check-in · {{ totals.checkins }}</button>
+        <button type="button" class="chip" data-filter="pending" aria-pressed="false">Chưa check-in · {{ totals.pending }}</button>
+      </div>
+      <label class="list-search">
+        <span class="sr-only">Tìm theo tên hoặc mã CB/SV</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"></path><path d="m21 21-4.3-4.3"></path></svg>
+        <input id="staffSearch" type="search" placeholder="Tìm tên, mã CB/SV…" autocomplete="off">
+      </label>
+    </div>
+    <div class="table-scroll">
+      <table class="list-table list-table--people">
+        <thead>
+          <tr>
+            <th>Mã CB/SV</th>
+            <th>Họ tên</th>
+            <th>Đơn vị</th>
+            <th>Check-in</th>
+            <th>Giờ check-in</th>
+          </tr>
+        </thead>
+        <tbody id="staffRows">
+          {% for row in rows %}
+          <tr data-checked="{{ 1 if row.checked_in else 0 }}" data-key="{{ (row.ma_cbsv ~ ' ' ~ row.ho_ten)|lower }}">
+            <td>{{ row.ma_cbsv }}</td>
+            <td><strong>{{ row.ho_ten }}</strong></td>
+            <td>{{ row.don_vi }}</td>
+            <td>{% if row.checked_in %}<span class="badge badge--success">Đã check-in</span>{% else %}<span class="badge badge--muted">Chưa</span>{% endif %}</td>
+            <td>{{ row.checkin_time or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="table-empty">Chưa có ai đăng ký sự kiện này.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p id="staffEmpty" class="table-empty" hidden>Không có dòng nào khớp.</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const rows = Array.from(document.querySelectorAll('#staffRows tr[data-key]'));
+  const chips = Array.from(document.querySelectorAll('#staffFilterTabs .chip'));
+  const search = document.getElementById('staffSearch');
+  const empty = document.getElementById('staffEmpty');
+  let filter = 'all';
+
+  // Bỏ dấu tiếng Việt để gõ "nguyen" vẫn tìm ra "Nguyễn"
+  const fold = (text) => text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+
+  function apply() {
+    const query = fold(search.value.trim());
+    let shown = 0;
+    rows.forEach((row) => {
+      const checked = row.dataset.checked === '1';
+      const okFilter = filter === 'all' || (filter === 'checked-in' ? checked : !checked);
+      const okSearch = !query || fold(row.dataset.key).includes(query);
+      row.hidden = !(okFilter && okSearch);
+      if (!row.hidden) shown += 1;
+    });
+    empty.hidden = shown > 0 || rows.length === 0;
+  }
+
+  chips.forEach((chip) => chip.addEventListener('click', () => {
+    filter = chip.dataset.filter;
+    chips.forEach((item) => {
+      const active = item === chip;
+      item.classList.toggle('is-active', active);
+      item.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    apply();
+  }));
+  search.addEventListener('input', apply);
+})();
+</script>
+{% endblock %}

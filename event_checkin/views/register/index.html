@@ -167,6 +167,13 @@
           <span>Email</span>
           <input type="email" name="email" id="email" placeholder="Email" required>
         </label>
+        {% if selected_event.cho_phep_cau_hoi %}
+        <label class="field-wide question-field">
+          <span>{{ selected_event.question_title }} <em class="question-field__optional">(không bắt buộc)</em></span>
+          <textarea name="cau_hoi" id="cau_hoi" rows="4" placeholder="Nhập câu hỏi của bạn (có thể bỏ trống)"></textarea>
+          <small class="question-field__counter" id="cauHoiCounter" aria-live="polite">0/1000</small>
+        </label>
+        {% endif %}
         <button class="btn btn--primary btn--full" type="submit">Gửi đăng ký</button>
       </form>
     </div>
@@ -394,31 +401,24 @@
     message.textContent = text;
   }
 
-  maInput.addEventListener('blur', async () => {
-    const value = maInput.value.trim();
-    if (!value) return;
-    try {
-      const response = await fetch('/api/lookup/' + encodeURIComponent(value));
-      const result = await response.json();
-      if (!result.success) {
-        // Mã chưa có trong hệ thống — không chặn hay báo lỗi, chỉ đơn giản là
-        // không tự động điền được thông tin. Người dùng vẫn tự nhập và đăng ký
-        // bình thường (backend /register tự tạo User mới nếu mã chưa tồn tại).
-        return;
-      }
-      const data = result.data;
-      hoTenInput.value = data.ho_ten || '';
-      const donViId = data.don_vi_id ? String(data.don_vi_id) : '';
-      if (donViId && !Array.from(donViInput.options).some((option) => option.value === donViId)) {
-        donViInput.add(new Option(data.don_vi || 'Đơn vị đã lưu', donViId));
-      }
-      donViInput.value = donViId;
-      // API tra mã chỉ trả họ tên + đơn vị (không lộ email/SĐT) -> người dùng tự nhập phần còn lại
-      showMessage('Đã tự động điền họ tên và đơn vị. Vui lòng nhập email để nhận chứng chỉ.', 'success');
-    } catch (error) {
-      showMessage('Không thể tra cứu dữ liệu.', 'error');
-    }
-  });
+  // TODO(Sierra): khi kết nối Sierra thì bật lại việc tra mã (GET /api/lookup/<ma_cbsv>) lúc rời ô Mã CB/SV
+  // để tự điền họ tên/đơn vị. Hiện chưa có dữ liệu nguồn nên người dùng tự nhập toàn bộ biểu mẫu.
+
+  // Ô câu hỏi (chỉ có ở sự kiện đã bật): bộ đếm theo ký tự, tối đa 1000 (server cũng kiểm tra lại)
+  const QUESTION_MAX = 1000;
+  const cauHoiInput = document.getElementById('cau_hoi');
+  const cauHoiCounter = document.getElementById('cauHoiCounter');
+  function updateQuestionCounter() {
+    const chars = Array.from(cauHoiInput.value);  // đếm theo ký tự (emoji tính 1), không theo đơn vị UTF-16
+    if (chars.length > QUESTION_MAX) cauHoiInput.value = chars.slice(0, QUESTION_MAX).join('');
+    const count = Math.min(chars.length, QUESTION_MAX);
+    cauHoiCounter.textContent = `${count}/${QUESTION_MAX}`;
+    cauHoiCounter.classList.toggle('is-limit', count >= QUESTION_MAX);
+  }
+  if (cauHoiInput) {
+    cauHoiInput.addEventListener('input', updateQuestionCounter);
+    updateQuestionCounter();
+  }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -431,6 +431,7 @@
       so_dien_thoai: sdtInput.value.trim(),
       email: emailInput.value.trim(),
     };
+    if (cauHoiInput) payload.cau_hoi = cauHoiInput.value.trim();
 
     try {
       const response = await fetch('/register', {
@@ -445,6 +446,7 @@
       }
       showMessage(result.message, 'success');
       form.reset();
+      if (cauHoiInput) updateQuestionCounter();
       eventInput.value = payload.event_id;
       maInput.focus();
     } catch (error) {

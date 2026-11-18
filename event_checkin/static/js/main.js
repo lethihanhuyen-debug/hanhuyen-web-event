@@ -64,6 +64,104 @@ window.confirmAsync = function (message, options) {
   });
 };
 
+/* Hộp xem nội dung dài, chỉ có nút Đóng (vd. câu hỏi đăng ký). Nội dung gán bằng textContent (không chèn HTML),
+   giữ nguyên xuống dòng.  Dùng:  window.infoDialog('Tiêu đề', 'Nội dung...') */
+window.infoDialog = function (title, text) {
+  if (typeof HTMLDialogElement === 'undefined') {
+    window.alert(String(title || '') + '\n\n' + String(text || ''));
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'app-dialog app-dialog--wide';
+    const body = document.createElement('div');
+    body.className = 'app-dialog__body';
+    const heading = document.createElement('h2');
+    heading.className = 'app-dialog__title';
+    heading.textContent = String(title || '');
+    const content = document.createElement('p');
+    content.className = 'app-dialog__text app-dialog__text--pre';
+    content.textContent = String(text || '');
+    const actions = document.createElement('div');
+    actions.className = 'app-dialog__actions';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'btn btn--primary';
+    close.textContent = 'Đóng';
+    actions.append(close);
+    body.append(heading, content, actions);
+    dialog.append(body);
+    document.body.append(dialog);
+    close.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+    dialog.addEventListener('close', () => { dialog.remove(); resolve(); });
+    dialog.showModal();
+    close.focus();
+  });
+};
+
+/* Gọi API có xử lý lỗi CHUNG -- dùng thay cho fetch() ở các trang admin/staff (trả Response như fetch, nơi gọi vẫn tự
+   đọc .json()/.blob()):
+   - 401 (hết phiên/bị khóa): hộp "Phiên đăng nhập đã hết..." rồi chuyển về /admin/login?next=<trang hiện tại>.
+     Promise KHÔNG trả về nữa, nên đoạn code gọi dừng luôn (không chạy tiếp với dữ liệu lỗi).
+   - Lỗi khác (403 không đủ quyền, 400/404/409, 5xx, mất kết nối): hộp thông báo kèm message từ server, để lỗi không bao giờ
+     bị nuốt âm thầm. Dùng window.apiFetchQuiet (= apiFetch với notify:false) ở nơi đã tự hiện đúng message đó ở chỗ người
+     dùng nhìn thấy, tránh hiện hai lần. 401 thì LUÔN xử lý chung. */
+(function () {
+  let sessionExpiredShown = false;
+  let errorDialogOpen = false;
+
+  function sessionExpired() {
+    if (!sessionExpiredShown) {
+      sessionExpiredShown = true;
+      const next = encodeURIComponent(window.location.pathname + window.location.search);
+      const go = () => { window.location.href = '/admin/login?next=' + next; };
+      Promise.resolve(window.infoDialog('Phiên đăng nhập đã hết', 'Phiên đăng nhập đã hết, vui lòng đăng nhập lại.')).then(go, go);
+    }
+    return new Promise(() => {});
+  }
+
+  async function errorMessage(response) {
+    try {
+      const data = await response.clone().json();
+      if (data && data.message) return String(data.message);
+    } catch (error) { /* phản hồi không phải JSON (vd. trang lỗi 500) -> dùng câu mặc định bên dưới */ }
+    if (response.status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
+    if (response.status === 404) return 'Không tìm thấy dữ liệu yêu cầu.';
+    if (response.status >= 500) return 'Máy chủ gặp lỗi, vui lòng thử lại sau.';
+    return 'Không thực hiện được yêu cầu (mã lỗi ' + response.status + ').';
+  }
+
+  async function notifyError(title, text) {
+    if (errorDialogOpen) return;
+    errorDialogOpen = true;
+    try { await window.infoDialog(title, text); } finally { errorDialogOpen = false; }
+  }
+
+  window.apiFetch = async function (url, options) {
+    const settings = Object.assign({}, options);
+    const notify = settings.notify !== false;
+    delete settings.notify;
+    let response;
+    try {
+      response = await fetch(url, settings);
+    } catch (error) {
+      if (notify) notifyError('Không kết nối được máy chủ', 'Không kết nối được máy chủ, vui lòng kiểm tra mạng rồi thử lại.');
+      throw error;
+    }
+    if (response.status === 401) return sessionExpired();
+    if (!response.ok && notify) {
+      const text = await errorMessage(response);
+      notifyError(response.status === 403 ? 'Không có quyền' : 'Không thực hiện được', text);
+    }
+    return response;
+  };
+
+  window.apiFetchQuiet = function (url, options) {
+    return window.apiFetch(url, Object.assign({}, options, { notify: false }));
+  };
+})();
+
 window.appUtils = {
   formatDateTimeVN(dateTimeString) {
     if (!dateTimeString) return '';
@@ -221,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function requestJson(url, options = {}) {
-    const response = await fetch(url, {
+    const response = await apiFetchQuiet(url, {
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
       ...options,
     });
