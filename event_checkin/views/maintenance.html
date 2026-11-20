@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Đang bảo trì | Event Check-in</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+{# Trang độc lập (không kế thừa base.html): base.html đọc tài khoản đăng nhập, mà lúc thiếu migration bảng admins có thể chưa đủ cột #}
+<body>
+  <main class="maintenance-page">
+    <div class="message message--warning" role="alert">{{ message }}</div>
+    <p><a class="btn btn--outline" href="/">Về trang đăng ký</a></p>
+  </main>
+</body>
+</html>

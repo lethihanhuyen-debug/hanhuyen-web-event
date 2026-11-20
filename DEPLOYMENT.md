@@ -289,6 +289,8 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 - [ ] Đăng nhập `/admin/login` bằng tài khoản admin đã đổi mật khẩu (không phải `admin123`)
 - [ ] Đăng ký thử 1 sự kiện bằng mã CB/SV test, check-in thử tại `/checkin`
 - [ ] `python -m event_checkin.migrations.m005_cau_hoi_dang_ky --check` báo `OK` (sau khi chạy m005)
+- [ ] `python -m event_checkin.migrations.m006_phan_quyen --check` và `python -m event_checkin.migrations.m007_certificate_token --check` đều báo `OK`
+- [ ] **Kiểm tra migration lúc khởi động**: sau `Restart-Service EventCheckinApp`, `C:\apps\eventcheckin\logs\app.log` **không** có dòng `Chưa chạy migration m00X, xem DEPLOYMENT.md`, và trang Quản trị **không** có banner đỏ "Lỗi hệ thống". Nếu có: app vẫn chạy nhưng phần liên quan tạm ngưng (thiếu m007 → mọi link chứng chỉ báo "Hệ thống chứng chỉ đang bảo trì"; thiếu m006 → đăng nhập/quản trị/check-in báo bảo trì, chỉ trang đăng ký còn mở). Chạy migration còn thiếu theo mục 9 rồi **khởi động lại app** (app chỉ kiểm tra lúc khởi động)
 - [ ] Menu **Quay số may mắn** (`/admin/lucky-draw`) mở được; thiết lập thử 1 sự kiện (giải + ảnh nền), quay thử, Lưu, rồi xóa thiết lập thử (sau khi chạy m004)
 - [ ] Chứng chỉ PDF/PNG tạo và tải được sau check-in (nếu event bật cấp chứng chỉ)
 - [ ] Email xác nhận gửi được (kiểm tra hộp thư, và `C:\apps\eventcheckin\logs\app.log` không có lỗi SMTP)

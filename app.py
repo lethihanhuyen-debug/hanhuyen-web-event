@@ -20,6 +20,7 @@ from event_checkin.extensions import mail
 from event_checkin.models import db
 from event_checkin.models.admin import Admin
 from event_checkin.models.event import Event
+from event_checkin.schema_status import init_schema_status, record_pending_migrations
 
 
 LOOPBACK_ADDRESSES = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
@@ -177,6 +178,9 @@ def create_app():
             response.headers["Expires"] = "0"
         return response
 
+    # Thiếu migration (m006/m007) -> trang bảo trì + banner thay cho lỗi 500; phải đăng ký TRƯỚC init_access
+    init_schema_status(app)
+
     # Kiểm tra quyền cho MỌI route (route chưa khai báo @access thì bị từ chối) -- xem event_checkin/access.py
     init_access(app)
 
@@ -192,7 +196,12 @@ def create_app():
     with app.app_context():
         db.create_all()
         ensure_schema_upgrades()
-        ensure_default_records()
+        pending = record_pending_migrations(app)
+        if "m006" in pending:
+            # ensure_default_records đọc bảng admins (cần các cột của m006) -> bỏ qua để app vẫn khởi động được
+            app.logger.error("Bỏ qua tạo tài khoản/sự kiện mặc định vì chưa chạy m006.")
+        else:
+            ensure_default_records()
 
     return app
 

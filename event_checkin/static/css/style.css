@@ -4190,3 +4190,16 @@ td.col-num {
 /* Tên + vai trò là liên kết sang trang Đổi mật khẩu */
 .header-user { text-decoration: none; }
 .header-user:hover .header-user__name { text-decoration: underline; }
+
+/* Banner báo thiếu migration (event_checkin/schema_status.py) -- chỉ hiện trên trang admin/staff */
+.migration-banner {
+  border: 2px solid var(--danger);
+  font-weight: 600;
+}
+
+.maintenance-page {
+  max-width: 560px;
+  margin: var(--space-8, 64px) auto;
+  padding: 0 16px;
+  text-align: center;
+}

@@ -71,8 +71,8 @@ def _has_email_unique():
     return False
 
 
-def problems():
-    """Danh sách những gì còn thiếu/sai (rỗng = đã đủ)."""
+def schema_problems():
+    """Chỉ phần cấu trúc DB (bảng/cột/chỉ mục) còn thiếu -- app.py gọi lúc khởi động (xem event_checkin/schema_status.py)."""
     from event_checkin.models import db
 
     result = []
@@ -88,6 +88,14 @@ def problems():
             result.append(f"thiếu bảng {table}")
     if "admins" in tables and "email" in _columns("admins") and not _has_email_unique():
         result.append("thiếu chỉ mục UNIQUE cho admins.email")
+    return result
+
+
+def problems():
+    """Danh sách những gì còn thiếu/sai (rỗng = đã đủ): cấu trúc DB + vai trò tài khoản."""
+    from event_checkin.models import db
+
+    result = schema_problems()
     if not result:
         marks = ", ".join(f"'{role}'" for role in ROLES)
         with db.engine.connect() as connection:

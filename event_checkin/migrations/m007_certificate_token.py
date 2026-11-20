@@ -70,23 +70,37 @@ def _same_file(source, target):
     return target.is_file() and source.is_file() and source.stat().st_size == target.stat().st_size
 
 
-def problems():
-    """Những gì còn thiếu/sai (rỗng = đạt)."""
+def schema_problems():
+    """Phần DB còn thiếu: bảng, cột token, chỉ mục UNIQUE, chứng chỉ chưa có token. app.py gọi lúc khởi động
+    (xem event_checkin/schema_status.py) -- không kiểm tra file để khởi động nhanh."""
     from event_checkin.models import db
 
     if "certificates" not in inspect(db.engine).get_table_names():
         return ["thiếu bảng certificates"]
-    result = []
     if not _has_token_column():
         return ["thiếu cột certificates.token"]
+    result = []
     if not _has_token_unique():
         result.append("thiếu chỉ mục UNIQUE cho certificates.token")
     with db.engine.connect() as connection:
-        rows = _rows(connection)
-    missing_token = sum(1 for row in rows if not row.token)
-    legacy_urls = sum(1 for row in rows if row.file_url and row.file_url.startswith(LEGACY_PREFIX))
+        missing_token = connection.execute(
+            text("SELECT COUNT(*) FROM certificates WHERE token IS NULL OR token = ''")
+        ).scalar()
     if missing_token:
         result.append(f"{missing_token} chứng chỉ chưa có token")
+    return result
+
+
+def problems():
+    """Những gì còn thiếu/sai (rỗng = đạt): phần DB + file đã chuyển ra khỏi static."""
+    from event_checkin.models import db
+
+    result = schema_problems()
+    if result and result[0] in ("thiếu bảng certificates", "thiếu cột certificates.token"):
+        return result
+    with db.engine.connect() as connection:
+        rows = _rows(connection)
+    legacy_urls = sum(1 for row in rows if row.file_url and row.file_url.startswith(LEGACY_PREFIX))
     if legacy_urls:
         result.append(f"{legacy_urls} chứng chỉ còn trỏ tới file trong static")
     for row in rows:

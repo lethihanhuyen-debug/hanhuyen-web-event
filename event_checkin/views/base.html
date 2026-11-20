@@ -55,6 +55,7 @@
 
   <main class="page-shell">
     <div class="container {% block container_class %}{% endblock %}">
+      {% for warning in migration_warnings %}<div class="message message--error migration-banner" role="alert"><strong>Lỗi hệ thống:</strong> {{ warning }}</div>{% endfor %}
       {% set access_notice = pop_access_notice() %}
       {% if access_notice %}<div class="message message--warning" role="alert">{{ access_notice }}</div>{% endif %}
       {% block content %}{% endblock %}
