@@ -248,18 +248,27 @@ class GracePeriodTest(AppTestCase):
 
 
 class TitlebarLayoutTest(AppTestCase):
-    """Nút Quay lại và nhãn tiêu đề cùng một thanh (staff-titlebar) ở mọi trang staff có nút Quay lại."""
+    """Nút Quay lại và nhãn tiêu đề cùng một thanh (staff-titlebar) ở trang staff; trang check-in không có nút Quay lại
+    mà có nút "Chọn sự kiện khác" (có khung) ở cuối thẻ."""
 
-    def test_back_button_is_in_titlebar(self):
-        c = self.client_for("staff")
+    def _event_id(self):
         with app.app_context():
             event = Event.query.first()
             self.assertIsNotNone(event)
-            event_id = event.id
-        for url in (f"/staff/events/{event_id}", f"/checkin/{event_id}"):
-            html = c.get(url).get_data(as_text=True)
-            bar = re.search(r'<div class="staff-titlebar">(.*?)</div>', html, re.S)
-            self.assertIsNotNone(bar, url)
-            self.assertIn('class="eyebrow"', bar.group(1), url)
-            self.assertIn("btn--back", bar.group(1), url)
-            self.assertNotIn("checkin-back", html, url)
+            return event.id
+
+    def test_back_button_is_in_titlebar(self):
+        url = f"/staff/events/{self._event_id()}"
+        html = self.client_for("staff").get(url).get_data(as_text=True)
+        bar = re.search(r'<div class="staff-titlebar">(.*?)</div>', html, re.S)
+        self.assertIsNotNone(bar, url)
+        self.assertIn('class="eyebrow"', bar.group(1), url)
+        self.assertIn("btn--back", bar.group(1), url)
+
+    def test_checkin_page_has_switch_button_and_no_back_button(self):
+        html = self.client_for("staff").get(f"/checkin/{self._event_id()}").get_data(as_text=True)
+        self.assertNotIn("btn--back", html)
+        self.assertNotIn("Quay lại", html)
+        self.assertNotIn("checkin-back", html)
+        switch = re.search(r'<div class="checkin-switch">\s*<a class="btn btn--outline" href="/staff/events">Chọn sự kiện khác</a>', html)
+        self.assertIsNotNone(switch, html)

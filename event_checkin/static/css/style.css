@@ -737,6 +737,17 @@ a {
   text-align: center;
 }
 
+/* Nút "Chọn sự kiện khác" cuối thẻ check-in: có khung viền, căn giữa, đủ cao để bấm trên điện thoại */
+.checkin-switch {
+  margin-top: var(--space-5);
+  display: flex;
+  justify-content: center;
+}
+
+.checkin-switch .btn {
+  min-height: 44px;
+}
+
 .checkin-event-list {
   display: flex;
   flex-direction: column;

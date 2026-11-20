@@ -4,11 +4,8 @@
 {% block content %}
 <section class="checkin-stage">
   <div class="checkin-card">
-    {# Thanh tiêu đề: nhãn bên trái, nút Quay lại bên phải, canh giữa theo chiều dọc, luôn cùng một hàng (kể cả điện thoại).
-       Quay lại trang trước; href là đường dự phòng khi mở trang trực tiếp -- xem script cuối trang. #}
     <div class="staff-titlebar">
       <p class="eyebrow">Check-in sự kiện</p>
-      <a id="backButton" class="btn btn--back" href="{{ url_for('staff.events_page') }}">← Quay lại</a>
     </div>
     <h1>{{ event.ten_su_kien }}</h1>
     {% set state = event.checkin_state %}
@@ -27,34 +24,14 @@
     </div>
 
     <div id="checkinResult" class="checkin-result" aria-live="polite"></div>
-    <p class="muted"><a href="{{ url_for('staff.events_page') }}">Chọn sự kiện khác</a></p>
+    <div class="checkin-switch">
+      <a class="btn btn--outline" href="{{ url_for('staff.events_page') }}">Chọn sự kiện khác</a>
+    </div>
   </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script>
-(function () {
-  const back = document.getElementById('backButton');
-  back.addEventListener('click', (event) => {
-    let sameSite = false;
-    try {
-      sameSite = !!document.referrer && new URL(document.referrer).origin === window.location.origin;
-    } catch (error) {
-      sameSite = false;
-    }
-    if (!sameSite) return; // không biết trang trước -> theo href dự phòng
-    event.preventDefault();
-    // Trang admin mở check-in ở tab mới (target="_blank") nên tab này không có
-    // lịch sử để back -- khi đó đi thẳng về trang đã mở ra nó.
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      window.location.href = document.referrer;
-    }
-  });
-})();
-</script>
 <script>
 (function () {
   const EVENT_ID = {{ event.id }};
