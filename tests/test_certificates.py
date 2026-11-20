@@ -26,7 +26,9 @@ EMAIL_A, EMAIL_B = "chu-chung-chi-a@example.com", "chu-chung-chi-b@example.com"
 UNIT = "Đơn vị bí mật thử"
 
 
-class CertificateSecurityTest(AppTestCase):
+class _CertificateFixture(AppTestCase):
+    """1 sự kiện có mẫu chứng chỉ + 2 người đã check-in và đã có chứng chỉ (A, B); xóa sạch khi xong."""
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -78,6 +80,9 @@ class CertificateSecurityTest(AppTestCase):
         client = app.test_client()
         client.environ_base["REMOTE_ADDR"] = ip
         return client
+
+
+class CertificateSecurityTest(_CertificateFixture):
 
     # ---- nơi lưu file ------------------------------------------------------------------------------------------
     def test_file_is_outside_static_and_static_url_is_404(self):
@@ -291,6 +296,46 @@ class CertificateSecurityTest(AppTestCase):
         self.assertIn("https://h/c/TOKEN", captured["body"])
         self.assertIn('href="https://h/c/TOKEN"', captured["html"])
         self.assertIn("https://h/verify/t/TOKEN", captured["body"])
+
+
+class CertificateCodeSequenceTest(_CertificateFixture):
+    """Mã chứng chỉ không bao giờ bị cấp lại sau khi xóa chứng chỉ (kể cả chứng chỉ có số lớn nhất)."""
+
+    def _issue(self, code):
+        with app.app_context():
+            if not User.query.get(code):
+                db.session.add(User(ma_cbsv=code, ho_ten=f"Người {code}"))
+                db.session.flush()
+                db.session.add(Registration(ma_cbsv=code, event_id=self.event_id))
+            db.session.add(CheckinRecord(event_id=self.event_id, patron_code=code, checkin_at=now_vn_naive()))
+            db.session.commit()
+            with app.test_request_context():
+                certificate, created = generate_certificate(code, event_id=self.event_id)
+            self.assertTrue(created)
+            return certificate.certificate_code
+
+    def test_deleted_codes_are_never_reused(self):
+        code_c = f"CC{self.suffix}".upper()
+        self.addCleanup(self._cleanup_person, code_c)
+        first = self._issue(code_c)
+        admin = self.client_for("admin")
+        r = admin.delete(f"/api/admin/events/{self.event_id}/checkins/{code_c}")      # xóa check-in -> xóa luôn chứng chỉ
+        self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
+        second = self._issue(code_c)
+        self.assertNotEqual(first, second)
+        self.assertGreater(int(second.rsplit("-", 1)[1]), int(first.rsplit("-", 1)[1]))
+        with app.app_context():
+            codes = [c for (c,) in db.session.query(Certificate.certificate_code).filter_by(event_id=self.event_id)]
+        self.assertEqual(len(codes), len(set(codes)))
+        self.assertNotIn(first, codes)
+
+    def _cleanup_person(self, code):
+        with app.app_context():
+            Certificate.query.filter_by(event_id=self.event_id, ma_cbsv=code).delete()
+            CheckinRecord.query.filter_by(event_id=self.event_id, patron_code=code).delete()
+            Registration.query.filter_by(event_id=self.event_id, ma_cbsv=code).delete()
+            User.query.filter_by(ma_cbsv=code).delete()
+            db.session.commit()
 
 
 class MigrationTest(AppTestCase):

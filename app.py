@@ -65,6 +65,9 @@ def ensure_schema_upgrades():
             connection.execute(text("ALTER TABLE events ADD COLUMN co_so VARCHAR(50)"))
         if "so_luong_toi_da" not in event_columns:
             connection.execute(text("ALTER TABLE events ADD COLUMN so_luong_toi_da INT"))
+        if "certificate_seq" not in event_columns:
+            # Bộ đếm số thứ tự mã chứng chỉ của sự kiện (chỉ tăng, không dùng lại mã đã cấp) -- xem service._next_certificate_code
+            connection.execute(text("ALTER TABLE events ADD COLUMN certificate_seq INT NOT NULL DEFAULT 0"))
 
         if "don_vi" in inspector.get_table_names() and "is_active" not in _indexed_columns(inspector, "don_vi"):
             connection.execute(text("CREATE INDEX ix_don_vi_is_active ON don_vi (is_active)"))

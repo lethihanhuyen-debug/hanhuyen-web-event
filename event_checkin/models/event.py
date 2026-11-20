@@ -26,6 +26,9 @@ class Event(db.Model):
     certificate_enabled = db.Column(db.Boolean, nullable=False, default=True)
     certificate_template = db.Column(db.String(255))
     certificate_layout = db.Column(db.Text)
+    # Số thứ tự lớn nhất đã dùng cho mã chứng chỉ của sự kiện. Chỉ tăng: xóa chứng chỉ không làm số giảm, nên mã đã
+    # gửi cho người này không bao giờ bị cấp lại cho người khác (app.py tự thêm cột khi khởi động).
+    certificate_seq = db.Column(db.Integer, nullable=False, default=0)
     # Ô "câu hỏi" tuỳ chọn ở form đăng ký (m005): công tắc theo từng sự kiện + tiêu đề admin tự đặt
     cho_phep_cau_hoi = db.Column(db.Boolean, nullable=False, default=False)
     tieu_de_cau_hoi = db.Column(db.String(255))

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from flask import current_app, url_for
+from sqlalchemy import text
 
 from event_checkin.certificates.generator import (
     certificate_values,
@@ -64,10 +65,33 @@ def _stored_file_path(file_url):
     return path
 
 
+def _max_used_sequence(event_id):
+    """Số thứ tự lớn nhất trong các mã chứng chỉ đang có của sự kiện (phần số cuối mã)."""
+    highest = 0
+    for (code,) in db.session.query(Certificate.certificate_code).filter(Certificate.event_id == event_id):
+        tail = (code or "").rsplit("-", 1)[-1]
+        if tail.isdigit():
+            highest = max(highest, int(tail))
+    return highest
+
+
 def _next_certificate_code(event_id):
+    """Mã mới = số thứ tự tiếp theo của bộ đếm events.certificate_seq (chỉ tăng).
+
+    Trước đây lấy "số chứng chỉ hiện có + 1": xóa một chứng chỉ (vd. xóa check-in) làm số đếm giảm, nên mã đã gửi
+    cho người A có thể bị cấp lại cho người B (link cũ của A mở ra chứng chỉ của B) hoặc trùng mã -> lỗi UNIQUE.
+    Bộ đếm không bao giờ giảm; lần đầu (cột mới = 0) được nâng lên bằng số lớn nhất đang có.
+    UPDATE khóa dòng sự kiện tới khi commit nên hai yêu cầu cùng lúc không lấy trùng số."""
     year = datetime.utcnow().year
-    count = Certificate.query.filter_by(event_id=event_id).count() + 1
-    return f"USSH-{year}-EVENT{event_id:03d}-{count:06d}"
+    db.session.execute(
+        text(
+            "UPDATE events SET certificate_seq = "
+            "CASE WHEN certificate_seq > :used THEN certificate_seq ELSE :used END + 1 WHERE id = :id"
+        ),
+        {"used": _max_used_sequence(event_id), "id": event_id},
+    )
+    sequence = db.session.execute(text("SELECT certificate_seq FROM events WHERE id = :id"), {"id": event_id}).scalar()
+    return f"USSH-{year}-EVENT{event_id:03d}-{sequence:06d}"
 
 
 def resolve_display_name(event_id, ma_cbsv):
