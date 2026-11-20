@@ -175,7 +175,7 @@ Vào **Quản trị → Quản lý tài khoản**.
 
 ### 10.2. Đổi mật khẩu, quên mật khẩu
 - Bấm vào **tên của bạn ở góc phải màn hình** để đổi mật khẩu. Mật khẩu tối thiểu 8 ký tự, gồm cả chữ và số. Đổi xong, các thiết bị khác bị đăng xuất.
-- Quên mật khẩu: ở trang đăng nhập bấm **Quên mật khẩu?**, nhập email của tài khoản. Nếu email đúng, hệ thống gửi liên kết đặt lại (hiệu lực 30 phút, dùng được một lần). Hệ thống luôn báo "Nếu email tồn tại, link đặt lại đã được gửi" để không lộ email nào có trong hệ thống, và chỉ cho yêu cầu tối đa 3 lần trong 15 phút. Tài khoản chưa có email hoặc đã bị khóa thì không nhận được liên kết, hãy nhờ quản trị cao cấp đặt lại.
+- Quên mật khẩu: ở trang đăng nhập bấm **Quên mật khẩu?**, nhập email của tài khoản. Nếu email đúng, hệ thống gửi liên kết đặt lại (hiệu lực 30 phút, dùng được một lần). Nếu email không thuộc tài khoản nào, hệ thống báo "Email này chưa đăng ký tài khoản"; nếu tài khoản đang bị khóa, hệ thống báo tài khoản bị khóa. Mỗi email và mỗi máy chỉ được yêu cầu tối đa 3 lần trong 15 phút, quá số lần sẽ được báo thử lại sau. Tài khoản chưa có email hoặc đã bị khóa thì không nhận được liên kết, hãy nhờ quản trị cao cấp đặt lại.
 - Chính quản trị cao cấp quên mật khẩu: nhờ người quản trị kỹ thuật chạy trên máy chủ `scripts\reset-superadmin.py <tên_đăng_nhập>` (xem `DEPLOYMENT.md`).
 
 ### 10.3. Nhật ký hoạt động (chỉ quản trị cao cấp)

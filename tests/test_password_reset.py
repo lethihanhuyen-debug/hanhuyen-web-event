@@ -12,7 +12,8 @@ from event_checkin.controllers import password_controller
 from event_checkin.models.audit_log import AuditLog
 from event_checkin.models.password_reset import PasswordReset
 
-GENERIC = "Nếu email tồn tại, link đặt lại đã được gửi."
+SENT = password_controller.FORGOT_SENT_MESSAGE
+UNKNOWN = "Email này chưa đăng ký tài khoản."
 
 
 class PasswordResetTest(AppTestCase):
@@ -46,11 +47,11 @@ class PasswordResetTest(AppTestCase):
         return match.group(1)
 
     # ---- yêu cầu quên mật khẩu -----------------------------------------------------------------------------
-    def test_existing_and_unknown_email_get_identical_response(self):
+    def test_existing_email_gets_link_and_unknown_email_is_reported(self):
         known = self.forgot(self.email)
         unknown = self.forgot(f"khong-co-{self.suffix}@example.com", ip="203.0.113.8")
-        self.assertEqual((known.status_code, known.get_json()), (200, {"success": True, "message": GENERIC}))
-        self.assertEqual((unknown.status_code, unknown.get_json()), (200, {"success": True, "message": GENERIC}))
+        self.assertEqual((known.status_code, known.get_json()), (200, {"success": True, "message": SENT}))
+        self.assertEqual((unknown.status_code, unknown.get_json()), (404, {"success": False, "message": UNKNOWN}))
         self.assertEqual(len(self.sent), 1)                                   # chỉ email có thật mới được gửi thư
         self.assertEqual(self.sent[0][0], self.email)
         self.assertIn("30 phút", self.sent[0][2])
@@ -66,7 +67,7 @@ class PasswordResetTest(AppTestCase):
         self.set_admin("staff", is_active=False)
         try:
             r = self.forgot(self.email)
-            self.assertEqual((r.status_code, r.get_json()["message"]), (200, GENERIC))   # vẫn trả đúng câu như bình thường
+            self.assertEqual((r.status_code, r.get_json()["message"]), (403, password_controller.FORGOT_LOCKED_MESSAGE))
             self.assertEqual(self.sent, [])
             with app.app_context():
                 self.assertEqual(PasswordReset.query.filter_by(admin_id=self.accounts["staff"][0]).count(), 0)
@@ -78,7 +79,9 @@ class PasswordResetTest(AppTestCase):
             self.assertEqual(self.forgot(self.email, ip=f"198.51.100.{i + 1}").status_code, 200)   # IP khác nhau, cùng email
         self.assertEqual(len(self.sent), 3)
         r = self.forgot(self.email, ip="198.51.100.77")                                      # lần 4 cùng email -> chặn
-        self.assertEqual((r.status_code, r.get_json()["message"]), (200, GENERIC))           # vẫn là câu cũ, không lộ việc bị chặn
+        self.assertEqual(r.status_code, 429)
+        self.assertEqual(r.get_json()["success"], False)
+        self.assertRegex(r.get_json()["message"], r"^Bạn đã yêu cầu quá nhiều lần\. Vui lòng đợi 1[45] phút rồi thử lại\.$")
         self.assertEqual(len(self.sent), 3)
 
         self.sent.clear()
@@ -87,6 +90,17 @@ class PasswordResetTest(AppTestCase):
         self.forgot(self.email.replace("staff_", "other_"), ip="198.51.100.200")
         with app.app_context():
             self.assertGreaterEqual(AuditLog.query.filter_by(action="password.forgot_throttled").count(), 2)
+
+    def test_throttle_message_counts_down_remaining_minutes(self):
+        for i in range(3):
+            self.forgot(self.email, ip=f"198.51.100.{120 + i}")
+        with app.app_context():     # yêu cầu cũ nhất cách đây 11 phút -> còn khoảng 4 phút
+            row = AuditLog.query.filter_by(action="password.forgot_request").order_by(AuditLog.id).first()
+            row.created_at = datetime.utcnow() - timedelta(minutes=11)
+            db.session.commit()
+        r = self.forgot(self.email, ip="198.51.100.130")
+        self.assertEqual(r.status_code, 429)
+        self.assertIn("Vui lòng đợi 4 phút rồi thử lại.", r.get_json()["message"])
 
     def test_old_requests_do_not_count_after_window(self):
         for i in range(3):
