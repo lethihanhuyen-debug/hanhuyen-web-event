@@ -1,7 +1,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, request
+from flask import Flask, abort, request
 from sqlalchemy import inspect, text
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash
@@ -20,6 +20,22 @@ from event_checkin.extensions import mail
 from event_checkin.models import db
 from event_checkin.models.admin import Admin
 from event_checkin.models.event import Event
+
+
+LOOPBACK_ADDRESSES = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+
+
+class TrustedLocalProxyFix:
+    """ProxyFix (x_for=1, x_proto=1, x_host=1) chỉ áp dụng khi kết nối đến từ loopback, tức IIS trên cùng máy."""
+
+    def __init__(self, wsgi_app):
+        self.direct = wsgi_app
+        self.proxied = ProxyFix(wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+    def __call__(self, environ, start_response):
+        if environ.get("REMOTE_ADDR") in LOOPBACK_ADDRESSES:
+            return self.proxied(environ, start_response)
+        return self.direct(environ, start_response)
 
 
 def _indexed_columns(inspector, table_name):
@@ -131,7 +147,16 @@ def create_app():
         # IIS terminates TLS and forwards to waitress over plain HTTP on
         # localhost -- restore the original scheme/host/client IP from the
         # X-Forwarded-* headers IIS's ARR reverse proxy sets, one hop deep.
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+        # Chỉ tin các header này khi request đến từ chính máy này (IIS cùng máy): ai gọi thẳng vào waitress từ máy
+        # khác (nếu lỡ mở port 8000) cũng không giả được IP bằng X-Forwarded-For.
+        app.wsgi_app = TrustedLocalProxyFix(app.wsgi_app)
+
+    @app.before_request
+    def block_legacy_certificate_files():
+        # Chứng chỉ cũ từng nằm trong static/certificates/generated (ai đoán tên file là tải được). File mới đã
+        # chuyển ra ngoài static; chặn hẳn đường dẫn cũ phòng khi thư mục cũ còn sót file.
+        if request.path.startswith("/static/certificates/generated/"):
+            abort(404)
 
     _configure_logging(app)
 

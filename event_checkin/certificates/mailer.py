@@ -22,11 +22,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from flask import url_for
-
 from event_checkin.certificates.patron_lookup import PatronLookupError, PatronNotFound, lookup_patron
 from event_checkin.certificates.service import (
     CertificateError,
+    certificate_links,
     generate_certificate,
     get_certificate_file_path,
     resolve_display_name,
@@ -236,7 +235,9 @@ def _send_one(event_id, patron_code, ten_su_kien):
             # c. Tạo chứng chỉ theo cấu hình đã lưu (Phần 3) -- tên in ưu tiên tên sửa tay
             certificate, _ = generate_certificate(patron_code, event_id=event_id, file_type="pdf")
             certificate_path = get_certificate_file_path(certificate)
-            verify_url = url_for("certificates.verify", certificate_code=certificate.certificate_code, _external=True)
+            # Link công khai theo token (không đoán được); mã tuần tự chỉ in trên chứng chỉ
+            links = certificate_links(certificate, external=True)
+            db.session.commit()   # ensure_token() có thể vừa sinh token cho chứng chỉ cũ
             # d. Gửi email: giờ check-in lấy đúng cột checkin_at đã lưu, không phải giờ gửi
             email_sent, error = send_checkin_email(
                 resolve_display_name(event_id, patron_code),
@@ -245,7 +246,8 @@ def _send_one(event_id, patron_code, ten_su_kien):
                 ten_su_kien=ten_su_kien,
                 certificate_path=certificate_path,
                 certificate_code=certificate.certificate_code,
-                verify_url=verify_url,
+                verify_url=links["verify_url"],
+                download_url=links["download_url"],
                 return_error=True,
             )
             if not email_sent:

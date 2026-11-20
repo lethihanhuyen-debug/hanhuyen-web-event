@@ -19,6 +19,7 @@ EXPECTED_PUBLIC = {
     "register.index", "register.event_register", "register.events_month_groups", "register.search_events",
     "register.public_events", "register.public_don_vi", "register.register",
     "certificates.download", "certificates.view_certificate", "certificates.verify",
+    "certificates.token_download", "certificates.token_view", "certificates.token_verify",
     "admin.login_page", "admin.me", "admin.login", "admin.logout",
     "password.forgot_page", "password.forgot_api", "password.reset_page", "password.reset_api",
 }

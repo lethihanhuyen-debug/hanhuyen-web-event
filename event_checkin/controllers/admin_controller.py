@@ -178,8 +178,8 @@ def _dashboard_payload():
             "trang_thai": "Đã check-in" if checkin_item else "Chưa check-in",
             "checkin_time": format_local(checkin_item.checkin_at) if checkin_item else "",
             "certificate_code": certificate.certificate_code if certificate else "",
-            "certificate_url": f"/api/certificates/{certificate.certificate_code}" if certificate else "",
-            "verify_url": f"/verify/{certificate.certificate_code}" if certificate else "",
+            "certificate_url": url_for("certificates.admin_download", certificate_code=certificate.certificate_code) if certificate else "",
+            "verify_url": url_for("certificates.token_verify", token=certificate.token) if certificate and certificate.token else "",
             "can_generate_certificate": bool(checkin_item and not certificate),
         })
 
@@ -260,7 +260,7 @@ def event_detail(event_id):
             "checkin_time": format_local(checkin_item["first_checkin_at"]) if checkin_item else "",
             "scans": checkin_item["scans"] if checkin_item else 0,
             "certificate_code": certificate.certificate_code if certificate else "",
-            "certificate_url": f"/api/certificates/{certificate.certificate_code}" if certificate else "",
+            "certificate_url": url_for("certificates.admin_download", certificate_code=certificate.certificate_code) if certificate else "",
             "cert_status": primary.cert_status if primary else "",
             "cert_error": (primary.error_msg or "") if primary else "",
             "cert_sent_at": format_local(primary.cert_sent_at) if primary and primary.cert_sent_at else "",
@@ -841,18 +841,12 @@ def fix_and_resend_checkin(event_id, record_id):
 
 def _certificate_files(event_id):
     """[(Certificate, Path)] của các chứng chỉ sự kiện còn file trên server.
-    Chỉ nhận file nằm trong thư mục static/certificates/generated (an toàn khi xoá)."""
-    root = (Path(current_app.static_folder) / "certificates" / "generated").resolve()
+    get_certificate_file_path chỉ trả file nằm trong thư mục lưu chứng chỉ (an toàn khi xoá)."""
     found = []
     for certificate in Certificate.query.filter_by(event_id=event_id).order_by(Certificate.id).all():
         path = get_certificate_file_path(certificate)
-        if not path or not path.is_file():
-            continue
-        try:
-            path.resolve().relative_to(root)
-        except ValueError:
-            continue
-        found.append((certificate, path))
+        if path and path.is_file():
+            found.append((certificate, path))
     return found
 
 
@@ -1793,14 +1787,10 @@ def delete_event(event_id):
     impact = _event_delete_impact(event_id)
     event_name = event.ten_su_kien
 
-    certificate_paths = []
-    for certificate in Certificate.query.filter_by(event_id=event_id).all():
-        if certificate.file_url:
-            static_prefix = url_for("static", filename="", _external=False)
-            relative_path = certificate.file_url
-            if relative_path.startswith(static_prefix):
-                relative_path = relative_path[len(static_prefix):]
-            certificate_paths.append(Path(current_app.static_folder) / relative_path)
+    certificate_paths = [
+        path for path in (get_certificate_file_path(item) for item in Certificate.query.filter_by(event_id=event_id).all())
+        if path
+    ]
 
     # Deleted in FK-dependency order: EmailLog references Certificate, both
     # reference Registration/CheckIn's (ma_cbsv, event_id) pair indirectly.
@@ -1835,11 +1825,7 @@ def delete_event_checkin(event_id, ma_cbsv):
     certificate = Certificate.query.filter_by(event_id=event_id, ma_cbsv=ma_cbsv).first()
     certificate_path = None
     if certificate and certificate.file_url:
-        static_prefix = url_for("static", filename="", _external=False)
-        relative_path = certificate.file_url
-        if relative_path.startswith(static_prefix):
-            relative_path = relative_path[len(static_prefix):]
-        certificate_path = Path(current_app.static_folder) / relative_path
+        certificate_path = get_certificate_file_path(certificate)
 
         EmailLog.query.filter_by(
             event_id=event_id,
@@ -1902,10 +1888,14 @@ def reset_data():
     if not confirmed:
         return jsonify({"success": False, "message": "Chưa xác nhận xóa dữ liệu."}), 400
 
+    # File chứng chỉ (có họ tên) xoá theo dữ liệu, không để sót lại trên đĩa
+    certificate_paths = [path for path in (get_certificate_file_path(item) for item in Certificate.query.all()) if path]
     db.session.query(EmailLog).delete()
     db.session.query(Certificate).delete()
     db.session.query(CheckinRecord).delete()
     db.session.query(CheckIn).delete()
     db.session.query(Registration).delete()
     db.session.commit()
+    for path in certificate_paths:
+        path.unlink(missing_ok=True)
     return jsonify({"success": True, "message": "Đã xóa toàn bộ dữ liệu đăng ký, check-in và chứng nhận."})

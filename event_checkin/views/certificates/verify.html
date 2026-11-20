@@ -1,36 +1,41 @@
 {% extends 'base.html' %}
 {% block title %}Xác minh chứng nhận | Event Check-in{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 
 {% block content %}
+{# Trang công khai: CHỈ họ tên, tên sự kiện, ngày cấp, trạng thái. Không hiện email, mã CB/SV, đơn vị, mã chứng nhận. #}
 <section class="verify-panel">
   <div class="panel-head">
     <div>
       <p class="eyebrow">Xác minh</p>
-      <h1>Chứng nhận hợp lệ</h1>
+      <h1>{{ 'Chứng nhận hợp lệ' if info.valid else 'Chứng nhận không còn hiệu lực' }}</h1>
     </div>
-    <a class="btn btn--primary" href="{{ url_for('certificates.download', certificate_code=certificate.certificate_code) }}">Tải chứng nhận</a>
+    {% if download_url %}
+      <div class="verify-actions">
+        <a class="btn btn--outline" href="{{ view_url }}" target="_blank" rel="noopener">Xem chứng nhận</a>
+        <a class="btn btn--primary" href="{{ download_url }}">Tải chứng nhận</a>
+      </div>
+    {% elif confirm_url %}
+      <a class="btn btn--primary" href="{{ confirm_url }}">Tải chứng nhận</a>
+    {% endif %}
   </div>
 
   <div class="certificate-summary">
     <div>
       <span>Họ tên</span>
-      <strong>{{ certificate.user.ho_ten if certificate.user else certificate.ma_cbsv }}</strong>
+      <strong>{{ info.ho_ten }}</strong>
     </div>
     <div>
-      <span>Mã CB/SV</span>
-      <strong>{{ certificate.ma_cbsv }}</strong>
-    </div>
-    <div>
-      <span>Mã chứng nhận</span>
-      <strong>{{ certificate.certificate_code }}</strong>
-    </div>
-    <div>
-      <span>Trạng thái</span>
-      <strong>{{ {'generated': 'Đã cấp', 'revoked': 'Đã thu hồi'}.get(certificate.status, certificate.status) }}</strong>
+      <span>Sự kiện</span>
+      <strong>{{ info.ten_su_kien }}</strong>
     </div>
     <div>
       <span>Ngày cấp</span>
-      <strong>{{ certificate.issued_at.strftime('%d/%m/%Y') }}</strong>
+      <strong>{{ info.ngay_cap }}</strong>
+    </div>
+    <div>
+      <span>Trạng thái</span>
+      <strong>{{ info.status_label }}</strong>
     </div>
   </div>
 </section>

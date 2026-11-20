@@ -549,22 +549,22 @@
     if (!code) return;
     certificatePreviewModal.hidden = false;
     certificatePreviewContent.innerHTML = 'Đang tải...';
-    certificateDownload.href = `/api/certificates/${encodeURIComponent(code)}`;
+    certificateDownload.href = `/api/admin/certificates/${encodeURIComponent(code)}`;
 
     try {
-      const head = await fetch(`/api/certificates/${encodeURIComponent(code)}/view`, { method: 'HEAD' });
+      const head = await fetch(`/api/admin/certificates/${encodeURIComponent(code)}/view`, { method: 'HEAD' });
       const contentType = head.headers.get('Content-Type') || '';
       certificatePreviewContent.innerHTML = '';
         if (contentType.includes('pdf')) {
           const iframe = document.createElement('iframe');
-          iframe.src = `/api/certificates/${encodeURIComponent(code)}/view`;
+          iframe.src = `/api/admin/certificates/${encodeURIComponent(code)}/view`;
           iframe.style.width = '100%';
           iframe.style.height = 'calc(100vh - 230px)';
           iframe.style.border = '0';
           certificatePreviewContent.appendChild(iframe);
         } else {
           const img = document.createElement('img');
-          img.src = `/api/certificates/${encodeURIComponent(code)}/view`;
+          img.src = `/api/admin/certificates/${encodeURIComponent(code)}/view`;
           img.style.maxWidth = '100%';
           img.style.maxHeight = 'calc(100vh - 230px)';
           img.style.width = 'auto';

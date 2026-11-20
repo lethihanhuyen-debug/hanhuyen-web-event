@@ -76,7 +76,11 @@ Chứng chỉ gửi thật luôn dùng đúng cấu hình và tên đã lưu ở
 3. Việc gửi chạy trên máy chủ: **đóng tab vẫn gửi tiếp**, mở lại trang sẽ thấy tiến độ. Trong lúc gửi, nút Gửi bị khóa.
 4. Xong đợt sẽ có dòng tổng kết số thành công / lỗi.
 
-Email gửi đi ghi họ tên, tên sự kiện và **giờ check-in** của người đó (không phải giờ gửi), kèm file chứng chỉ PDF.
+Email gửi đi ghi họ tên, tên sự kiện và **giờ check-in** của người đó (không phải giờ gửi), kèm file chứng chỉ PDF, một đường dẫn **Tải chứng nhận** và một đường dẫn **Xác minh chứng nhận**. Hai đường dẫn này là riêng của từng người (dạng `/c/…` và `/verify/t/…`, không đoán được từ mã chứng nhận); nhắc người nhận không chia sẻ.
+
+- Trang xác minh công khai chỉ hiện họ tên, tên sự kiện, ngày cấp và trạng thái; không hiện email, mã CB/SV, đơn vị.
+- **Thư gửi trước 11/2026** có đường dẫn cũ theo mã chứng nhận. Đường dẫn cũ vẫn mở được trang xác minh, nhưng muốn tải file thì người nhận phải nhập đúng **mã CB/SV** của mình (sai quá 5 lần trong 15 phút sẽ bị chặn tạm). Người nhận vẫn còn file PDF đính kèm trong thư cũ. Cần đường dẫn mới thì bấm **Gửi lại** cho người đó.
+- Admin xem/tải chứng chỉ trong trang quản trị như cũ; tài khoản nhân viên check-in (staff) không xem/tải được chứng chỉ.
 
 Nếu máy chủ bị khởi động lại giữa chừng: người chưa gửi vẫn ở trạng thái *Chưa gửi* — chỉ cần bấm **Gửi chứng chỉ** lần nữa, người đã nhận sẽ không bị gửi lại.
 

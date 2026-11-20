@@ -57,6 +57,12 @@ class Config:
     # Số giờ SAU giờ kết thúc sự kiện mà staff vẫn check-in được (quá mốc này chỉ admin thêm tay). Server kiểm tra
     # theo đúng mốc này và giao diện (nút Check-in, dòng nhắc) cũng dùng cùng mốc -- xem Event.checkin_state.
     CHECKIN_GRACE_HOURS = float(os.getenv("CHECKIN_GRACE_HOURS", "5"))
+    # Nơi lưu file chứng chỉ đã tạo: NGOÀI thư mục static (không ai mở thẳng qua URL được), chỉ phục vụ qua route
+    # có kiểm tra token/quyền. Mặc định instance/certificates (đã có trong .gitignore). Nhớ đưa thư mục này vào backup.
+    CERTIFICATE_STORAGE_DIR = Path(os.getenv("CERTIFICATE_STORAGE_DIR") or (BASE_DIR / "instance" / "certificates"))
+    # Số request tối đa mỗi phút cho MỖI IP vào các route chứng chỉ công khai (tải/xem/xác minh). Để cao vì cả
+    # trường thường dùng chung 1 IP công cộng (Wi-Fi trường). Quá mức -> 429.
+    CERT_PUBLIC_RATE_LIMIT = int(os.getenv("CERT_PUBLIC_RATE_LIMIT", "120"))
     PERMANENT_SESSION_LIFETIME = timedelta(days=REMEMBER_LOGIN_DAYS)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"

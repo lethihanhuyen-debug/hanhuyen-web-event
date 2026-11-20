@@ -27,23 +27,41 @@ class CertificateError(Exception):
     pass
 
 
-def _storage_root():
-    return Path(current_app.static_folder) / "certificates" / "generated"
+LEGACY_STATIC_PREFIX = "/static/"
+LEGACY_GENERATED_DIR = ("certificates", "generated")
 
 
-def _public_url(path):
-    relative = path.relative_to(Path(current_app.static_folder)).as_posix()
-    return url_for("static", filename=relative, _external=False)
+def storage_root():
+    """Thư mục lưu file chứng chỉ (ngoài static, xem Config.CERTIFICATE_STORAGE_DIR)."""
+    return Path(current_app.config["CERTIFICATE_STORAGE_DIR"])
+
+
+def legacy_storage_root():
+    """Thư mục cũ trong static (trước m007). Chỉ còn dùng để đọc dữ liệu chưa chuyển và cho m007."""
+    return Path(current_app.static_folder).joinpath(*LEGACY_GENERATED_DIR)
+
+
+def _relative_path(path):
+    return path.relative_to(storage_root()).as_posix()
 
 
 def _stored_file_path(file_url):
+    """Đường dẫn thật của file. file_url mới là đường dẫn tương đối trong storage_root(); dạng cũ
+    "/static/certificates/generated/..." (chưa chạy m007) vẫn đọc được từ thư mục static cũ.
+    Trả None nếu đường dẫn thoát ra ngoài thư mục cho phép (phòng dữ liệu lạ)."""
     if not file_url:
         return None
-    prefix = url_for("static", filename="", _external=False)
-    relative = file_url
-    if relative.startswith(prefix):
-        relative = relative[len(prefix):]
-    return Path(current_app.static_folder) / relative
+    if file_url.startswith(LEGACY_STATIC_PREFIX):
+        root = legacy_storage_root()
+        path = Path(current_app.static_folder) / file_url[len(LEGACY_STATIC_PREFIX):]
+    else:
+        root = storage_root()
+        path = root / file_url
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return None
+    return path
 
 
 def _next_certificate_code(event_id):
@@ -134,7 +152,7 @@ def _render_certificate_file(registration, certificate_code, issued_at, requeste
     student_unit = user.ten_don_vi if user else ""
     event_name = event.ten_su_kien if event else ""
     template_path, layout = event_layout(event)
-    year_dir = _storage_root() / str(issued_at.year)
+    year_dir = storage_root() / str(issued_at.year)
     if requested_type == "pdf":
         output_path = year_dir / f"{certificate_code}.pdf"
         rendered_path = save_pdf_certificate(
@@ -186,8 +204,9 @@ def generate_certificate(ma_cbsv, event_id=DEFAULT_EVENT_ID, file_type="pdf"):
                 existing.issued_at or datetime.utcnow(),
                 requested_type,
             )
-            existing.file_url = _public_url(output_path)
+            existing.file_url = _relative_path(output_path)
             existing.file_type = actual_type
+            existing.ensure_token()
             db.session.commit()
             if previous_path and previous_path != output_path and previous_path.exists():
                 previous_path.unlink(missing_ok=True)
@@ -205,7 +224,8 @@ def generate_certificate(ma_cbsv, event_id=DEFAULT_EVENT_ID, file_type="pdf"):
         ma_cbsv=registration.ma_cbsv,
         event_id=event_id,
         certificate_code=certificate_code,
-        file_url=_public_url(output_path),
+        token=Certificate.new_token(),
+        file_url=_relative_path(output_path),
         file_type=actual_type,
         status="generated",
         issued_at=issued_at,
@@ -218,3 +238,14 @@ def generate_certificate(ma_cbsv, event_id=DEFAULT_EVENT_ID, file_type="pdf"):
 
 def get_certificate_file_path(certificate):
     return _stored_file_path(certificate.file_url)
+
+
+def certificate_links(certificate, external=False):
+    """Link công khai (theo token) của một chứng chỉ, dùng cho email và trang admin. Chứng chỉ chưa có token
+    (dữ liệu trước m007) được sinh token ngay -- người gọi tự commit."""
+    token = certificate.ensure_token()
+    return {
+        "download_url": url_for("certificates.token_download", token=token, _external=external),
+        "view_url": url_for("certificates.token_view", token=token, _external=external),
+        "verify_url": url_for("certificates.token_verify", token=token, _external=external),
+    }

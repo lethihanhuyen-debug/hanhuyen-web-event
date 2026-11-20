@@ -737,6 +737,13 @@ a {
   text-align: center;
 }
 
+/* Trang xác minh chứng chỉ: nút Xem + Tải cạnh nhau, tự xuống dòng khi hẹp */
+.verify-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 /* Nút "Chọn sự kiện khác" cuối thẻ check-in: có khung viền, căn giữa, đủ cao để bấm trên điện thoại */
 .checkin-switch {
   margin-top: var(--space-5);

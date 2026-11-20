@@ -30,6 +30,16 @@ from event_checkin.models.password_reset import PasswordReset  # noqa: E402
 
 TEST_PASSWORD = "Test1234x"
 
+# File chứng chỉ do test tạo ra nằm ở thư mục tạm riêng, không lẫn vào thư mục chứng chỉ thật (instance/certificates)
+import atexit  # noqa: E402
+import shutil  # noqa: E402
+import tempfile  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+TEST_CERT_DIR = Path(tempfile.mkdtemp(prefix="cert_test_"))
+app.config["CERTIFICATE_STORAGE_DIR"] = TEST_CERT_DIR
+atexit.register(shutil.rmtree, TEST_CERT_DIR, True)
+
 
 class AppTestCase(unittest.TestCase):
     """Tạo 3 tài khoản thử (super_admin / admin / staff) cho cả lớp test, xóa khi xong."""

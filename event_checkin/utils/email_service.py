@@ -98,6 +98,7 @@ def send_checkin_email(
     certificate_code=None,
     verify_url=None,
     return_error=False,
+    download_url=None,
 ):
     if not email:
         error = "Người dùng không có địa chỉ email."
@@ -125,15 +126,18 @@ def send_checkin_email(
     certificate_text = ""
     certificate_html = ""
     if certificate_code:
+        # Link riêng theo token: chỉ người nhận thư có link, không ai đoán được từ mã chứng nhận
         certificate_text = (
             f"\nMã chứng nhận: {certificate_code}"
+            + (f"\nTải chứng nhận: {download_url}" if download_url else "")
             + (f"\nXác minh: {verify_url}" if verify_url else "")
-            + "\nFile chứng nhận được đính kèm trong email này.\n"
+            + "\nFile chứng nhận được đính kèm trong email này. Vui lòng không chia sẻ các đường dẫn trên.\n"
         )
         certificate_html = (
             f"<p><b>Mã chứng nhận:</b> {certificate_code}</p>"
+            + (f'<p><a href="{download_url}">Tải chứng nhận</a></p>' if download_url else "")
             + (f'<p><a href="{verify_url}">Xác minh chứng nhận</a></p>' if verify_url else "")
-            + "<p>File chứng nhận được đính kèm trong email này.</p>"
+            + "<p>File chứng nhận được đính kèm trong email này. Vui lòng không chia sẻ các đường dẫn trên.</p>"
         )
 
     text_body = (
