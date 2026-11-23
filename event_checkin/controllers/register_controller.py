@@ -25,16 +25,14 @@ CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
 
 def _hero_events():
     """Banner trang đăng ký lấy nội dung từ 3 sự kiện mới tạo gần đây nhất --
-    thay cho banner tĩnh admin phải tự nhập tay. Nút CTA link thẳng tới trang
+    thay cho banner tĩnh admin phải tự nhập tay. Chỉ hiện ảnh; bấm vào ảnh mở trang
     đăng ký của đúng sự kiện đó (register.event_register)."""
     events = Event.query.order_by(Event.created_at.desc()).limit(3).all()
     result = []
     for event in events:
         result.append({
             "id": event.id,
-            "badge_text": event.co_so or "Sự kiện mới",
             "title": event.ten_su_kien,
-            "cta_text": "Đăng ký ngay",
             "hinh": event.hinh,  # ảnh hiển thị: xem _event_media.html (ảnh mặc định nếu trống)
             "link": url_for("register.event_register", event_id=event.id),
         })
