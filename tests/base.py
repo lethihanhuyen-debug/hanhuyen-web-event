@@ -39,6 +39,13 @@ from pathlib import Path  # noqa: E402
 TEST_CERT_DIR = Path(tempfile.mkdtemp(prefix="cert_test_"))
 app.config["CERTIFICATE_STORAGE_DIR"] = TEST_CERT_DIR
 atexit.register(shutil.rmtree, TEST_CERT_DIR, True)
+# Ảnh sự kiện do test tải lên / m008 xử lý: thư mục tạm, không đụng static/events thật (dùng chung với DB thật)
+TEST_IMAGE_DIR = Path(tempfile.mkdtemp(prefix="event_img_test_"))
+TEST_IMAGE_BACKUP_DIR = Path(tempfile.mkdtemp(prefix="event_img_goc_test_"))
+app.config["EVENT_IMAGE_DIR"] = TEST_IMAGE_DIR
+app.config["EVENT_IMAGE_BACKUP_DIR"] = TEST_IMAGE_BACKUP_DIR
+atexit.register(shutil.rmtree, TEST_IMAGE_DIR, True)
+atexit.register(shutil.rmtree, TEST_IMAGE_BACKUP_DIR, True)
 
 
 class AppTestCase(unittest.TestCase):

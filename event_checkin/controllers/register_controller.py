@@ -35,7 +35,7 @@ def _hero_events():
             "badge_text": event.co_so or "Sự kiện mới",
             "title": event.ten_su_kien,
             "cta_text": "Đăng ký ngay",
-            "image_url": url_for("static", filename=event.hinh) if event.hinh else None,
+            "hinh": event.hinh,  # ảnh hiển thị: xem _event_media.html (ảnh mặc định nếu trống)
             "link": url_for("register.event_register", event_id=event.id),
         })
     return result

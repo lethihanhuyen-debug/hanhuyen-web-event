@@ -7,20 +7,26 @@ chỗ đọc cột còn thiếu (vd. "Unknown column 'certificates.token'"). Gi�
 - thiếu m007: các route chứng chỉ trả "Hệ thống chứng chỉ đang bảo trì" (503);
 - thiếu m006: các trang cần tài khoản (đăng nhập, admin, staff, check-in) trả trang bảo trì (503), vì bảng admins
   thiếu cột thì không đăng nhập được. Trang đăng ký vẫn mở.
+- thiếu m008: ảnh sự kiện vẫn hiện (chỉ thiếu width/height), riêng nút tải ảnh sự kiện mới báo bảo trì.
 Chỉ kiểm tra MỘT LẦN lúc khởi động: chạy migration xong phải khởi động lại app.
 """
 from flask import current_app, jsonify, render_template, request
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
-from event_checkin.migrations import m006_phan_quyen, m007_certificate_token
+from event_checkin.migrations import m006_phan_quyen, m007_certificate_token, m008_event_image_size
 
 CHECKS = (
     ("m006", m006_phan_quyen.schema_problems),
     ("m007", m007_certificate_token.schema_problems),
+    ("m008", m008_event_image_size.schema_problems),
 )
 EXTENSION_KEY = "pending_migrations"
 CERT_MAINTENANCE_MESSAGE = "Hệ thống chứng chỉ đang bảo trì. Vui lòng thử lại sau."
 ACCOUNT_MAINTENANCE_MESSAGE = "Hệ thống quản trị đang bảo trì. Vui lòng thử lại sau."
+EVENT_IMAGE_MAINTENANCE_MESSAGE = "Chức năng tải ảnh sự kiện đang bảo trì (chưa chạy migration m008, xem DEPLOYMENT.md)."
+GENERAL_MAINTENANCE_MESSAGE = "Hệ thống đang bảo trì. Vui lòng thử lại sau."
+# Route ghi kích thước ảnh (cột của m008)
+EVENT_IMAGE_ENDPOINTS = {"admin.upload_event_image"}
 # Blueprint đọc bảng admins dù route là công khai (đăng nhập, quên mật khẩu...)
 ACCOUNT_BLUEPRINTS = {"admin", "staff", "password", "account", "checkin", "lucky"}
 
@@ -82,6 +88,8 @@ def _blocked_message():
             return ACCOUNT_MAINTENANCE_MESSAGE
     if "m007" in pending and request.blueprint == "certificates":
         return CERT_MAINTENANCE_MESSAGE
+    if "m008" in pending and request.endpoint in EVENT_IMAGE_ENDPOINTS:
+        return EVENT_IMAGE_MAINTENANCE_MESSAGE
     return None
 
 
@@ -100,7 +108,13 @@ def handle_database_error(error):
 
     db.session.rollback()
     current_app.logger.error("Lỗi DB khi chưa chạy đủ migration (%s): %s", ", ".join(pending), error.orig)
-    return maintenance_response(ACCOUNT_MAINTENANCE_MESSAGE if "m006" in pending else CERT_MAINTENANCE_MESSAGE)
+    if "m006" in pending:
+        message = ACCOUNT_MAINTENANCE_MESSAGE
+    elif "m007" in pending:
+        message = CERT_MAINTENANCE_MESSAGE
+    else:
+        message = GENERAL_MAINTENANCE_MESSAGE
+    return maintenance_response(message)
 
 
 def _template_context():

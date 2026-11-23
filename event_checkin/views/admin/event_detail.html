@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_event_media.html' import event_media %}
 {% block title %}{{ event.ten_su_kien }} | Quản trị sự kiện{% endblock %}
 
 {% block container_class %}container--wide{% endblock %}
@@ -26,9 +27,7 @@
     </div>
   </div>
 
-  {% if event.hinh_url %}
-    <img class="event-detail-image" src="{{ event.hinh_url }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
-  {% endif %}
+  {{ event_media(event, 'detail', alt='Hình sự kiện ' ~ event.ten_su_kien, lazy=false) }}
 
   <div class="stat-grid">
     <div class="stat-card">

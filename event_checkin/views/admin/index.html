@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_event_media.html' import event_media %}
 {% block title %}Quản trị sự kiện | Event Check-in{% endblock %}
 
 {% block head %}
@@ -108,13 +109,7 @@
   <div class="admin-event-list">
     {% for event in events %}
       <article class="admin-event-card js-event-row" data-status="{{ event.trang_thai }}" data-url="{{ url_for('admin.event_detail', event_id=event.id) }}">
-        <div class="admin-event-card__image">
-          {% if event.hinh_url %}
-            <img src="{{ event.hinh_url }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
-          {% else %}
-            <span>Chưa có hình</span>
-          {% endif %}
-        </div>
+        {{ event_media(event, 'card', alt='Hình sự kiện ' ~ event.ten_su_kien, extra_class='admin-event-card__image') }}
         <div class="admin-event-card__main">
           <h2>{{ event.ten_su_kien }}</h2>
         </div>
@@ -364,8 +359,13 @@
     eventImagePreview.hidden = false;
   }
 
+  const MAX_UPLOAD_MB = {{ config.MAX_UPLOAD_MB | int }};  // config.py MAX_UPLOAD_MB (server cũng chặn, đây chỉ để báo sớm)
+
   async function uploadEventImage(eventId) {
     if (!eventImageInput.files.length) return null;
+    if (eventImageInput.files[0].size > MAX_UPLOAD_MB * 1024 * 1024) {
+      throw new Error(`Ảnh quá lớn. Mỗi lần tải lên tối đa ${MAX_UPLOAD_MB}MB, vui lòng chọn ảnh nhỏ hơn.`);
+    }
     const formData = new FormData();
     formData.append('event_image', eventImageInput.files[0]);
     const response = await apiFetchQuiet(`/api/admin/events/${eventId}/image`, {
@@ -382,6 +382,14 @@
 
   eventImageInput.addEventListener('change', () => {
     const file = eventImageInput.files[0];
+    if (file && file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      message.className = 'message message--error field-wide';
+      message.textContent = `Ảnh quá lớn (${(file.size / 1024 / 1024).toFixed(1)}MB). Mỗi lần tải lên tối đa ${MAX_UPLOAD_MB}MB, vui lòng chọn ảnh nhỏ hơn.`;
+      message.hidden = false;
+      eventImageInput.value = '';
+      setImagePreview(editingEventData && editingEventData.hinh_url);
+      return;
+    }
     setImagePreview(file ? URL.createObjectURL(file) : editingEventData && editingEventData.hinh_url);
   });
 

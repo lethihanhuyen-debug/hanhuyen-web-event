@@ -2,6 +2,7 @@
    và cho endpoint /api/events/month-groups (trả về dưới dạng chuỗi HTML để nối
    thêm vào #eventGroups khi bấm "Xem thêm"), để logic hiển thị badge trạng thái
    và định dạng ngày giờ chỉ nằm ở một chỗ duy nhất. #}
+{% from '_event_media.html' import event_media %}
 {% set wd_names = ["CN", "Th 2", "Th 3", "Th 4", "Th 5", "Th 6", "Th 7"] %}
 {% for group in event_groups %}
   <section class="event-month-group">
@@ -9,13 +10,7 @@
     <div class="event-list">
       {% for event in group.events %}
         <a class="event-card" data-status="{{ event.computed_status }}" href="{{ url_for('register.event_register', event_id=event.id) }}">
-          <div class="event-card__image">
-            {% if event.hinh %}
-              <img src="{{ url_for('static', filename=event.hinh) }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
-            {% else %}
-              <span>Chưa có hình</span>
-            {% endif %}
-          </div>
+          {{ event_media(event, 'card', alt='Hình sự kiện ' ~ event.ten_su_kien, extra_class='event-card__image') }}
           <div class="event-main">
             {% if event.computed_status == 'upcoming' %}
               <span class="badge badge--success">Sắp diễn ra</span>

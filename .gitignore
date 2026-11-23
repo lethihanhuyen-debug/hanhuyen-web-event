@@ -18,3 +18,6 @@ event_checkin/static/lucky/uploads/
 # Chứng chỉ đã tạo (có họ tên người nhận): không bao giờ đưa lên repo.
 # Thư mục cũ trong static (trước m007) và thư mục mới instance/certificates (đã nằm trong instance/ ở trên).
 event_checkin/static/certificates/generated/
+
+# Ảnh (banner) sự kiện do admin tải lên (từ m008). Sao lưu riêng -- xem DEPLOYMENT.md mục 2.3.
+event_checkin/static/events/

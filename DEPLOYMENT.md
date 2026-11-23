@@ -116,6 +116,12 @@ trong `.env`), không nằm trong DB nên phải sao lưu riêng. Thêm vào cu�
 ```powershell
 robocopy "C:\apps\eventcheckin\instance\certificates" "C:\backups\certificates" /MIR /R:1 /W:1 | Out-Null
 ```
+**Ảnh sự kiện** (từ bản m008 không còn nằm trong git) và bản gốc ảnh trước khi m008 thu nhỏ cũng phải sao lưu riêng.
+Thêm tiếp vào cuối `backup-db.ps1`:
+```powershell
+robocopy "C:\apps\eventcheckin\event_checkin\static\events" "C:\backups\events" /MIR /R:1 /W:1 | Out-Null
+robocopy "C:\apps\eventcheckin\instance\event_images_goc" "C:\backups\event_images_goc" /E /R:1 /W:1 | Out-Null
+```
 
 Khuyến nghị: định kỳ copy thư mục `C:\backups` ra ngoài server (Google Drive, OneDrive, ổ ngoài...) — backup nằm chung server sẽ mất luôn nếu server hỏng/bị mã hoá.
 
@@ -290,7 +296,10 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 - [ ] Đăng ký thử 1 sự kiện bằng mã CB/SV test, check-in thử tại `/checkin`
 - [ ] `python -m event_checkin.migrations.m005_cau_hoi_dang_ky --check` báo `OK` (sau khi chạy m005)
 - [ ] `python -m event_checkin.migrations.m006_phan_quyen --check` và `python -m event_checkin.migrations.m007_certificate_token --check` đều báo `OK`
-- [ ] **Kiểm tra migration lúc khởi động**: sau `Restart-Service EventCheckinApp`, `C:\apps\eventcheckin\logs\app.log` **không** có dòng `Chưa chạy migration m00X, xem DEPLOYMENT.md`, và trang Quản trị **không** có banner đỏ "Lỗi hệ thống". Nếu có: app vẫn chạy nhưng phần liên quan tạm ngưng (thiếu m007 → mọi link chứng chỉ báo "Hệ thống chứng chỉ đang bảo trì"; thiếu m006 → đăng nhập/quản trị/check-in báo bảo trì, chỉ trang đăng ký còn mở). Chạy migration còn thiếu theo mục 9 rồi **khởi động lại app** (app chỉ kiểm tra lúc khởi động)
+- [ ] `python -m event_checkin.migrations.m008_event_image_size --check` báo `OK`
+- [ ] **Ảnh sau khi `git pull`**: trước pull đã sao lưu `event_checkin\static\events` và `instance\` (mục 9 → Cập nhật code); sau pull số file ảnh bằng số trước pull; thiếu thì chép lại từ bản sao lưu. Mở trang chủ: sự kiện nào có ảnh đều hiện đúng ảnh (không hiện ảnh mặc định ngoài ý muốn)
+- [ ] Tải thử ảnh sự kiện > 15MB: báo "File quá lớn..." (không phải trang lỗi 413 trống)
+- [ ] **Kiểm tra migration lúc khởi động**: sau `Restart-Service EventCheckinApp`, `C:\apps\eventcheckin\logs\app.log` **không** có dòng `Chưa chạy migration m00X, xem DEPLOYMENT.md`, và trang Quản trị **không** có banner đỏ "Lỗi hệ thống". Nếu có: app vẫn chạy nhưng phần liên quan tạm ngưng (thiếu m007 → mọi link chứng chỉ báo "Hệ thống chứng chỉ đang bảo trì"; thiếu m006 → đăng nhập/quản trị/check-in báo bảo trì, chỉ trang đăng ký còn mở; thiếu m008 → ảnh vẫn hiện, riêng nút tải ảnh sự kiện báo bảo trì). Chạy migration còn thiếu theo mục 9 rồi **khởi động lại app** (app chỉ kiểm tra lúc khởi động)
 - [ ] Menu **Quay số may mắn** (`/admin/lucky-draw`) mở được; thiết lập thử 1 sự kiện (giải + ảnh nền), quay thử, Lưu, rồi xóa thiết lập thử (sau khi chạy m004)
 - [ ] Chứng chỉ PDF/PNG tạo và tải được sau check-in (nếu event bật cấp chứng chỉ)
 - [ ] Email xác nhận gửi được (kiểm tra hộp thư, và `C:\apps\eventcheckin\logs\app.log` không có lỗi SMTP)
@@ -301,7 +310,17 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 ## 9. Vận hành lâu dài
 
 - **Log ứng dụng**: `C:\apps\eventcheckin\logs\app.log` (tự xoay vòng, tối đa 5 file x 5MB, cấu hình trong `app.py`). Log service (stdout/stderr) tại `C:\apps\eventcheckin\logs\service-*.log`.
-- **Cập nhật code**: `git pull` trong `C:\apps\eventcheckin`, `pip install -r requirements.txt` nếu có thư viện mới, rồi `Restart-Service EventCheckinApp`. App tự chạy `ensure_schema_upgrades()`/`db.create_all()` mỗi lần khởi động nên các thay đổi schema nhỏ (thêm cột/index) tự áp dụng, không cần chạy migration thủ công.
+- **Cập nhật code** — LUÔN sao lưu file do admin tải lên **trước** `git pull` (ảnh sự kiện, chứng chỉ, bản gốc ảnh không
+  nằm trong git; một bản cập nhật gỡ thư mục khỏi git có thể làm `git pull` xóa file thật):
+  ```powershell
+  $ngay = Get-Date -Format yyyyMMdd-HHmm
+  robocopy "C:\apps\eventcheckin\event_checkin\static\events" "C:\backups\truoc_pull_$ngay\events" /E /R:1 /W:1
+  robocopy "C:\apps\eventcheckin\instance" "C:\backups\truoc_pull_$ngay\instance" /E /R:1 /W:1
+  (Get-ChildItem "C:\apps\eventcheckin\event_checkin\static\events" -File).Count   # ghi lại số này
+  ```
+  Sau `git pull`: đếm lại số file ảnh, phải **bằng** số đã ghi. Thiếu thì chép lại từ bản sao lưu (không ghi đè file
+  đang có): `robocopy "C:\backups\truoc_pull_$ngay\events" "C:\apps\eventcheckin\event_checkin\static\events" /E /XC /XN /XO`
+  (tương tự cho `instance`). Các bước còn lại: `git pull` trong `C:\apps\eventcheckin`, `pip install -r requirements.txt` nếu có thư viện mới, rồi `Restart-Service EventCheckinApp`. App tự chạy `ensure_schema_upgrades()`/`db.create_all()` mỗi lần khởi động nên các thay đổi schema nhỏ (thêm cột/index) tự áp dụng, không cần chạy migration thủ công.
 - **Ngoại lệ — bản cập nhật check-in/gửi chứng chỉ (10/2026)**: thêm bảng/cột mà `db.create_all()` không tự thêm vào bảng đã có. Sao lưu database, chép code mới, `Restart-Service EventCheckinApp`, rồi chạy **ngay** theo thứ tự (chạy lại nhiều lần vẫn an toàn):
   ```powershell
   .venv\Scripts\python -m event_checkin.migrations.m001_checkin_records --dry-run   # xem trước
@@ -380,6 +399,20 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
   - `.env` có thể đặt `CERTIFICATE_STORAGE_DIR` (thư mục khác, ví dụ trên ổ D:) và `CERT_PUBLIC_RATE_LIMIT` (số request mỗi phút cho mỗi IP vào các trang chứng chỉ công khai, mặc định `120` vì cả trường dùng chung IP Wi-Fi; đếm trong bộ nhớ, khởi động lại app thì về 0). Nhập sai mã CB/SV ở link cũ: tối đa 5 lần / 15 phút cho mỗi mã chứng chỉ và mỗi IP.
   - Mã chứng chỉ: số thứ tự lấy từ bộ đếm `events.certificate_seq` (chỉ tăng; app tự thêm cột này khi khởi động, không cần migration), nên xóa check-in/chứng chỉ không làm mã cũ bị cấp lại cho người khác. Mã đã bị cấp lại trước bản cập nhật này (nếu có) không sửa được tự động; link cũ của những mã đó vẫn an toàn vì phải nhập đúng mã CB/SV.
   - Kiểm tra IP thật: sau khi bật `X-Forwarded-For`, đăng nhập từ một máy khác rồi xem **Quản trị → Nhật ký hoạt động**: cột IP phải là IP của máy đó (không phải `127.0.0.1`). Nếu vẫn là `127.0.0.1`: kiểm tra `APP_ENV=production` trong `.env` và cấu hình ARR ở mục 1. IP này dùng cho nhật ký, giới hạn quên mật khẩu và các giới hạn chứng chỉ.
+- **Bản cập nhật ảnh sự kiện (11/2026, migration m008)**: banner hiện đủ ảnh theo tỉ lệ gốc (không cắt/méo), ảnh tải lên được kiểm tra đúng là ảnh, ảnh > 2000px hoặc > 2MB tự thu nhỏ + nén, lưu kích thước vào `events.hinh_width/hinh_height`; giới hạn mỗi lần tải lên 15MB (`MAX_UPLOAD_MB` trong `.env`). Thư mục `event_checkin\static\events` **được gỡ khỏi git** (như chứng chỉ ở m007). Làm **đúng thứ tự**:
+  1. Sao lưu DB **và thư mục ảnh**: `robocopy "C:\apps\eventcheckin\event_checkin\static\events" "C:\backups\events_truoc_m008" /E`, ghi lại số file: `(Get-ChildItem "C:\backups\events_truoc_m008" -File).Count`.
+  2. `git pull`. Nếu git báo lỗi vì file trong `static\events` khác bản trên repo: `git checkout -- event_checkin/static/events` rồi `git pull` lại (đã có bản sao ở bước 1).
+  3. Chép lại ảnh có thể đã bị `git pull` xóa, không ghi đè file đang có: `robocopy "C:\backups\events_truoc_m008" "C:\apps\eventcheckin\event_checkin\static\events" /E /XC /XN /XO`. Đếm lại: phải bằng số ở bước 1.
+  4. Chạy m008 rồi khởi động lại:
+     ```powershell
+     .venv\Scripts\python -m event_checkin.migrations.m008_event_image_size --dry-run   # ảnh nào sẽ thu nhỏ (dung lượng trước/sau), ảnh thừa nào sẽ xóa
+     .venv\Scripts\python -m event_checkin.migrations.m008_event_image_size             # thực hiện (chạy lại nhiều lần vẫn an toàn)
+     .venv\Scripts\python -m event_checkin.migrations.m008_event_image_size --check     # mã thoát 0 + dòng "OK" là đạt
+     Restart-Service EventCheckinApp
+     ```
+     m008 chép **bản gốc** của mọi ảnh sắp thu nhỏ hoặc xóa sang `instance\event_images_goc\events\` (giữ nguyên tên) **trước** khi đụng tới file. Ảnh thừa = file trong `static\events` mà không sự kiện nào trỏ tới (ảnh cũ khi đổi đuôi .png/.jpg, ảnh của sự kiện đã xóa). Chưa chạy m008 thì web vẫn chạy (ảnh vẫn hiện), chỉ nút tải ảnh sự kiện báo bảo trì và trang Quản trị có banner đỏ.
+  5. Kiểm tra trang chủ, trang đăng ký và trang Quản trị: ảnh hiện đủ, không cắt. Giữ `instance\event_images_goc` và `C:\backups\events_truoc_m008` thêm một thời gian.
+  6. Thêm 2 dòng robocopy ảnh vào `backup-db.ps1` (mục 2.3).
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.
 

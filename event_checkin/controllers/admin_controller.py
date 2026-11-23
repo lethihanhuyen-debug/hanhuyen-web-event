@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from flask import Blueprint, Response, current_app, jsonify, make_response, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, current_app, g, jsonify, make_response, redirect, render_template, request, session, url_for
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
@@ -33,6 +33,7 @@ from event_checkin.models.event import Event
 from event_checkin.models.lucky_draw import LuckyConfig, LuckyWinner
 from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
+from event_checkin.utils import event_image as event_images
 from event_checkin.utils.timezone import format_local, format_utc_as_vn, now_vn_naive, vn_today_range
 
 
@@ -116,6 +117,8 @@ def _event_payload(event):
         "ten_su_kien": event.ten_su_kien,
         "hinh": event.hinh,
         "hinh_url": url_for("static", filename=event.hinh) if event.hinh else None,
+        "hinh_width": event_images.event_image(event)["width"] if event.hinh else None,
+        "hinh_height": event_images.event_image(event)["height"] if event.hinh else None,
         "mo_ta": event.mo_ta,
         "dia_diem": event.dia_diem,
         "co_so": event.co_so,
@@ -1451,7 +1454,10 @@ def update_event(event_id):
 
     event.ten_su_kien = ten_su_kien
     if "hinh" in payload:
-        event.hinh = (payload.get("hinh") or "").strip() or None
+        new_hinh = (payload.get("hinh") or "").strip() or None
+        if new_hinh != event.hinh:
+            event.hinh = new_hinh
+            event_images.set_size(event.id, None, None)  # kích thước cũ không còn đúng với ảnh khác
     event.mo_ta = (payload.get("mo_ta") or "").strip() or None
     event.dia_diem = (payload.get("dia_diem") or "").strip() or None
     event.co_so = co_so
@@ -1486,15 +1492,17 @@ def upload_event_image(event_id):
     if extension not in EVENT_IMAGE_EXTENSIONS:
         return jsonify({"success": False, "message": "Chỉ hỗ trợ PNG, JPG, JPEG hoặc WEBP."}), 400
 
-    image_dir = Path(current_app.static_folder) / "events"
-    image_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"event_{event_id}_image{extension}"
-    file_path = image_dir / filename
-    file.save(file_path)
-
-    event.hinh = f"events/{filename}"
+    # Mở thử bằng Pillow (đúng là ảnh, không hỏng), xoay theo EXIF, thu nhỏ/nén nếu quá lớn, lưu kích thước -- xem
+    # event_checkin/utils/event_image.py
+    try:
+        old_image = event_images.save_event_image(event, file.read())
+    except event_images.ImageRejected as error:
+        return jsonify({"success": False, "message": str(error)}), 400
     event.updated_at = datetime.utcnow()
     db.session.commit()
+    if old_image and old_image.is_file():
+        old_image.unlink(missing_ok=True)
+    g.pop("event_image_sizes", None)  # payload bên dưới đọc lại kích thước mới
 
     return jsonify({
         "success": True,
@@ -1796,6 +1804,7 @@ def delete_event(event_id):
     # reference Registration/CheckIn's (ma_cbsv, event_id) pair indirectly.
     from event_checkin.utils.lucky_draw import purge_event_data, remove_files
     lucky_files = purge_event_data(event_id)  # dữ liệu quay số + ảnh nền (có khoá ngoại sang events)
+    image_path = event_images.stored_path(event.hinh)
     EmailLog.query.filter_by(event_id=event_id).delete()
     Certificate.query.filter_by(event_id=event_id).delete()
     CheckinRecord.query.filter_by(event_id=event_id).delete()
@@ -1808,6 +1817,8 @@ def delete_event(event_id):
         if path.exists():
             path.unlink(missing_ok=True)
     remove_files(lucky_files)
+    if image_path and image_path.is_file():
+        image_path.unlink(missing_ok=True)
 
     log_action("event.delete", "event", event_id, {"ten_su_kien": event_name, **impact})
     return jsonify({"success": True, "message": "Đã xóa sự kiện."})

@@ -1,8 +1,9 @@
 import logging
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, abort, request
+from flask import Flask, abort, jsonify, request
 from sqlalchemy import inspect, text
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash
 
@@ -21,6 +22,7 @@ from event_checkin.models import db
 from event_checkin.models.admin import Admin
 from event_checkin.models.event import Event
 from event_checkin.schema_status import init_schema_status, record_pending_migrations
+from event_checkin.utils.event_image import init_event_images
 
 
 LOOPBACK_ADDRESSES = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
@@ -177,6 +179,16 @@ def create_app():
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         return response
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def upload_too_large(_error):
+        # MAX_CONTENT_LENGTH (config.py) áp cho mọi chỗ tải file lên; mặc định Flask trả trang 413 tiếng Anh trống trơn
+        message = f"File quá lớn. Mỗi lần tải lên tối đa {app.config['MAX_UPLOAD_MB']}MB, vui lòng chọn file nhỏ hơn."
+        if request.path.startswith("/api/") or request.method not in ("GET", "HEAD"):
+            return jsonify({"success": False, "code": "file_too_large", "message": message}), 413
+        return message, 413
+
+    init_event_images(app)
 
     # Thiếu migration (m006/m007) -> trang bảo trì + banner thay cho lỗi 500; phải đăng ký TRƯỚC init_access
     init_schema_status(app)

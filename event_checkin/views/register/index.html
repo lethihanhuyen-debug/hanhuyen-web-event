@@ -1,4 +1,5 @@
 ﻿{% extends 'base.html' %}
+{% from '_event_media.html' import event_media %}
 {% block title %}Đăng ký | Event Check-in{% endblock %}
 
 {% block content %}
@@ -24,27 +25,29 @@
 {% if hero_events %}
 <div class="hero-slider" id="heroSlider">
   {% for event in hero_events %}
+    {# Ảnh hiện đủ (contain) trên nền mờ; tên sự kiện + nút nằm DƯỚI ảnh để không che chữ trên banner #}
     <div class="hero-slide{% if loop.first %} is-active{% endif %}" data-slide="{{ loop.index0 }}">
-      <div class="hero-slide__bg hero-slide__bg--{{ loop.index0 % 3 }}">
-        {% if event.image_url %}<img class="hero-slide__img" src="{{ event.image_url }}" alt="">{% endif %}
-      </div>
-      <div class="hero-slide__overlay"></div>
+      {{ event_media(event, 'hero', alt='Hình sự kiện ' ~ event.title, lazy=not loop.first) }}
       <div class="hero-slide__content">
-        {% if event.badge_text %}<span class="hero-slide__badge">{{ event.badge_text }}</span>{% endif %}
-        <h1 class="hero-slide__title">{{ event.title }}</h1>
+        <div class="hero-slide__text">
+          {% if event.badge_text %}<span class="hero-slide__badge">{{ event.badge_text }}</span>{% endif %}
+          <h1 class="hero-slide__title">{{ event.title }}</h1>
+        </div>
         <a class="btn btn--primary hero-slide__cta" href="{{ event.link }}">{{ event.cta_text }} <span aria-hidden="true">→</span></a>
       </div>
     </div>
   {% endfor %}
 
   {% if hero_events|length > 1 %}
-    <button type="button" class="hero-slider__arrow hero-slider__arrow--prev" id="heroPrev" aria-label="Banner trước">‹</button>
-    <button type="button" class="hero-slider__arrow hero-slider__arrow--next" id="heroNext" aria-label="Banner tiếp theo">›</button>
-
-    <div class="hero-slider__dots" id="heroDots">
-      {% for event in hero_events %}
-        <button type="button" class="hero-slider__dot{% if loop.first %} is-active{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Banner {{ loop.index }}"></button>
-      {% endfor %}
+    {# Hàng điều hướng riêng dưới slide: không đè lên ảnh (banner có chữ sát mép) #}
+    <div class="hero-slider__nav">
+      <button type="button" class="hero-slider__arrow hero-slider__arrow--prev" id="heroPrev" aria-label="Banner trước">‹</button>
+      <button type="button" class="hero-slider__arrow hero-slider__arrow--next" id="heroNext" aria-label="Banner tiếp theo">›</button>
+      <div class="hero-slider__dots" id="heroDots">
+        {% for event in hero_events %}
+          <button type="button" class="hero-slider__dot{% if loop.first %} is-active{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Banner {{ loop.index }}"></button>
+        {% endfor %}
+      </div>
     </div>
   {% endif %}
 </div>
@@ -126,9 +129,7 @@
       <p class="muted">Thử đổi từ khoá tìm kiếm hoặc chọn lại bộ lọc trạng thái.</p>
     </div>
   {% else %}
-    {% if selected_event.hinh %}
-      <img class="event-detail-image" src="{{ url_for('static', filename=selected_event.hinh) }}" alt="Hình sự kiện {{ selected_event.ten_su_kien }}">
-    {% endif %}
+    {{ event_media(selected_event, 'detail', alt='Hình sự kiện ' ~ selected_event.ten_su_kien, lazy=false) }}
     {% if not selected_event.is_registration_open %}
       <div class="form-card">
         <p class="muted">{{ selected_event.registration_block_reason }}</p>
