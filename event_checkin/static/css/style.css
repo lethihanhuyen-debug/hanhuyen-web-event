@@ -2283,43 +2283,20 @@ a.hero-slide:focus-visible {
   outline-offset: -3px;
 }
 
-/* Hàng điều hướng dưới slide (hàng 2 của lưới), không đè lên ảnh: ‹ • • • › */
-.hero-slider__nav {
-  grid-row: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-5);
-}
-
-.hero-slider__arrow {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(40, 100, 150, 0.2);
-  border-radius: 50%;
-  background: rgba(253, 250, 242, 0.75);
-  color: var(--warm-taupe);
-  font-size: var(--text-2xl);
-  line-height: 1;
-  transition: background .2s ease;
-}
-
-.hero-slider__arrow:hover {
-  background: rgba(253, 250, 242, 0.95);
-}
-
+/* Chấm chuyển slide đè lên mép dưới ảnh, trên nền mờ nhỏ để luôn nhìn thấy */
 .hero-slider__dots {
-  order: 2;
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-.hero-slider__arrow--next {
-  order: 3;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(253, 250, 242, 0.7);
+  backdrop-filter: blur(4px);
 }
 
 .hero-slider__dot {
@@ -2462,12 +2439,6 @@ a.hero-slide:focus-visible {
 /* Overrides mobile cho hero slider — đặt SAU style gốc phía trên để thắng
    cascade (cùng độ ưu tiên selector, đứng sau nên được áp dụng trên < 640px). */
 @media (max-width: 640px) {
-  .hero-slider__arrow {
-    width: 32px;
-    height: 32px;
-    font-size: var(--text-lg);
-  }
-
 }
 
 /* =========================================================
@@ -2899,16 +2870,18 @@ a.hero-slide:focus-visible {
     min-height: 44px;
   }
 
-  .hero-slider__arrow {
-    width: 44px;
-    height: 44px;
+  /* chấm có vùng bấm rộng (padding) nên khung nền bớt padding/gap cho gọn */
+  .hero-slider__dots {
+    bottom: 6px;
+    gap: 0;
+    padding: 0 4px;
   }
 
   .hero-slider__dot {
     box-sizing: content-box;
     width: 8px;
     height: 8px;
-    padding: var(--space-2);
+    padding: 6px;
     background-clip: content-box;
   }
 

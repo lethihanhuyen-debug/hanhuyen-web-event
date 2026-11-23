@@ -33,15 +33,11 @@
   {% endfor %}
 
   {% if hero_events|length > 1 %}
-    {# Hàng điều hướng riêng dưới slide: không đè lên ảnh (banner có chữ sát mép) #}
-    <div class="hero-slider__nav">
-      <button type="button" class="hero-slider__arrow hero-slider__arrow--prev" id="heroPrev" aria-label="Banner trước">‹</button>
-      <button type="button" class="hero-slider__arrow hero-slider__arrow--next" id="heroNext" aria-label="Banner tiếp theo">›</button>
-      <div class="hero-slider__dots" id="heroDots">
-        {% for event in hero_events %}
-          <button type="button" class="hero-slider__dot{% if loop.first %} is-active{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Banner {{ loop.index }}"></button>
-        {% endfor %}
-      </div>
+    {# Chấm chuyển slide nằm đè lên mép dưới ảnh (không có mũi tên) #}
+    <div class="hero-slider__dots" id="heroDots">
+      {% for event in hero_events %}
+        <button type="button" class="hero-slider__dot{% if loop.first %} is-active{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Banner {{ loop.index }}"></button>
+      {% endfor %}
     </div>
   {% endif %}
 </div>
@@ -199,7 +195,7 @@
     }
   }
 
-  // ---------- Hero slider: auto-advance + dots + arrows ----------
+  // ---------- Hero slider: tự chuyển + chấm ----------
   const slider = document.getElementById('heroSlider');
   if (slider) {
     const slides = Array.from(slider.querySelectorAll('.hero-slide'));
@@ -221,13 +217,8 @@
       timer = setInterval(() => goTo(current + 1), 6000);
     }
 
-    // Mũi tên/dot chỉ được render khi có > 1 slide (xem index.html) -- guard
-    // null vì chỉ 1 slide thì không cần điều hướng hay tự chuyển.
-    const heroPrev = document.getElementById('heroPrev');
-    const heroNext = document.getElementById('heroNext');
-    if (heroPrev && heroNext && slides.length > 1) {
-      heroPrev.addEventListener('click', () => { goTo(current - 1); restartAutoplay(); });
-      heroNext.addEventListener('click', () => { goTo(current + 1); restartAutoplay(); });
+    // Chấm chỉ được render khi có > 1 slide (xem index.html); 1 slide thì không cần tự chuyển.
+    if (slides.length > 1) {
       dots.forEach((dot) => dot.addEventListener('click', () => { goTo(Number(dot.dataset.goto)); restartAutoplay(); }));
       slider.addEventListener('mouseenter', () => timer && clearInterval(timer));
       slider.addEventListener('mouseleave', restartAutoplay);
