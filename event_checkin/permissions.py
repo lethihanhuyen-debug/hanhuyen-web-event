@@ -49,6 +49,7 @@ PATRON_LOOKUP = "patron.lookup"            # tra mã CB/SV (trả họ tên + đ
 # Quyền thêm của admin.
 ADMIN_AREA = "admin.area"                  # vào khu /admin (trang tổng, dashboard)
 REGISTRATION_VIEW_FULL = "registration.view_full"  # xem đủ thông tin đăng ký (email, SĐT, câu hỏi)
+REGISTRATION_DELETE = "registration.delete"        # hủy (xóa mềm) / khôi phục đăng ký của người đăng ký
 EVENT_MANAGE = "event.manage"              # tạo/sửa sự kiện, ảnh sự kiện
 CHECKIN_MANAGE = "checkin.manage"          # thêm tay/import/xóa/gộp trùng check-in, sửa tên in chứng chỉ
 CERTIFICATE_MANAGE = "certificate.manage"  # gửi/gửi lại/tạo chứng chỉ; mẫu, bố cục, font; kho chứng chỉ
@@ -72,6 +73,7 @@ _STAFF_PERMISSIONS = frozenset({
 _ADMIN_EXTRA = frozenset({
     ADMIN_AREA,
     REGISTRATION_VIEW_FULL,
+    REGISTRATION_DELETE,
     EVENT_MANAGE,
     CHECKIN_MANAGE,
     CERTIFICATE_MANAGE,

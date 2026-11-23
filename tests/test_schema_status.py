@@ -81,3 +81,13 @@ class SchemaStatusTest(AppTestCase):
             with pending({}):
                 with self.assertRaises(OperationalError):
                     schema_status.handle_database_error(error)
+
+    def test_missing_m009_shows_maintenance_instead_of_500(self):
+        with pending({"m009": ["thiếu cột registrations.trang_thai"]}):
+            for path in ("/", "/api/events/search"):
+                response = self.client_for().get(path)
+                self.assertEqual(response.status_code, 503, path)
+            response = self.client_for().post("/api/register", json={"ma_cbsv": "X"})
+            self.assertEqual(response.status_code, 503)
+            self.assertEqual(response.get_json()["code"], "maintenance")
+            self.assertEqual(self.client_for().get("/static/css/style.css").status_code, 200)

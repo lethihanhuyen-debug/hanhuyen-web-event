@@ -297,9 +297,11 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 - [ ] `python -m event_checkin.migrations.m005_cau_hoi_dang_ky --check` báo `OK` (sau khi chạy m005)
 - [ ] `python -m event_checkin.migrations.m006_phan_quyen --check` và `python -m event_checkin.migrations.m007_certificate_token --check` đều báo `OK`
 - [ ] `python -m event_checkin.migrations.m008_event_image_size --check` báo `OK`
+- [ ] `python -m event_checkin.migrations.m009_huy_dang_ky --check` báo `OK`
+- [ ] Xóa người đăng ký: đăng nhập admin, mở chi tiết 1 sự kiện thử, xóa 1 người → biến khỏi danh sách, số "Đã đăng ký" giảm 1, có trong mục "Đã hủy"; bấm Khôi phục → quay lại như cũ. Đăng nhập staff: không thấy nút Xóa
 - [ ] **Ảnh sau khi `git pull`**: trước pull đã sao lưu `event_checkin\static\events` và `instance\` (mục 9 → Cập nhật code); sau pull số file ảnh bằng số trước pull; thiếu thì chép lại từ bản sao lưu. Mở trang chủ: sự kiện nào có ảnh đều hiện đúng ảnh (không hiện ảnh mặc định ngoài ý muốn)
 - [ ] Tải thử ảnh sự kiện > 15MB: báo "File quá lớn..." (không phải trang lỗi 413 trống)
-- [ ] **Kiểm tra migration lúc khởi động**: sau `Restart-Service EventCheckinApp`, `C:\apps\eventcheckin\logs\app.log` **không** có dòng `Chưa chạy migration m00X, xem DEPLOYMENT.md`, và trang Quản trị **không** có banner đỏ "Lỗi hệ thống". Nếu có: app vẫn chạy nhưng phần liên quan tạm ngưng (thiếu m007 → mọi link chứng chỉ báo "Hệ thống chứng chỉ đang bảo trì"; thiếu m006 → đăng nhập/quản trị/check-in báo bảo trì, chỉ trang đăng ký còn mở; thiếu m008 → ảnh vẫn hiện, riêng nút tải ảnh sự kiện báo bảo trì). Chạy migration còn thiếu theo mục 9 rồi **khởi động lại app** (app chỉ kiểm tra lúc khởi động)
+- [ ] **Kiểm tra migration lúc khởi động**: sau `Restart-Service EventCheckinApp`, `C:\apps\eventcheckin\logs\app.log` **không** có dòng `Chưa chạy migration m00X, xem DEPLOYMENT.md`, và trang Quản trị **không** có banner đỏ "Lỗi hệ thống". Nếu có: app vẫn chạy nhưng phần liên quan tạm ngưng (thiếu m007 → mọi link chứng chỉ báo "Hệ thống chứng chỉ đang bảo trì"; thiếu m006 → đăng nhập/quản trị/check-in báo bảo trì, chỉ trang đăng ký còn mở; thiếu m008 → ảnh vẫn hiện, riêng nút tải ảnh sự kiện báo bảo trì; thiếu m009 → **mọi trang** báo bảo trì). Chạy migration còn thiếu theo mục 9 rồi **khởi động lại app** (app chỉ kiểm tra lúc khởi động)
 - [ ] Menu **Quay số may mắn** (`/admin/lucky-draw`) mở được; thiết lập thử 1 sự kiện (giải + ảnh nền), quay thử, Lưu, rồi xóa thiết lập thử (sau khi chạy m004)
 - [ ] Chứng chỉ PDF/PNG tạo và tải được sau check-in (nếu event bật cấp chứng chỉ)
 - [ ] Email xác nhận gửi được (kiểm tra hộp thư, và `C:\apps\eventcheckin\logs\app.log` không có lỗi SMTP)
@@ -413,6 +415,18 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
      m008 chép **bản gốc** của mọi ảnh sắp thu nhỏ hoặc xóa sang `instance\event_images_goc\events\` (giữ nguyên tên) **trước** khi đụng tới file. Ảnh thừa = file trong `static\events` mà không sự kiện nào trỏ tới (ảnh cũ khi đổi đuôi .png/.jpg, ảnh của sự kiện đã xóa). Chưa chạy m008 thì web vẫn chạy (ảnh vẫn hiện), chỉ nút tải ảnh sự kiện báo bảo trì và trang Quản trị có banner đỏ.
   5. Kiểm tra trang chủ, trang đăng ký và trang Quản trị: ảnh hiện đủ, không cắt. Giữ `instance\event_images_goc` và `C:\backups\events_truoc_m008` thêm một thời gian.
   6. Thêm 2 dòng robocopy ảnh vào `backup-db.ps1` (mục 2.3).
+- **Bản cập nhật xóa người đăng ký (11/2026, migration m009)**: admin/super_admin xóa được người đăng ký (từng người hoặc hàng loạt) ở trang chi tiết sự kiện. Xóa là **xóa mềm**: dòng đăng ký giữ trong DB với `trang_thai = 'cancelled'` + giờ/người/lý do hủy; người bị xóa không còn trong danh sách, xuất Excel, check-in, gửi chứng chỉ, quay số và được nhả lại chỗ; có mục **"Đã hủy"** để xem lại và **Khôi phục**. Ô "Chặn mã này đăng ký lại sự kiện này" dùng cho đăng ký ảo. Không xóa thông tin trong bảng `users`, không gửi email. Người đã được cấp chứng chỉ hoặc đang trúng thưởng thì không xóa được. Làm **đúng thứ tự** (không khởi động lại app trước bước 3 -- thiếu m009 thì **mọi trang** báo bảo trì):
+  1. Sao lưu DB (mục 2.3).
+  2. `git pull`.
+  3. Chạy m009 rồi khởi động lại:
+     ```powershell
+     .venv\Scripts\python -m event_checkin.migrations.m009_huy_dang_ky --dry-run   # xem sẽ thêm cột/chỉ mục nào
+     .venv\Scripts\python -m event_checkin.migrations.m009_huy_dang_ky             # thực hiện (chạy lại nhiều lần vẫn an toàn)
+     .venv\Scripts\python -m event_checkin.migrations.m009_huy_dang_ky --check     # mã thoát 0 + dòng "OK" là đạt
+     Restart-Service EventCheckinApp
+     ```
+     m009 chỉ **thêm** cột vào `registrations` (đăng ký cũ = đang hiệu lực), không sửa/xóa dữ liệu.
+  4. Kiểm tra: trang chủ và trang Quản trị mở được; số "Đã đăng ký" của các sự kiện không đổi so với trước khi cập nhật.
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.
 

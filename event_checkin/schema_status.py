@@ -8,17 +8,20 @@ chỗ đọc cột còn thiếu (vd. "Unknown column 'certificates.token'"). Gi�
 - thiếu m006: các trang cần tài khoản (đăng nhập, admin, staff, check-in) trả trang bảo trì (503), vì bảng admins
   thiếu cột thì không đăng nhập được. Trang đăng ký vẫn mở.
 - thiếu m008: ảnh sự kiện vẫn hiện (chỉ thiếu width/height), riêng nút tải ảnh sự kiện mới báo bảo trì.
+- thiếu m009: gần như mọi trang đều đọc bảng registrations (đăng ký, admin, staff, check-in, chứng chỉ, quay số)
+  -> mọi trang (trừ file tĩnh) trả trang bảo trì chung. Phải chạy m009 rồi khởi động lại.
 Chỉ kiểm tra MỘT LẦN lúc khởi động: chạy migration xong phải khởi động lại app.
 """
 from flask import current_app, jsonify, render_template, request
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
-from event_checkin.migrations import m006_phan_quyen, m007_certificate_token, m008_event_image_size
+from event_checkin.migrations import m006_phan_quyen, m007_certificate_token, m008_event_image_size, m009_huy_dang_ky
 
 CHECKS = (
     ("m006", m006_phan_quyen.schema_problems),
     ("m007", m007_certificate_token.schema_problems),
     ("m008", m008_event_image_size.schema_problems),
+    ("m009", m009_huy_dang_ky.schema_problems),
 )
 EXTENSION_KEY = "pending_migrations"
 CERT_MAINTENANCE_MESSAGE = "Hệ thống chứng chỉ đang bảo trì. Vui lòng thử lại sau."
@@ -80,6 +83,8 @@ def _blocked_message():
     pending = pending_migrations()
     if not pending or request.endpoint in (None, "static"):
         return None
+    if "m009" in pending:
+        return GENERAL_MAINTENANCE_MESSAGE        # thiếu cột của registrations: trang nào cũng đọc bảng này
     if "m006" in pending:
         from event_checkin import permissions as perm
 

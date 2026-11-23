@@ -17,6 +17,7 @@ from event_checkin.models.audit_log import AuditLog
 from event_checkin.models.checkin_record import CheckinRecord
 from event_checkin.models.event import Event
 from event_checkin.models.password_reset import PasswordReset
+from event_checkin.models.registration import Registration
 from event_checkin.utils.timezone import format_utc_as_vn
 
 account_bp = Blueprint("account", __name__)
@@ -233,10 +234,11 @@ def delete_account(account_id):
         Event.query.filter(or_(Event.created_by == admin.id, Event.updated_by == admin.id)).count()
         + CheckinRecord.query.filter(CheckinRecord.checked_in_by == admin.id).count()
         + Admin.query.filter(Admin.created_by == admin.id).count()
+        + Registration.query.filter(Registration.huy_boi == admin.id).count()
     )
     if related:
         return _error(
-            f"Tài khoản này đã gắn với {related} dữ liệu (sự kiện, lượt check-in hoặc tài khoản do họ tạo) nên không thể xóa. "
+            f"Tài khoản này đã gắn với {related} dữ liệu (sự kiện, lượt check-in, đăng ký đã hủy hoặc tài khoản do họ tạo) nên không thể xóa. "
             "Hãy khóa tài khoản thay vì xóa.", 409)
 
     username = admin.username

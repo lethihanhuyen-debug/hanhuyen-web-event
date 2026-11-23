@@ -7,10 +7,11 @@ from sqlalchemy.exc import IntegrityError
 
 from event_checkin import permissions as perm
 from event_checkin.access import access
+from event_checkin.audit import log_action
 from event_checkin.models import db
 from event_checkin.models.don_vi import DonVi
 from event_checkin.models.event import Event
-from event_checkin.models.registration import Registration
+from event_checkin.models.registration import STATUS_ACTIVE, Registration
 from event_checkin.models.user import User
 
 
@@ -21,6 +22,7 @@ QUESTION_MAX_LENGTH = 1000
 CRLF, CR, LF = chr(13) + chr(10), chr(13), chr(10)  # chuẩn hoá xuống dòng của câu hỏi về LF
 MONTH_GROUPS_PER_PAGE = 3
 CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
+BLOCKED_MESSAGE = "Mã này không thể đăng ký sự kiện này. Vui lòng liên hệ ban tổ chức."
 
 
 def _hero_events():
@@ -316,8 +318,11 @@ def register():
     # (which is rejected below) never has the side effect of overwriting the
     # already-registered user's profile fields.
     existed = Registration.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
-    if existed:
+    if existed and existed.is_active:
         return jsonify({"success": False, "message": f"Mã {ma_cbsv} đã đăng ký sự kiện này."}), 409
+    if existed and existed.chan_dang_ky_lai:
+        # admin đã hủy đăng ký này và chặn đăng ký lại (đăng ký ảo) -- xem admin_controller.cancel_registrations
+        return jsonify({"success": False, "message": BLOCKED_MESSAGE}), 403
 
     don_vi = None
     if don_vi_id:
@@ -360,7 +365,7 @@ def register():
         db.session.query(Event.id).filter(Event.id == event_id).with_for_update().one()
         current_count = (
             db.session.query(func.count(Registration.id))
-            .filter(Registration.event_id == event_id)
+            .filter(Registration.event_id == event_id, Registration.trang_thai == STATUS_ACTIVE)  # đã hủy không chiếm chỗ
             .with_for_update()
             .scalar()
         )
@@ -368,13 +373,20 @@ def register():
             db.session.rollback()
             return jsonify({"success": False, "message": "Sự kiện đã đủ số lượng đăng ký."}), 400
 
-    registration = Registration(
-        ma_cbsv=ma_cbsv,
-        event_id=event_id,
-        thoi_gian_dang_ky=now,
-        cau_hoi=cau_hoi,
-    )
-    db.session.add(registration)
+    if existed:
+        # Đã bị hủy trước đó (không chặn): dùng lại chính dòng cũ (UNIQUE mã + sự kiện), giờ và câu hỏi theo lần này
+        registration = existed
+        registration.mark_active()
+        registration.thoi_gian_dang_ky = now
+        registration.cau_hoi = cau_hoi
+    else:
+        registration = Registration(
+            ma_cbsv=ma_cbsv,
+            event_id=event_id,
+            thoi_gian_dang_ky=now,
+            cau_hoi=cau_hoi,
+        )
+        db.session.add(registration)
     try:
         db.session.commit()
     except IntegrityError:
@@ -385,6 +397,9 @@ def register():
         db.session.rollback()
         return jsonify({"success": False, "message": f"Mã {ma_cbsv} đã đăng ký sự kiện này."}), 409
 
+    if existed:
+        log_action("registration.reregister", "event", event_id, {"ma_cbsv": ma_cbsv, "ten_su_kien": event.ten_su_kien},
+                   username="(người đăng ký)")
     return jsonify({
         "success": True,
         "message": f"Đăng ký thành công cho {user.ho_ten}.",

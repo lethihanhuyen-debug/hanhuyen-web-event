@@ -99,11 +99,10 @@ class Event(db.Model):
 
     @property
     def registration_count(self):
-        """Số người đã đăng ký (số dòng Registration, mỗi mã CB/SV chỉ đăng ký
-        được 1 lần cho 1 sự kiện nhờ unique constraint -- xem models/registration.py).
+        """Số người đã đăng ký: chỉ đếm đăng ký còn hiệu lực (đăng ký đã hủy không chiếm chỗ -- m009).
         Import cục bộ để tránh phụ thuộc vòng giữa event.py và registration.py."""
         from event_checkin.models.registration import Registration
-        return Registration.query.filter_by(event_id=self.id).count()
+        return Registration.active().filter_by(event_id=self.id).count()
 
     @property
     def registration_block_reason(self):

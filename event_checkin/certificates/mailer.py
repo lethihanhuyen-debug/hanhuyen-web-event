@@ -34,6 +34,7 @@ from event_checkin.models import db
 from event_checkin.models.checkin_record import CheckinRecord
 from event_checkin.models.email_log import EmailLog
 from event_checkin.models.event import Event
+from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
 from event_checkin.utils.email_service import send_checkin_email
 from event_checkin.utils.timezone import format_local, now_vn_naive
@@ -66,7 +67,8 @@ def primary_record(records):
 
 
 def _records_by_patron(event_id, patron_code=None):
-    query = CheckinRecord.query.filter_by(event_id=event_id)
+    # Bỏ check-in của người đã bị hủy đăng ký: không đếm, không gửi chứng chỉ (dòng vẫn giữ trong DB)
+    query = CheckinRecord.query.filter_by(event_id=event_id).filter(Registration.checkin_not_cancelled())
     if patron_code:
         query = query.filter_by(patron_code=patron_code)
     groups = {}
