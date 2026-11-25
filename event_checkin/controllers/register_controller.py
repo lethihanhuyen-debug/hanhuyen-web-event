@@ -351,6 +351,16 @@ def register():
     if existed and existed.chan_dang_ky_lai:
         # admin đã hủy đăng ký này và chặn đăng ký lại (đăng ký ảo) -- xem admin_controller.cancel_registrations
         return jsonify({"success": False, "message": BLOCKED_MESSAGE}), 403
+    # Mỗi email chỉ dùng cho 1 mã trong cùng sự kiện (họ tên được trùng: người khác nhau có thể cùng tên).
+    # Đăng ký đã bị admin hủy không tính.
+    email_taken = (
+        Registration.active()
+        .join(User, User.ma_cbsv == Registration.ma_cbsv)
+        .filter(Registration.event_id == event_id, Registration.ma_cbsv != ma_cbsv, func.lower(User.email) == email)
+        .first()
+    )
+    if email_taken:
+        return jsonify({"success": False, "message": "Email này đã được dùng để đăng ký sự kiện này với mã số khác."}), 409
 
     don_vi = None
     if don_vi_id:

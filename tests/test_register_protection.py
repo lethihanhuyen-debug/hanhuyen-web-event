@@ -122,6 +122,17 @@ class RegisterProtectionTest(AppTestCase):
         self.assertIn('<option value="" disabled selected hidden>— Chọn đối tượng —</option>', page)
         self.assertIn('<option value="" disabled selected hidden>— Chọn đơn vị —</option>', page)
 
+    def test_same_name_allowed_same_email_blocked(self):
+        client = self.client_for()
+        first = client.post("/api/register", json=self.payload(40, email="trung40@example.com"))
+        self.assertEqual(first.status_code, 200, first.get_json())
+        same_name = client.post("/api/register", json=self.payload(41, email="khac41@example.com"))   # cùng họ tên "Người Thử"
+        self.assertEqual(same_name.status_code, 200, same_name.get_json())
+        same_email = client.post("/api/register", json=self.payload(42, email="TRUNG40@example.com"))
+        self.assertEqual(same_email.status_code, 409)
+        self.assertIn("Email này đã được dùng", same_email.get_json()["message"])
+        self.assertEqual(self.registered(42), 0)
+
     def test_don_vi_required_when_list_exists(self):
         client = self.client_for()
         data = self.payload(30)
