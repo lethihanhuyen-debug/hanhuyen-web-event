@@ -75,6 +75,17 @@ class Config:
     # số). Quá mức -> 413 kèm thông báo tiếng Việt (app.py). IIS mặc định cho tới 30MB nên không cần chỉnh IIS.
     MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "15"))
     MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
+    # Chống đăng nhập tự động/brute-force ở /api/admin/login. LOGIN_RATE_LIMIT: số request tối đa/phút MỖI IP
+    # (chặn spam thô, đếm trong bộ nhớ, mất khi restart). LOGIN_FAIL_LIMIT lần sai trong LOGIN_FAIL_WINDOW_MINUTES
+    # phút (theo TÀI KHOẢN hoặc theo IP, lấy số lớn hơn; đếm bằng nhật ký hoạt động nên không mất khi restart).
+    LOGIN_RATE_LIMIT = int(os.getenv("LOGIN_RATE_LIMIT", "20"))
+    LOGIN_FAIL_LIMIT = int(os.getenv("LOGIN_FAIL_LIMIT", "5"))
+    LOGIN_FAIL_WINDOW_MINUTES = int(os.getenv("LOGIN_FAIL_WINDOW_MINUTES", "15"))
+    # Google reCAPTCHA v2 ("Tôi không phải robot") ở trang đăng nhập admin. Để trống (mặc định) -> không hiện
+    # widget, không xác thực gì thêm (đăng nhập vẫn hoạt động bình thường khi chưa có key thật). Điền cả 2 biến
+    # môi trường này để bật: lấy ở https://www.google.com/recaptcha/admin (chọn reCAPTCHA v2 "Hộp kiểm").
+    RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "")
+    RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "")
     PERMANENT_SESSION_LIFETIME = timedelta(days=REMEMBER_LOGIN_DAYS)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"

@@ -2,9 +2,11 @@ import csv
 import json
 import re
 import unicodedata
+import urllib.parse
+import urllib.request
 import zipfile
 from io import BytesIO, StringIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -18,12 +20,13 @@ from werkzeug.utils import secure_filename
 from event_checkin import permissions as perm
 from event_checkin.permissions import home_path_for_role, role_label
 from event_checkin.access import access, get_current_admin
-from event_checkin.audit import audited, log_action
+from event_checkin.audit import audited, client_ip, log_action
 from event_checkin.certificates import mailer
 from event_checkin.certificates.generator import CERTIFICATE_FIELDS, effective_layout
 from event_checkin.certificates.service import CertificateError, get_certificate_file_path, render_preview_png
 from event_checkin.models import db
 from event_checkin.models.admin import Admin
+from event_checkin.models.audit_log import AuditLog
 from event_checkin.models.certificate import Certificate
 from event_checkin.models.checkin import CheckIn
 from event_checkin.models.checkin_record import CheckinRecord
@@ -34,10 +37,15 @@ from event_checkin.models.lucky_draw import LuckyConfig, LuckyWinner
 from event_checkin.models.registration import STATUS_ACTIVE, STATUS_CANCELLED, Registration
 from event_checkin.models.user import User
 from event_checkin.utils import event_image as event_images
+from event_checkin.utils.rate_limit import PerIpRateLimiter
 from event_checkin.utils.timezone import format_local, format_utc_as_vn, now_vn_naive, vn_today_range
 
 
 admin_bp = Blueprint("admin", __name__)
+# ---- Chống đăng nhập tự động (brute-force / auto-click) -------------------------------------------------------
+login_limiter = PerIpRateLimiter()
+LOGIN_HONEYPOT_FIELD = "ghi_chu_noi_bo"
+LOGIN_RATE_LIMITED_MESSAGE = "Bạn thao tác quá nhanh, vui lòng thử lại sau 1 phút."
 CERTIFICATE_TEMPLATE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 CERTIFICATE_FONT_EXTENSIONS = {".ttf", ".otf"}
 EVENT_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -1307,6 +1315,34 @@ def _xlsx_response(workbook, utf8_filename, ascii_filename):
     return response
 
 
+def _login_failures(username, ip):
+    """Đếm số lần đăng nhập sai gần đây theo TÀI KHOẢN và theo IP (lấy số lớn hơn) trong nhật ký hoạt động --
+    giống certificate_controller._legacy_failures. Dùng DB (không phải bộ nhớ) nên không mất khi restart app."""
+    since = datetime.utcnow() - timedelta(minutes=current_app.config["LOGIN_FAIL_WINDOW_MINUTES"])
+    query = AuditLog.query.filter(AuditLog.action == "auth.login_failed", AuditLog.created_at >= since)
+    by_username = query.filter(AuditLog.username == username).count() if username else 0
+    by_ip = query.filter(AuditLog.ip == ip).count() if ip else 0
+    return max(by_username, by_ip)
+
+
+def _verify_recaptcha(token, ip):
+    """Xác thực Google reCAPTCHA v2 ở server. Chưa cấu hình RECAPTCHA_SECRET_KEY (chưa gắn key thật) -> coi như
+    tắt, luôn cho qua để không chặn đăng nhập."""
+    secret = current_app.config.get("RECAPTCHA_SECRET_KEY")
+    if not secret:
+        return True
+    if not token:
+        return False
+    try:
+        data = urllib.parse.urlencode({"secret": secret, "response": token, "remoteip": ip or ""}).encode()
+        with urllib.request.urlopen("https://www.google.com/recaptcha/api/siteverify", data=data, timeout=5) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+        return bool(result.get("success"))
+    except Exception:
+        current_app.logger.exception("Không xác thực được reCAPTCHA")
+        return False
+
+
 @admin_bp.get("/admin/login")
 @access(perm.PUBLIC)
 def login_page():
@@ -1317,7 +1353,11 @@ def login_page():
     admin = get_current_admin()
     if admin:
         return redirect(next_url or home_path_for_role(admin.role))
-    return render_template("admin/login.html", next_url=next_url)
+    return render_template(
+        "admin/login.html",
+        next_url=next_url,
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_SITE_KEY") or "",
+    )
 
 
 @admin_bp.get("/api/admin/me")
@@ -1336,6 +1376,33 @@ def login():
     username = (payload.get("username") or "").strip()
     password = payload.get("password") or ""
     remember = str(payload.get("remember", "")).lower() in {"1", "true", "yes", "on"}
+    ip = client_ip()
+
+    # Ô bẫy: người thật không thấy/không điền ô này, bot điền form thường điền hết -> trả lỗi giống sai mật khẩu
+    # thường (không lộ cho bot biết đã bị phát hiện), chỉ ghi riêng vào nhật ký.
+    if str(payload.get(LOGIN_HONEYPOT_FIELD) or "").strip():
+        log_action("auth.login_honeypot", "account", None, {"username": username}, username=username)
+        return jsonify({"success": False, "message": "Tài khoản hoặc mật khẩu không đúng."}), 401
+
+    # Giới hạn nhanh theo IP (đếm trong bộ nhớ) -- chặn spam request thô trước khi đụng tới DB.
+    if not login_limiter.allow(ip or "?", current_app.config["LOGIN_RATE_LIMIT"]):
+        response = jsonify({"success": False, "message": LOGIN_RATE_LIMITED_MESSAGE})
+        response.status_code = 429
+        response.headers["Retry-After"] = "60"
+        return response
+
+    # Khóa tạm (đếm bằng DB, không mất khi restart) sau nhiều lần sai liên tiếp theo TÊN TÀI KHOẢN hoặc IP.
+    if _login_failures(username, ip) >= current_app.config["LOGIN_FAIL_LIMIT"]:
+        log_action("auth.login_throttled", "account", None, {"username": username}, username=username)
+        minutes = current_app.config["LOGIN_FAIL_WINDOW_MINUTES"]
+        response = jsonify({"success": False, "message": f"Đã nhập sai quá nhiều lần. Vui lòng thử lại sau {minutes} phút."})
+        response.status_code = 429
+        return response
+
+    # reCAPTCHA (chỉ xác thực khi đã cấu hình RECAPTCHA_SECRET_KEY trong .env -- xem config.py).
+    recaptcha_token = payload.get("recaptcha_token") or payload.get("g-recaptcha-response")
+    if not _verify_recaptcha(recaptcha_token, ip):
+        return jsonify({"success": False, "message": "Vui lòng xác nhận reCAPTCHA \"Tôi không phải robot\"."}), 400
 
     admin = Admin.query.filter_by(username=username).first()
     if not admin or not admin.is_active or not check_password_hash(admin.password_hash, password):
