@@ -88,7 +88,7 @@ def checkin():
 
     # Vẫn bắt buộc đã đăng ký sự kiện (1 truy vấn theo UNIQUE index, rất nhanh) vì
     # chưa tích hợp Sierra: họ tên/email để gửi chứng chỉ lấy từ dữ liệu đăng ký.
-    registration = Registration.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
+    registration = Registration.active().filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()  # đã hủy = chưa đăng ký
     if not registration:
         return jsonify({"success": False, "message": f"Mã {ma_cbsv} chưa đăng ký sự kiện này."}), 404
 

@@ -18,6 +18,7 @@ from event_checkin.controllers.admin_controller import (
 )
 from event_checkin.models import db
 from event_checkin.models.checkin_record import CheckinRecord
+from event_checkin.models.registration import Registration
 from event_checkin.models.event import Event
 from event_checkin.models.lucky_draw import LuckyConfig, LuckyPrize, LuckyWinner
 from event_checkin.models.user import User
@@ -102,6 +103,7 @@ def _participants(event_id):
     Tên: cert_display_name -> patron_name -> tên đăng ký (User) -> trống; ưu tiên dòng không 'duplicate'."""
     records = (
         CheckinRecord.query.filter_by(event_id=event_id)
+        .filter(Registration.checkin_not_cancelled())       # người bị hủy đăng ký không được quay
         .order_by(CheckinRecord.checkin_at.asc(), CheckinRecord.id.asc())
         .all()
     )
@@ -239,6 +241,7 @@ def _checkin_counts():
     """{event_id: số người (mã khác nhau) đã check-in}."""
     return dict(
         db.session.query(CheckinRecord.event_id, db.func.count(db.distinct(CheckinRecord.patron_code)))
+        .filter(Registration.checkin_not_cancelled())
         .group_by(CheckinRecord.event_id).all()
     )
 

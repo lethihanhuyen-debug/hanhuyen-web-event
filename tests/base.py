@@ -30,6 +30,25 @@ from event_checkin.models.password_reset import PasswordReset  # noqa: E402
 
 TEST_PASSWORD = "Test1234x"
 
+# File chứng chỉ do test tạo ra nằm ở thư mục tạm riêng, không lẫn vào thư mục chứng chỉ thật (instance/certificates)
+import atexit  # noqa: E402
+import shutil  # noqa: E402
+import tempfile  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+TEST_CERT_DIR = Path(tempfile.mkdtemp(prefix="cert_test_"))
+app.config["CERTIFICATE_STORAGE_DIR"] = TEST_CERT_DIR
+atexit.register(shutil.rmtree, TEST_CERT_DIR, True)
+# Ảnh sự kiện do test tải lên / m008 xử lý: thư mục tạm, không đụng static/events thật (dùng chung với DB thật)
+TEST_IMAGE_DIR = Path(tempfile.mkdtemp(prefix="event_img_test_"))
+TEST_IMAGE_BACKUP_DIR = Path(tempfile.mkdtemp(prefix="event_img_goc_test_"))
+app.config["EVENT_IMAGE_DIR"] = TEST_IMAGE_DIR
+app.config["EVENT_IMAGE_BACKUP_DIR"] = TEST_IMAGE_BACKUP_DIR
+atexit.register(shutil.rmtree, TEST_IMAGE_DIR, True)
+atexit.register(shutil.rmtree, TEST_IMAGE_BACKUP_DIR, True)
+# Mọi request test đến từ cùng 1 IP: nới giới hạn đăng ký theo IP (test riêng của giới hạn tự đặt lại số nhỏ)
+app.config["REGISTER_RATE_LIMIT"] = 100000
+
 
 class AppTestCase(unittest.TestCase):
     """Tạo 3 tài khoản thử (super_admin / admin / staff) cho cả lớp test, xóa khi xong."""

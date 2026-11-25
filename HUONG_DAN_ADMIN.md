@@ -76,7 +76,11 @@ Chứng chỉ gửi thật luôn dùng đúng cấu hình và tên đã lưu ở
 3. Việc gửi chạy trên máy chủ: **đóng tab vẫn gửi tiếp**, mở lại trang sẽ thấy tiến độ. Trong lúc gửi, nút Gửi bị khóa.
 4. Xong đợt sẽ có dòng tổng kết số thành công / lỗi.
 
-Email gửi đi ghi họ tên, tên sự kiện và **giờ check-in** của người đó (không phải giờ gửi), kèm file chứng chỉ PDF.
+Email gửi đi ghi họ tên, tên sự kiện và **giờ check-in** của người đó (không phải giờ gửi), kèm file chứng chỉ PDF, một đường dẫn **Tải chứng nhận** và một đường dẫn **Xác minh chứng nhận**. Hai đường dẫn này là riêng của từng người (dạng `/c/…` và `/verify/t/…`, không đoán được từ mã chứng nhận); nhắc người nhận không chia sẻ.
+
+- Trang xác minh công khai chỉ hiện họ tên, tên sự kiện, ngày cấp và trạng thái; không hiện email, mã CB/SV, đơn vị.
+- **Thư gửi trước 11/2026** có đường dẫn cũ theo mã chứng nhận. Đường dẫn cũ vẫn mở được trang xác minh, nhưng muốn tải file thì người nhận phải nhập đúng **mã CB/SV** của mình (sai quá 5 lần trong 15 phút sẽ bị chặn tạm). Người nhận vẫn còn file PDF đính kèm trong thư cũ. Cần đường dẫn mới thì bấm **Gửi lại** cho người đó.
+- Admin xem/tải chứng chỉ trong trang quản trị như cũ; tài khoản nhân viên check-in (staff) không xem/tải được chứng chỉ.
 
 Nếu máy chủ bị khởi động lại giữa chừng: người chưa gửi vẫn ở trạng thái *Chưa gửi* — chỉ cần bấm **Gửi chứng chỉ** lần nữa, người đã nhận sẽ không bị gửi lại.
 
@@ -175,7 +179,7 @@ Vào **Quản trị → Quản lý tài khoản**.
 
 ### 10.2. Đổi mật khẩu, quên mật khẩu
 - Bấm vào **tên của bạn ở góc phải màn hình** để đổi mật khẩu. Mật khẩu tối thiểu 8 ký tự, gồm cả chữ và số. Đổi xong, các thiết bị khác bị đăng xuất.
-- Quên mật khẩu: ở trang đăng nhập bấm **Quên mật khẩu?**, nhập email của tài khoản. Nếu email đúng, hệ thống gửi liên kết đặt lại (hiệu lực 30 phút, dùng được một lần). Hệ thống luôn báo "Nếu email tồn tại, link đặt lại đã được gửi" để không lộ email nào có trong hệ thống, và chỉ cho yêu cầu tối đa 3 lần trong 15 phút. Tài khoản chưa có email hoặc đã bị khóa thì không nhận được liên kết, hãy nhờ quản trị cao cấp đặt lại.
+- Quên mật khẩu: ở trang đăng nhập bấm **Quên mật khẩu?**, nhập email của tài khoản. Nếu email đúng, hệ thống gửi liên kết đặt lại (hiệu lực 30 phút, dùng được một lần). Nếu email không thuộc tài khoản nào, hệ thống báo "Email này chưa đăng ký tài khoản"; nếu tài khoản đang bị khóa, hệ thống báo tài khoản bị khóa. Mỗi email và mỗi máy chỉ được yêu cầu tối đa 3 lần trong 15 phút, quá số lần sẽ được báo thử lại sau. Tài khoản chưa có email hoặc đã bị khóa thì không nhận được liên kết, hãy nhờ quản trị cao cấp đặt lại.
 - Chính quản trị cao cấp quên mật khẩu: nhờ người quản trị kỹ thuật chạy trên máy chủ `scripts\reset-superadmin.py <tên_đăng_nhập>` (xem `DEPLOYMENT.md`).
 
 ### 10.3. Nhật ký hoạt động (chỉ quản trị cao cấp)

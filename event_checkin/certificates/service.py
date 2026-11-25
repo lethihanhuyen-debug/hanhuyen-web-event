@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from flask import current_app, url_for
+from sqlalchemy import text
 
 from event_checkin.certificates.generator import (
     certificate_values,
@@ -27,29 +28,70 @@ class CertificateError(Exception):
     pass
 
 
-def _storage_root():
-    return Path(current_app.static_folder) / "certificates" / "generated"
+LEGACY_STATIC_PREFIX = "/static/"
+LEGACY_GENERATED_DIR = ("certificates", "generated")
 
 
-def _public_url(path):
-    relative = path.relative_to(Path(current_app.static_folder)).as_posix()
-    return url_for("static", filename=relative, _external=False)
+def storage_root():
+    """Thư mục lưu file chứng chỉ (ngoài static, xem Config.CERTIFICATE_STORAGE_DIR)."""
+    return Path(current_app.config["CERTIFICATE_STORAGE_DIR"])
+
+
+def legacy_storage_root():
+    """Thư mục cũ trong static (trước m007). Chỉ còn dùng để đọc dữ liệu chưa chuyển và cho m007."""
+    return Path(current_app.static_folder).joinpath(*LEGACY_GENERATED_DIR)
+
+
+def _relative_path(path):
+    return path.relative_to(storage_root()).as_posix()
 
 
 def _stored_file_path(file_url):
+    """Đường dẫn thật của file. file_url mới là đường dẫn tương đối trong storage_root(); dạng cũ
+    "/static/certificates/generated/..." (chưa chạy m007) vẫn đọc được từ thư mục static cũ.
+    Trả None nếu đường dẫn thoát ra ngoài thư mục cho phép (phòng dữ liệu lạ)."""
     if not file_url:
         return None
-    prefix = url_for("static", filename="", _external=False)
-    relative = file_url
-    if relative.startswith(prefix):
-        relative = relative[len(prefix):]
-    return Path(current_app.static_folder) / relative
+    if file_url.startswith(LEGACY_STATIC_PREFIX):
+        root = legacy_storage_root()
+        path = Path(current_app.static_folder) / file_url[len(LEGACY_STATIC_PREFIX):]
+    else:
+        root = storage_root()
+        path = root / file_url
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return None
+    return path
+
+
+def _max_used_sequence(event_id):
+    """Số thứ tự lớn nhất trong các mã chứng chỉ đang có của sự kiện (phần số cuối mã)."""
+    highest = 0
+    for (code,) in db.session.query(Certificate.certificate_code).filter(Certificate.event_id == event_id):
+        tail = (code or "").rsplit("-", 1)[-1]
+        if tail.isdigit():
+            highest = max(highest, int(tail))
+    return highest
 
 
 def _next_certificate_code(event_id):
+    """Mã mới = số thứ tự tiếp theo của bộ đếm events.certificate_seq (chỉ tăng).
+
+    Trước đây lấy "số chứng chỉ hiện có + 1": xóa một chứng chỉ (vd. xóa check-in) làm số đếm giảm, nên mã đã gửi
+    cho người A có thể bị cấp lại cho người B (link cũ của A mở ra chứng chỉ của B) hoặc trùng mã -> lỗi UNIQUE.
+    Bộ đếm không bao giờ giảm; lần đầu (cột mới = 0) được nâng lên bằng số lớn nhất đang có.
+    UPDATE khóa dòng sự kiện tới khi commit nên hai yêu cầu cùng lúc không lấy trùng số."""
     year = datetime.utcnow().year
-    count = Certificate.query.filter_by(event_id=event_id).count() + 1
-    return f"USSH-{year}-EVENT{event_id:03d}-{count:06d}"
+    db.session.execute(
+        text(
+            "UPDATE events SET certificate_seq = "
+            "CASE WHEN certificate_seq > :used THEN certificate_seq ELSE :used END + 1 WHERE id = :id"
+        ),
+        {"used": _max_used_sequence(event_id), "id": event_id},
+    )
+    sequence = db.session.execute(text("SELECT certificate_seq FROM events WHERE id = :id"), {"id": event_id}).scalar()
+    return f"USSH-{year}-EVENT{event_id:03d}-{sequence:06d}"
 
 
 def resolve_display_name(event_id, ma_cbsv):
@@ -134,7 +176,7 @@ def _render_certificate_file(registration, certificate_code, issued_at, requeste
     student_unit = user.ten_don_vi if user else ""
     event_name = event.ten_su_kien if event else ""
     template_path, layout = event_layout(event)
-    year_dir = _storage_root() / str(issued_at.year)
+    year_dir = storage_root() / str(issued_at.year)
     if requested_type == "pdf":
         output_path = year_dir / f"{certificate_code}.pdf"
         rendered_path = save_pdf_certificate(
@@ -186,8 +228,9 @@ def generate_certificate(ma_cbsv, event_id=DEFAULT_EVENT_ID, file_type="pdf"):
                 existing.issued_at or datetime.utcnow(),
                 requested_type,
             )
-            existing.file_url = _public_url(output_path)
+            existing.file_url = _relative_path(output_path)
             existing.file_type = actual_type
+            existing.ensure_token()
             db.session.commit()
             if previous_path and previous_path != output_path and previous_path.exists():
                 previous_path.unlink(missing_ok=True)
@@ -205,7 +248,8 @@ def generate_certificate(ma_cbsv, event_id=DEFAULT_EVENT_ID, file_type="pdf"):
         ma_cbsv=registration.ma_cbsv,
         event_id=event_id,
         certificate_code=certificate_code,
-        file_url=_public_url(output_path),
+        token=Certificate.new_token(),
+        file_url=_relative_path(output_path),
         file_type=actual_type,
         status="generated",
         issued_at=issued_at,
@@ -218,3 +262,14 @@ def generate_certificate(ma_cbsv, event_id=DEFAULT_EVENT_ID, file_type="pdf"):
 
 def get_certificate_file_path(certificate):
     return _stored_file_path(certificate.file_url)
+
+
+def certificate_links(certificate, external=False):
+    """Link công khai (theo token) của một chứng chỉ, dùng cho email và trang admin. Chứng chỉ chưa có token
+    (dữ liệu trước m007) được sinh token ngay -- người gọi tự commit."""
+    token = certificate.ensure_token()
+    return {
+        "download_url": url_for("certificates.token_download", token=token, _external=external),
+        "view_url": url_for("certificates.token_view", token=token, _external=external),
+        "verify_url": url_for("certificates.token_verify", token=token, _external=external),
+    }

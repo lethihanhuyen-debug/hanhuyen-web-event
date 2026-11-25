@@ -3,7 +3,8 @@ from event_checkin.models.registration import Registration
 
 
 def find_registration(ma_cbsv, event_id=1):
-    return Registration.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
+    # Đăng ký đã hủy coi như chưa đăng ký: không tạo/gửi chứng chỉ (dù còn dòng check-in cũ)
+    return Registration.active().filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
 
 
 def has_successful_checkin(registration):

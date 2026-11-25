@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Xác nhận để tải chứng chỉ | Event Check-in{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+{# Link cũ (theo mã chứng chỉ) đã gửi qua email: phải nhập đúng mã CB/SV của người được cấp mới tải/xem được.
+   Trang hiện giống hệt nhau dù mã chứng chỉ có tồn tại hay không. #}
+<section class="auth-stage">
+  <form class="auth-card" method="post" action="{{ request.path }}">
+    <h1>Xác nhận để tải chứng chỉ</h1>
+    <p class="auth-subtitle">Để bảo vệ thông tin cá nhân, vui lòng nhập mã CB/SV của người được cấp chứng chỉ này.</p>
+    {% if message %}<div class="message message--error" role="alert">{{ message }}</div>{% endif %}
+    <div class="auth-form">
+      <label class="auth-field">
+        <span>Mã CB/SV</span>
+        <input name="ma_cbsv" type="text" autocomplete="off" required autofocus>
+      </label>
+      <button class="btn btn--primary btn--full auth-submit" type="submit">{{ 'Xem chứng chỉ' if mode == 'view' else 'Tải chứng chỉ' }}</button>
+      <p class="auth-forgot">Sau khi xác nhận, bạn được chuyển sang đường dẫn riêng của chứng chỉ{{ ' và file sẽ được tải về' if mode != 'view' else '' }}. Lần sau mở thẳng đường dẫn đó, không cần nhập lại.</p>
+    </div>
+  </form>
+</section>
+{% endblock %}

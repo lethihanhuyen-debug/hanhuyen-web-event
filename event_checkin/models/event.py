@@ -26,6 +26,9 @@ class Event(db.Model):
     certificate_enabled = db.Column(db.Boolean, nullable=False, default=True)
     certificate_template = db.Column(db.String(255))
     certificate_layout = db.Column(db.Text)
+    # Số thứ tự lớn nhất đã dùng cho mã chứng chỉ của sự kiện. Chỉ tăng: xóa chứng chỉ không làm số giảm, nên mã đã
+    # gửi cho người này không bao giờ bị cấp lại cho người khác (app.py tự thêm cột khi khởi động).
+    certificate_seq = db.Column(db.Integer, nullable=False, default=0)
     # Ô "câu hỏi" tuỳ chọn ở form đăng ký (m005): công tắc theo từng sự kiện + tiêu đề admin tự đặt
     cho_phep_cau_hoi = db.Column(db.Boolean, nullable=False, default=False)
     tieu_de_cau_hoi = db.Column(db.String(255))
@@ -96,11 +99,10 @@ class Event(db.Model):
 
     @property
     def registration_count(self):
-        """Số người đã đăng ký (số dòng Registration, mỗi mã CB/SV chỉ đăng ký
-        được 1 lần cho 1 sự kiện nhờ unique constraint -- xem models/registration.py).
+        """Số người đã đăng ký: chỉ đếm đăng ký còn hiệu lực (đăng ký đã hủy không chiếm chỗ -- m009).
         Import cục bộ để tránh phụ thuộc vòng giữa event.py và registration.py."""
         from event_checkin.models.registration import Registration
-        return Registration.query.filter_by(event_id=self.id).count()
+        return Registration.active().filter_by(event_id=self.id).count()
 
     @property
     def registration_block_reason(self):

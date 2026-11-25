@@ -1,4 +1,5 @@
 ﻿{% extends 'base.html' %}
+{% from '_event_media.html' import event_media %}
 {% block title %}Đăng ký | Event Check-in{% endblock %}
 
 {% block content %}
@@ -24,23 +25,15 @@
 {% if hero_events %}
 <div class="hero-slider" id="heroSlider">
   {% for event in hero_events %}
-    <div class="hero-slide{% if loop.first %} is-active{% endif %}" data-slide="{{ loop.index0 }}">
-      <div class="hero-slide__bg hero-slide__bg--{{ loop.index0 % 3 }}">
-        {% if event.image_url %}<img class="hero-slide__img" src="{{ event.image_url }}" alt="">{% endif %}
-      </div>
-      <div class="hero-slide__overlay"></div>
-      <div class="hero-slide__content">
-        {% if event.badge_text %}<span class="hero-slide__badge">{{ event.badge_text }}</span>{% endif %}
-        <h1 class="hero-slide__title">{{ event.title }}</h1>
-        <a class="btn btn--primary hero-slide__cta" href="{{ event.link }}">{{ event.cta_text }} <span aria-hidden="true">→</span></a>
-      </div>
-    </div>
+    {# Chỉ hiện ảnh (đủ, contain, trên nền mờ); bấm vào ảnh mở trang đăng ký của sự kiện #}
+    <a class="hero-slide{% if loop.first %} is-active{% endif %}" data-slide="{{ loop.index0 }}" href="{{ event.link }}"
+       aria-label="Đăng ký: {{ event.title }}"{% if not loop.first %} tabindex="-1"{% endif %}>
+      {{ event_media(event, 'hero', alt='Hình sự kiện ' ~ event.title, lazy=not loop.first) }}
+    </a>
   {% endfor %}
 
   {% if hero_events|length > 1 %}
-    <button type="button" class="hero-slider__arrow hero-slider__arrow--prev" id="heroPrev" aria-label="Banner trước">‹</button>
-    <button type="button" class="hero-slider__arrow hero-slider__arrow--next" id="heroNext" aria-label="Banner tiếp theo">›</button>
-
+    {# Chấm chuyển slide nằm đè lên mép dưới ảnh (không có mũi tên) #}
     <div class="hero-slider__dots" id="heroDots">
       {% for event in hero_events %}
         <button type="button" class="hero-slider__dot{% if loop.first %} is-active{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Banner {{ loop.index }}"></button>
@@ -126,9 +119,7 @@
       <p class="muted">Thử đổi từ khoá tìm kiếm hoặc chọn lại bộ lọc trạng thái.</p>
     </div>
   {% else %}
-    {% if selected_event.hinh %}
-      <img class="event-detail-image" src="{{ url_for('static', filename=selected_event.hinh) }}" alt="Hình sự kiện {{ selected_event.ten_su_kien }}">
-    {% endif %}
+    {{ event_media(selected_event, 'detail', alt='Hình sự kiện ' ~ selected_event.ten_su_kien, lazy=false) }}
     {% if not selected_event.is_registration_open %}
       <div class="form-card">
         <p class="muted">{{ selected_event.registration_block_reason }}</p>
@@ -167,6 +158,12 @@
           <span>Email</span>
           <input type="email" name="email" id="email" placeholder="Email" required>
         </label>
+        {# Ô bẫy chống đăng ký tự động: ẩn bằng CSS (.hp-field), KHÔNG dùng display:none/hidden trong HTML; người dùng
+           thật không thấy, không Tab tới được. Có giá trị -> server giả vờ thành công nhưng không lưu. #}
+        <div class="hp-field" aria-hidden="true">
+          <label for="ghi_chu_noi_bo">Để trống ô này</label>
+          <input type="text" name="ghi_chu_noi_bo" id="ghi_chu_noi_bo" tabindex="-1" autocomplete="off" value="">
+        </div>
         {% if selected_event.cho_phep_cau_hoi %}
         <label class="field-wide question-field">
           <span>{{ selected_event.question_title }} <em class="question-field__optional">(không bắt buộc)</em></span>
@@ -204,7 +201,7 @@
     }
   }
 
-  // ---------- Hero slider: auto-advance + dots + arrows ----------
+  // ---------- Hero slider: tự chuyển + chấm ----------
   const slider = document.getElementById('heroSlider');
   if (slider) {
     const slides = Array.from(slider.querySelectorAll('.hero-slide'));
@@ -214,7 +211,10 @@
 
     function goTo(index) {
       current = (index + slides.length) % slides.length;
-      slides.forEach((slide, i) => slide.classList.toggle('is-active', i === current));
+      slides.forEach((slide, i) => {
+        slide.classList.toggle('is-active', i === current);
+        if (i === current) slide.removeAttribute('tabindex'); else slide.setAttribute('tabindex', '-1');  // Tab chỉ vào slide đang hiện
+      });
       dots.forEach((dot, i) => dot.classList.toggle('is-active', i === current));
     }
 
@@ -223,13 +223,8 @@
       timer = setInterval(() => goTo(current + 1), 6000);
     }
 
-    // Mũi tên/dot chỉ được render khi có > 1 slide (xem index.html) -- guard
-    // null vì chỉ 1 slide thì không cần điều hướng hay tự chuyển.
-    const heroPrev = document.getElementById('heroPrev');
-    const heroNext = document.getElementById('heroNext');
-    if (heroPrev && heroNext && slides.length > 1) {
-      heroPrev.addEventListener('click', () => { goTo(current - 1); restartAutoplay(); });
-      heroNext.addEventListener('click', () => { goTo(current + 1); restartAutoplay(); });
+    // Chấm chỉ được render khi có > 1 slide (xem index.html); 1 slide thì không cần tự chuyển.
+    if (slides.length > 1) {
       dots.forEach((dot) => dot.addEventListener('click', () => { goTo(Number(dot.dataset.goto)); restartAutoplay(); }));
       slider.addEventListener('mouseenter', () => timer && clearInterval(timer));
       slider.addEventListener('mouseleave', restartAutoplay);
@@ -432,6 +427,8 @@
       email: emailInput.value.trim(),
     };
     if (cauHoiInput) payload.cau_hoi = cauHoiInput.value.trim();
+    const trap = document.getElementById('ghi_chu_noi_bo');
+    if (trap && trap.value) payload.ghi_chu_noi_bo = trap.value;   // ô bẫy: người thật để trống
 
     try {
       const response = await fetch('/register', {

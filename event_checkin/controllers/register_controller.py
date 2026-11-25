@@ -1,17 +1,19 @@
 import re
 from datetime import datetime
 
-from flask import Blueprint, jsonify, render_template, request, url_for
+from flask import Blueprint, current_app, jsonify, render_template, request, url_for
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 
 from event_checkin import permissions as perm
 from event_checkin.access import access
+from event_checkin.audit import client_ip, log_action
 from event_checkin.models import db
 from event_checkin.models.don_vi import DonVi
 from event_checkin.models.event import Event
-from event_checkin.models.registration import Registration
+from event_checkin.models.registration import STATUS_ACTIVE, Registration
 from event_checkin.models.user import User
+from event_checkin.utils.rate_limit import PerIpRateLimiter
 
 
 register_bp = Blueprint("register", __name__)
@@ -21,21 +23,25 @@ QUESTION_MAX_LENGTH = 1000
 CRLF, CR, LF = chr(13) + chr(10), chr(13), chr(10)  # chuẩn hoá xuống dòng của câu hỏi về LF
 MONTH_GROUPS_PER_PAGE = 3
 CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
+BLOCKED_MESSAGE = "Mã này không thể đăng ký sự kiện này. Vui lòng liên hệ ban tổ chức."
+RATE_LIMITED_MESSAGE = "Bạn thao tác quá nhanh, vui lòng thử lại sau 1 phút"
+# Ô bẫy (honeypot) trong form đăng ký: người dùng thật không thấy (ẩn bằng CSS .hp-field), bot tự điền mọi ô thì điền
+# cả ô này. Tên ô cố ý không giống "website"/"url" để trình duyệt không tự điền.
+HONEYPOT_FIELD = "ghi_chu_noi_bo"
+register_limiter = PerIpRateLimiter()
 
 
 def _hero_events():
     """Banner trang đăng ký lấy nội dung từ 3 sự kiện mới tạo gần đây nhất --
-    thay cho banner tĩnh admin phải tự nhập tay. Nút CTA link thẳng tới trang
+    thay cho banner tĩnh admin phải tự nhập tay. Chỉ hiện ảnh; bấm vào ảnh mở trang
     đăng ký của đúng sự kiện đó (register.event_register)."""
     events = Event.query.order_by(Event.created_at.desc()).limit(3).all()
     result = []
     for event in events:
         result.append({
             "id": event.id,
-            "badge_text": event.co_so or "Sự kiện mới",
             "title": event.ten_su_kien,
-            "cta_text": "Đăng ký ngay",
-            "image_url": url_for("static", filename=event.hinh) if event.hinh else None,
+            "hinh": event.hinh,  # ảnh hiển thị: xem _event_media.html (ảnh mặc định nếu trống)
             "link": url_for("register.event_register", event_id=event.id),
         })
     return result
@@ -275,7 +281,22 @@ def public_don_vi():
 @register_bp.post("/api/register")
 @access(perm.PUBLIC)
 def register():
+    # Giới hạn theo IP thật (client_ip, sau ProxyFix) cho cả /register và /api/register -- đếm MỌI lần gửi
+    if not register_limiter.allow(client_ip() or "?", current_app.config["REGISTER_RATE_LIMIT"]):
+        response = jsonify({"success": False, "message": RATE_LIMITED_MESSAGE})
+        response.status_code = 429
+        response.headers["Retry-After"] = "60"
+        return response
+
     payload = request.get_json(silent=True) or request.form
+    if str(payload.get(HONEYPOT_FIELD) or "").strip():
+        # Bot: giả vờ thành công (để bot không đổi cách), KHÔNG lưu gì, chỉ ghi nhật ký
+        ho_ten_bot = str(payload.get("ho_ten") or "").strip()[:255]
+        log_action("registration.honeypot", "event", str(payload.get("event_id") or "")[:20] or None, {
+            "ma_cbsv": str(payload.get("ma_cbsv") or "")[:50], "ho_ten": ho_ten_bot,
+            "email": str(payload.get("email") or "")[:255], "o_bay": str(payload.get(HONEYPOT_FIELD))[:200],
+        }, username="(bot)")
+        return jsonify({"success": True, "message": f"Đăng ký thành công cho {ho_ten_bot}."})
     ma_cbsv = (payload.get("ma_cbsv") or "").strip()
     ho_ten = (payload.get("ho_ten") or "").strip()
     don_vi_id = payload.get("don_vi_id")
@@ -318,8 +339,11 @@ def register():
     # (which is rejected below) never has the side effect of overwriting the
     # already-registered user's profile fields.
     existed = Registration.query.filter_by(ma_cbsv=ma_cbsv, event_id=event_id).first()
-    if existed:
+    if existed and existed.is_active:
         return jsonify({"success": False, "message": f"Mã {ma_cbsv} đã đăng ký sự kiện này."}), 409
+    if existed and existed.chan_dang_ky_lai:
+        # admin đã hủy đăng ký này và chặn đăng ký lại (đăng ký ảo) -- xem admin_controller.cancel_registrations
+        return jsonify({"success": False, "message": BLOCKED_MESSAGE}), 403
 
     don_vi = None
     if don_vi_id:
@@ -362,7 +386,7 @@ def register():
         db.session.query(Event.id).filter(Event.id == event_id).with_for_update().one()
         current_count = (
             db.session.query(func.count(Registration.id))
-            .filter(Registration.event_id == event_id)
+            .filter(Registration.event_id == event_id, Registration.trang_thai == STATUS_ACTIVE)  # đã hủy không chiếm chỗ
             .with_for_update()
             .scalar()
         )
@@ -370,13 +394,20 @@ def register():
             db.session.rollback()
             return jsonify({"success": False, "message": "Sự kiện đã đủ số lượng đăng ký."}), 400
 
-    registration = Registration(
-        ma_cbsv=ma_cbsv,
-        event_id=event_id,
-        thoi_gian_dang_ky=now,
-        cau_hoi=cau_hoi,
-    )
-    db.session.add(registration)
+    if existed:
+        # Đã bị hủy trước đó (không chặn): dùng lại chính dòng cũ (UNIQUE mã + sự kiện), giờ và câu hỏi theo lần này
+        registration = existed
+        registration.mark_active()
+        registration.thoi_gian_dang_ky = now
+        registration.cau_hoi = cau_hoi
+    else:
+        registration = Registration(
+            ma_cbsv=ma_cbsv,
+            event_id=event_id,
+            thoi_gian_dang_ky=now,
+            cau_hoi=cau_hoi,
+        )
+        db.session.add(registration)
     try:
         db.session.commit()
     except IntegrityError:
@@ -387,6 +418,9 @@ def register():
         db.session.rollback()
         return jsonify({"success": False, "message": f"Mã {ma_cbsv} đã đăng ký sự kiện này."}), 409
 
+    if existed:
+        log_action("registration.reregister", "event", event_id, {"ma_cbsv": ma_cbsv, "ten_su_kien": event.ten_su_kien},
+                   username="(người đăng ký)")
     return jsonify({
         "success": True,
         "message": f"Đăng ký thành công cho {user.ho_ten}.",

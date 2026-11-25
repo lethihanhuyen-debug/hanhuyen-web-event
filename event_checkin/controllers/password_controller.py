@@ -26,7 +26,16 @@ password_bp = Blueprint("password", __name__)
 RESET_TOKEN_MINUTES = 30        # link hết hạn sau 30 phút và chỉ dùng 1 lần
 FORGOT_LIMIT = 3                # tối đa 3 yêu cầu ...
 FORGOT_WINDOW_MINUTES = 15      # ... trong 15 phút, tính riêng theo email và theo IP
-FORGOT_GENERIC_MESSAGE = "Nếu email tồn tại, link đặt lại đã được gửi."
+FORGOT_SENT_MESSAGE = "Đã gửi liên kết đặt lại mật khẩu tới email của bạn. Vui lòng kiểm tra hộp thư (kể cả mục Spam)."
+FORGOT_UNKNOWN_MESSAGE = "Email này chưa đăng ký tài khoản."
+FORGOT_LOCKED_MESSAGE = "Tài khoản dùng email này đang bị khóa. Vui lòng liên hệ quản trị viên."
+FORGOT_THROTTLED_PREFIX = "Bạn đã yêu cầu quá nhiều lần."
+
+
+def _throttled_message(wait):
+    """Câu báo khi vượt giới hạn, kèm số phút còn phải đợi (làm tròn lên, tối thiểu 1 phút)."""
+    minutes = max(1, -(-int(wait.total_seconds()) // 60))
+    return f"{FORGOT_THROTTLED_PREFIX} Vui lòng đợi {minutes} phút rồi thử lại."
 INVALID_LINK_MESSAGE = "Liên kết không hợp lệ hoặc đã hết hạn. Hãy yêu cầu đặt lại mật khẩu để nhận liên kết mới."
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
@@ -120,37 +129,41 @@ def forgot_api():
 
     ip = client_ip()
     key = security.hash_email_key(email)
-    window_start = datetime.utcnow() - timedelta(minutes=FORGOT_WINDOW_MINUTES)
-    recent = AuditLog.query.filter(
+    now = datetime.utcnow()
+    window = timedelta(minutes=FORGOT_WINDOW_MINUTES)
+    recent = [row.created_at for row in AuditLog.query.with_entities(AuditLog.created_at).filter(
         AuditLog.action == "password.forgot_request",
-        AuditLog.created_at >= window_start,
+        AuditLog.created_at >= now - window,
         or_(AuditLog.target_id == key, AuditLog.ip == ip) if ip else AuditLog.target_id == key,
-    ).count()
-    if recent >= FORGOT_LIMIT:
-        # Quá số lần: không làm gì thêm nhưng vẫn trả đúng câu như bình thường (không lộ việc bị chặn/có email hay không)
+    ).order_by(AuditLog.created_at).all()]
+    if len(recent) >= FORGOT_LIMIT:
+        # Quá số lần: chặn trước khi tra email, nên giới hạn này cũng hạn chế việc dò xem email nào đã có tài khoản.
+        # Báo số phút còn phải đợi: đến khi đủ yêu cầu cũ ra khỏi cửa sổ để số yêu cầu xuống dưới giới hạn.
         log_action("password.forgot_throttled", "email_hash", key)
-        return jsonify({"success": True, "message": FORGOT_GENERIC_MESSAGE})
+        return jsonify({"success": False, "message": _throttled_message(recent[len(recent) - FORGOT_LIMIT] + window - now)}), 429
 
     log_action("password.forgot_request", "email_hash", key)
 
     admin = Admin.query.filter(func.lower(Admin.email) == email).first()
-    if admin and admin.is_active:
-        token = security.new_reset_token()
-        now = datetime.utcnow()
-        # Link mới làm các link cũ chưa dùng của tài khoản này mất hiệu lực
-        PasswordReset.query.filter(PasswordReset.admin_id == admin.id, PasswordReset.used_at.is_(None)).update({"used_at": now})
-        db.session.add(PasswordReset(
-            admin_id=admin.id,
-            token_hash=security.hash_token(token),
-            expires_at=now + timedelta(minutes=RESET_TOKEN_MINUTES),
-        ))
-        db.session.commit()
-        link = url_for("password.reset_page", token=token, _external=True)
-        if not current_app.config.get("IS_PRODUCTION"):
-            logger.info("[DEV] Link đặt lại mật khẩu cho %s: %s", admin.username, link)
-        _run_async(_send_reset_mail, admin.email, admin.username, link)
-
-    return jsonify({"success": True, "message": FORGOT_GENERIC_MESSAGE})
+    if not admin:
+        return jsonify({"success": False, "message": FORGOT_UNKNOWN_MESSAGE}), 404
+    if not admin.is_active:
+        return jsonify({"success": False, "message": FORGOT_LOCKED_MESSAGE}), 403
+    token = security.new_reset_token()
+    now = datetime.utcnow()
+    # Link mới làm các link cũ chưa dùng của tài khoản này mất hiệu lực
+    PasswordReset.query.filter(PasswordReset.admin_id == admin.id, PasswordReset.used_at.is_(None)).update({"used_at": now})
+    db.session.add(PasswordReset(
+        admin_id=admin.id,
+        token_hash=security.hash_token(token),
+        expires_at=now + timedelta(minutes=RESET_TOKEN_MINUTES),
+    ))
+    db.session.commit()
+    link = url_for("password.reset_page", token=token, _external=True)
+    if not current_app.config.get("IS_PRODUCTION"):
+        logger.info("[DEV] Link đặt lại mật khẩu cho %s: %s", admin.username, link)
+    _run_async(_send_reset_mail, admin.email, admin.username, link)
+    return jsonify({"success": True, "message": FORGOT_SENT_MESSAGE})
 
 
 # ---- Đặt lại mật khẩu bằng link ---------------------------------------------------------------------------

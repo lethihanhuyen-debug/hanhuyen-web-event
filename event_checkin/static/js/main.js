@@ -1,3 +1,77 @@
+/* Hộp xác nhận CÓ Ô NHẬP (ô lý do, ô tích...). Trả về null nếu bấm hủy, ngược lại {tên ô: giá trị}.
+   Dùng:  const values = await formDialog('Xóa ...?\nGhi chú', { fields: [
+            { name: 'reason', type: 'textarea', label: 'Lý do (không bắt buộc)', maxLength: 500 },
+            { name: 'block', type: 'checkbox', label: 'Chặn ...' } ], okText: 'Xóa', danger: true });
+   Dòng bắt đầu bằng "⚠" được tô cảnh báo. */
+window.formDialog = function (message, options) {
+  const opts = Object.assign({ title: 'Xác nhận', okText: 'Đồng ý', danger: false, fields: [] }, options || {});
+  opts.cancelText = opts.cancelText || (opts.danger ? 'Giữ lại' : 'Hủy');
+  const lines = String(message || '').split('\n').map((line) => line.trim()).filter(Boolean);
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'app-dialog app-dialog--form';
+    const form = document.createElement('form');
+    form.method = 'dialog';
+    form.className = 'app-dialog__body';
+    const title = document.createElement('h2');
+    title.className = 'app-dialog__title';
+    title.textContent = opts.title;
+    form.append(title);
+    lines.forEach((line) => {
+      const p = document.createElement('p');
+      p.className = 'app-dialog__text' + (line.startsWith('⚠') ? ' app-dialog__text--warn' : '');
+      p.textContent = line;
+      form.append(p);
+    });
+    const inputs = {};
+    opts.fields.forEach((field) => {
+      const label = document.createElement('label');
+      label.className = 'app-dialog__field' + (field.type === 'checkbox' ? ' app-dialog__field--check' : '');
+      let input;
+      if (field.type === 'textarea') {
+        input = document.createElement('textarea');
+        input.rows = 2;
+      } else {
+        input = document.createElement('input');
+        input.type = field.type || 'text';
+      }
+      input.name = field.name;
+      if (field.maxLength) input.maxLength = field.maxLength;
+      if (field.placeholder) input.placeholder = field.placeholder;
+      const text = document.createElement('span');
+      text.textContent = field.label || '';
+      if (field.type === 'checkbox') label.append(input, text); else label.append(text, input);
+      form.append(label);
+      inputs[field.name] = input;
+    });
+    const actions = document.createElement('div');
+    actions.className = 'app-dialog__actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn btn--ghost';
+    cancel.textContent = opts.cancelText;
+    const ok = document.createElement('button');
+    ok.type = 'submit';
+    ok.className = 'btn ' + (opts.danger ? 'btn--danger-solid' : 'btn--primary');
+    ok.textContent = opts.okText;
+    actions.append(cancel, ok);
+    form.append(actions);
+    dialog.append(form);
+    document.body.append(dialog);
+
+    let result = null;
+    cancel.addEventListener('click', () => dialog.close());
+    form.addEventListener('submit', () => {
+      result = {};
+      Object.entries(inputs).forEach(([name, input]) => { result[name] = input.type === 'checkbox' ? input.checked : input.value.trim(); });
+    });
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+    dialog.addEventListener('close', () => { dialog.remove(); resolve(result); });
+    dialog.showModal();
+    cancel.focus();
+  });
+};
+
 /* Hộp xác nhận dùng chung: thay confirm() của trình duyệt, cùng giao diện với mọi hộp thoại khác.
    Dùng:  if (!await confirmAsync('Nội dung...')) return;   (trong hàm async). Trả về true/false như confirm().
    Dòng đầu của nội dung là câu hỏi, các dòng sau là ghi chú. Tên nút "đồng ý" suy ra từ câu hỏi. */

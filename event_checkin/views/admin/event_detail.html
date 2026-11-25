@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_event_media.html' import event_media %}
 {% block title %}{{ event.ten_su_kien }} | Quản trị sự kiện{% endblock %}
 
 {% block container_class %}container--wide{% endblock %}
@@ -26,14 +27,12 @@
     </div>
   </div>
 
-  {% if event.hinh_url %}
-    <img class="event-detail-image" src="{{ event.hinh_url }}" alt="Hình sự kiện {{ event.ten_su_kien }}">
-  {% endif %}
+  {{ event_media(event, 'detail', alt='Hình sự kiện ' ~ event.ten_su_kien, lazy=false) }}
 
   <div class="stat-grid">
     <div class="stat-card">
       <span>Đã đăng ký</span>
-      <strong>{{ totals.registrations }}</strong>
+      <strong id="statRegs">{{ totals.registrations }}</strong>
     </div>
     <div class="stat-card">
       <span>Đã check-in</span>
@@ -78,17 +77,30 @@
         <button type="button" class="chip" data-filter="has-question" aria-pressed="false" title="Chỉ người có gửi câu hỏi">Có câu hỏi · <span data-count="has-question">{{ totals.questions }}</span></button>
         {% endif %}
         <button type="button" class="chip chip--danger" data-filter="failed" aria-pressed="false">Gửi lỗi · <span data-count="failed">{{ rows|selectattr('cert_status', 'equalto', 'failed')|list|length }}</span></button>
+        {% if can_delete %}
+        <button type="button" class="chip" data-filter="cancelled" aria-pressed="false" title="Đăng ký đã xóa: xem lại hoặc khôi phục">Đã hủy · <span data-count="cancelled">{{ totals.cancelled }}</span></button>
+        {% endif %}
       </div>
       <label class="list-search">
         <span class="sr-only">Tìm theo tên, mã CB/SV hoặc email</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"></path><path d="m21 21-4.3-4.3"></path></svg>
-        <input id="regSearch" type="search" placeholder="Tìm tên, mã CB/SV, email…" autocomplete="off">
+        <input id="regSearch" type="search" placeholder="Tìm tên, mã CB/SV, email, giờ đăng ký…" autocomplete="off">
       </label>
     </div>
+    {% if can_delete %}
+    {# Hiện khi có ít nhất 1 dòng được tích. Ở mục "Đã hủy" nút đổi thành Khôi phục. #}
+    <div class="bulk-bar" id="bulkBar" hidden>
+      <span class="bulk-bar__count" id="bulkCount"></span>
+      <button type="button" class="btn btn--row btn--danger-solid" id="bulkCancel">Xóa đã chọn</button>
+      <button type="button" class="btn btn--row btn--primary" id="bulkRestore" hidden>Khôi phục đã chọn</button>
+      <button type="button" class="btn btn--row btn--ghost" id="bulkClear">Bỏ chọn</button>
+    </div>
+    {% endif %}
     <div class="table-scroll">
       <table class="list-table list-table--people">
         <thead>
           <tr>
+            {% if can_delete %}<th class="col-select"><input type="checkbox" id="selectAll" aria-label="Chọn tất cả người đang hiện trong danh sách"></th>{% endif %}
             <th>Người tham dự</th>
             <th>Đơn vị</th>
             {% if show_questions %}<th>Câu hỏi</th>{% endif %}
@@ -98,7 +110,7 @@
           </tr>
         </thead>
         <tbody id="regRows">
-          <tr><td colspan="{{ 6 if show_questions else 5 }}" class="table-empty">Đang tải…</td></tr>
+          <tr><td colspan="{{ 5 + (1 if show_questions else 0) + (1 if can_delete else 0) }}" class="table-empty">Đang tải…</td></tr>
         </tbody>
       </table>
     </div>
@@ -205,6 +217,9 @@
   window.addEventListener('DOMContentLoaded', () => {
     const EVENT_ID = {{ event.id }};
     const SHOW_QUESTIONS = {{ show_questions|tojson }};
+    const CAN_DELETE = {{ can_delete|tojson }};
+    const COLS = 5 + (SHOW_QUESTIONS ? 1 : 0) + (CAN_DELETE ? 1 : 0);
+    const selected = new Set();   // mã CB/SV đang được tích (chỉ các dòng cùng loại: đang hiệu lực / đã hủy)
     const tbody = document.getElementById('regRows');
     const searchInput = document.getElementById('regSearch');
     const chipButtons = Array.from(document.querySelectorAll('#checkinFilterTabs .chip'));
@@ -231,8 +246,12 @@
         error: r.cert_error || '', sentAt: r.cert_sent_at || '', sendCount: r.send_count || 0,
         recordId: null, sending: false, tr: null,
         question: r.cau_hoi || '',
+        regTime: r.thoi_gian_dang_ky || '',
+        cancelBlocked: r.cancel_blocked || '',
+        cancelled: !!r.cancelled, cancelledAt: r.huy_luc || '', cancelledBy: r.huy_boi || '',
+        cancelReason: r.ly_do_huy || '', blockedRereg: !!r.chan_dang_ky_lai, cancelledCheckin: r.cancelled_checkin_time || '',
       };
-      person.searchKey = normalize([person.name, person.code, person.email, person.question].join(' '));
+      person.searchKey = normalize([person.name, person.code, person.email, person.question, person.regTime].join(' '));
       return person;
     }
     const people = JSON.parse(document.getElementById('regData').textContent).map(toPerson);
@@ -282,6 +301,7 @@
     function menuFor(p) {
       const who = p.name || p.code;
       const actions = [];
+      if (p.cancelled) return el('span');
       if (p.checkedIn) {
         actions.push({
           label: 'Xem chứng nhận',
@@ -300,7 +320,19 @@
     function buildRow(p) {
       const tr = document.createElement('tr');
       tr.dataset.code = p.code;
-      if (p.status === 'failed') tr.classList.add('row--error');
+      if (p.status === 'failed' && !p.cancelled) tr.classList.add('row--error');
+      if (p.cancelled) tr.classList.add('row--cancelled');
+
+      if (CAN_DELETE) {
+        const pick = el('td', 'col-select');
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = selected.has(p.code);
+        box.setAttribute('aria-label', `Chọn ${p.name || p.code}`);
+        box.addEventListener('change', () => { if (box.checked) selected.add(p.code); else selected.delete(p.code); updateBulkBar(); });
+        pick.appendChild(box);
+        tr.appendChild(pick);
+      }
 
       const person = el('td');
       const cell = el('div', 'cell-person');
@@ -310,7 +342,19 @@
         line.append(document.createTextNode(' · '));
         line.append(el('span', 'cell-person__code', p.code));
       }
+      if (p.blockedRereg) {
+        const tag = badge('danger', 'Chặn đăng ký lại', 'Mã này không tự đăng ký lại sự kiện này được (khôi phục để gỡ chặn)');
+        tag.classList.add('badge--blocked');
+        line.append(tag);
+      }
       cell.appendChild(line);
+      if (p.regTime) cell.appendChild(el('div', 'cell-person__meta', `Đăng ký: ${p.regTime}`));
+      if (p.cancelled) {
+        const parts = [`Đã xóa lúc ${p.cancelledAt || '—'}${p.cancelledBy ? ' bởi ' + p.cancelledBy : ''}`];
+        if (p.cancelReason) parts.push(`Lý do: ${p.cancelReason}`);
+        if (p.cancelledCheckin) parts.push(`Đã check-in lúc ${p.cancelledCheckin} (không tính)`);
+        cell.appendChild(el('div', 'cell-person__cancel', parts.join(' · ')));
+      }
       if (p.checkedIn && p.status === 'failed') cell.appendChild(el('div', 'row-error', p.email || 'Chưa có email'));  // để admin kiểm tra địa chỉ sai
       person.appendChild(cell);
       tr.appendChild(person);
@@ -337,7 +381,9 @@
       }
 
       const checkin = el('td');
-      if (p.checkedIn) {
+      if (p.cancelled) {
+        checkin.appendChild(el('span', 'cell-muted', '—'));
+      } else if (p.checkedIn) {
         const tag = el('span', 'cell-checkin');
         tag.title = p.checkinFull + (p.scans > 1 ? ` · quét ${p.scans} lần` : '');
         tag.append(icon('check'), document.createTextNode(timeOnly(p.checkinFull) || p.checkinFull));
@@ -347,9 +393,31 @@
       }
       tr.appendChild(checkin);
 
-      tr.appendChild(certCell(p));
+      if (p.cancelled) {
+        const td = el('td');
+        td.appendChild(el('span', 'cell-muted', '—'));
+        tr.appendChild(td);
+      } else {
+        tr.appendChild(certCell(p));
+      }
       const actions = el('td', 'col-actions');
-      actions.appendChild(menuFor(p));
+      const box = el('div', 'row-actions');
+      if (CAN_DELETE && p.cancelled) {
+        const restore = el('button', 'btn btn--row btn--outline', 'Khôi phục');
+        restore.type = 'button';
+        restore.setAttribute('aria-label', `Khôi phục đăng ký của ${p.name || p.code}`);
+        restore.addEventListener('click', () => restorePeople([p]));
+        box.appendChild(restore);
+      } else if (CAN_DELETE) {
+        const remove = el('button', 'btn btn--row btn--danger-ghost', 'Xóa');
+        remove.type = 'button';
+        remove.setAttribute('aria-label', `Xóa đăng ký của ${p.name || p.code}`);
+        if (p.cancelBlocked) remove.title = p.cancelBlocked;   // vẫn bấm được: hiện lý do không xóa được
+        remove.addEventListener('click', () => cancelPeople([p]));
+        box.appendChild(remove);
+      }
+      box.appendChild(menuFor(p));
+      actions.appendChild(box);
       tr.appendChild(actions);
       return tr;
     }
@@ -358,6 +426,8 @@
     function matches(p) {
       const q = normalize(searchInput.value);
       if (q && !p.searchKey.includes(q)) return false;
+      if (activeFilter === 'cancelled') return p.cancelled;
+      if (p.cancelled) return false;                       // đã hủy chỉ hiện ở mục "Đã hủy"
       if (activeFilter === 'checked-in') return p.checkedIn;
       if (activeFilter === 'pending') return !p.checkedIn;
       if (activeFilter === 'failed') return p.checkedIn && p.status === 'failed';
@@ -377,22 +447,31 @@
       if (!emptyRow) {
         emptyRow = document.createElement('tr');
         const td = el('td', 'table-empty');
-        td.colSpan = SHOW_QUESTIONS ? 6 : 5;
+        td.colSpan = COLS;
         emptyRow.appendChild(td);
       }
-      emptyRow.firstChild.textContent = people.length ? 'Không có ai phù hợp với bộ lọc hoặc từ khóa.' : 'Chưa có ai đăng ký sự kiện này.';
+      let emptyText = 'Không có ai phù hợp với bộ lọc hoặc từ khóa.';
+      if (activeFilter === 'cancelled' && !people.some((p) => p.cancelled)) emptyText = 'Chưa có đăng ký nào bị xóa.';
+      else if (activeFilter !== 'cancelled' && !people.some((p) => !p.cancelled)) emptyText = 'Chưa có ai đăng ký sự kiện này.';
+      emptyRow.firstChild.textContent = emptyText;
       if (!emptyRow.parentNode) tbody.appendChild(emptyRow);
       emptyRow.hidden = visible > 0;
+      updateBulkBar();
     }
 
     function updateCounts() {
-      const checked = people.filter((p) => p.checkedIn).length;
-      const failed = people.filter((p) => p.checkedIn && p.status === 'failed').length;
-      const sent = people.filter((p) => p.checkedIn && p.status === 'sent').length;
-      const counts = { all: people.length, 'checked-in': checked, pending: people.length - checked, failed, 'has-question': people.filter((p) => p.question).length };
+      const active = people.filter((p) => !p.cancelled);       // số liệu chỉ tính đăng ký còn hiệu lực
+      const checked = active.filter((p) => p.checkedIn).length;
+      const failed = active.filter((p) => p.checkedIn && p.status === 'failed').length;
+      const sent = active.filter((p) => p.checkedIn && p.status === 'sent').length;
+      const counts = {
+        all: active.length, 'checked-in': checked, pending: active.length - checked, failed,
+        'has-question': active.filter((p) => p.question).length, cancelled: people.length - active.length,
+      };
       document.querySelectorAll('#checkinFilterTabs [data-count]').forEach((node) => { node.textContent = counts[node.dataset.count]; });
+      document.getElementById('statRegs').textContent = active.length;
       document.getElementById('statCheckins').textContent = checked;
-      document.getElementById('statPending').textContent = people.length - checked;
+      document.getElementById('statPending').textContent = active.length - checked;
       document.getElementById('statSent').textContent = `${sent}/${checked}`;
     }
 
@@ -417,6 +496,7 @@
     chipButtons.forEach((chip) => {
       chip.addEventListener('click', () => {
         activeFilter = chip.dataset.filter;
+        selected.clear();                                   // chọn ở mục này không mang sang mục khác
         chipButtons.forEach((c) => { const on = c === chip; c.classList.toggle('is-active', on); c.setAttribute('aria-pressed', String(on)); });
         applyFilter();
       });
@@ -431,7 +511,7 @@
       const byCode = new Map();
       data.rows.forEach((row) => { if (!byCode.has(row.patron_code)) byCode.set(row.patron_code, []); byCode.get(row.patron_code).push(row); });
       people.forEach((p) => {
-        const rows = byCode.get(p.code) || [];
+        const rows = p.cancelled ? [] : (byCode.get(p.code) || []);
         if (!rows.length) { p.checkedIn = false; p.status = ''; p.recordId = null; p.error = ''; p.checkinFull = ''; p.scans = 0; return; }
         const primary = rows.find((r) => r.cert_status !== 'duplicate') || rows[0];
         p.checkedIn = true;
@@ -531,6 +611,149 @@
       }
     }
 
+    // ---- Chọn nhiều + xóa (hủy) / khôi phục đăng ký ----
+    const bulkBar = document.getElementById('bulkBar');
+    const selectAll = document.getElementById('selectAll');
+
+    function visiblePeople() {
+      return people.filter((p) => p.tr && !p.tr.hidden);
+    }
+
+    function updateBulkBar() {
+      if (!CAN_DELETE) return;
+      // bỏ chọn những dòng không còn hiện (đổi bộ lọc/tìm kiếm) để không xóa nhầm người không nhìn thấy
+      const visible = new Set(visiblePeople().map((p) => p.code));
+      Array.from(selected).forEach((code) => { if (!visible.has(code)) selected.delete(code); });
+      people.forEach((p) => {
+        const box = p.tr && p.tr.querySelector('.col-select input');
+        if (box) box.checked = selected.has(p.code);
+      });
+      const count = selected.size;
+      bulkBar.hidden = count === 0;
+      document.getElementById('bulkCount').textContent = `Đã chọn ${count} người`;
+      const inCancelled = activeFilter === 'cancelled';
+      document.getElementById('bulkCancel').hidden = inCancelled;
+      document.getElementById('bulkRestore').hidden = !inCancelled;
+      selectAll.checked = count > 0 && count === visible.size;
+      selectAll.indeterminate = count > 0 && count < visible.size;
+    }
+
+    function selectedPeople() {
+      return people.filter((p) => selected.has(p.code));
+    }
+
+    function personLabel(p) {
+      return p.name ? `${p.name} (mã ${p.code})` : `Mã ${p.code}`;
+    }
+
+    async function showSkipped(skipped) {
+      if (!skipped || !skipped.length) return;
+      await window.infoDialog(
+        `Bỏ qua ${skipped.length} người không xóa được`,
+        skipped.map((item) => `• ${item.name ? item.name + ' (' + item.code + ')' : item.code}: ${item.reason}`).join('\n'),
+      );
+    }
+
+    async function cancelPeople(list) {
+      if (!list.length) return;
+      const allowed = list.filter((p) => !p.cancelBlocked);
+      if (list.length === 1 && !allowed.length) {
+        await window.infoDialog('Không thể xóa', `${personLabel(list[0])}: ${list[0].cancelBlocked}`);
+        return;
+      }
+      if (!allowed.length) {
+        await showSkipped(list.map((p) => ({ code: p.code, name: p.name, reason: p.cancelBlocked })));
+        return;
+      }
+      const lines = [];
+      if (list.length === 1) {
+        lines.push(`Xóa đăng ký của ${list[0].name || '(chưa có tên)'} – mã CB/SV ${list[0].code}?`);
+        if (list[0].checkedIn) {
+          lines.push(`⚠ Người này đã check-in lúc ${timeOnly(list[0].checkinFull) || list[0].checkinFull}. Bản ghi check-in được giữ nhưng không tính nữa (không gửi chứng chỉ).`);
+        }
+      } else {
+        lines.push(`Xóa đăng ký của ${allowed.length} người?`);
+        const checked = allowed.filter((p) => p.checkedIn);
+        if (checked.length) {
+          const names = checked.slice(0, 5).map((p) => `${p.name || p.code} (${timeOnly(p.checkinFull)})`).join(', ');
+          lines.push(`⚠ ${checked.length} người đã check-in: ${names}${checked.length > 5 ? '…' : ''}. Bản ghi check-in được giữ nhưng không tính nữa.`);
+        }
+        const blockedCount = list.length - allowed.length;
+        if (blockedCount) lines.push(`⚠ ${blockedCount} người sẽ được bỏ qua vì đã có chứng chỉ hoặc đã trúng thưởng.`);
+      }
+      lines.push('Người bị xóa không còn trong danh sách, xuất Excel, check-in, gửi chứng chỉ, quay số và được nhả lại chỗ. Không gửi email cho họ. Có thể khôi phục ở mục "Đã hủy".');
+      const values = await window.formDialog(lines.join('\n'), {
+        title: list.length === 1 ? 'Xóa đăng ký' : 'Xóa đăng ký hàng loạt',
+        okText: list.length === 1 ? 'Xóa' : `Xóa ${allowed.length} người`,
+        danger: true,
+        fields: [
+          { name: 'reason', type: 'textarea', label: 'Lý do (không bắt buộc)', maxLength: 500, placeholder: 'Ví dụ: đăng ký ảo, đăng ký nhầm…' },
+          { name: 'block', type: 'checkbox', label: list.length === 1 ? 'Chặn mã này đăng ký lại sự kiện này' : 'Chặn các mã này đăng ký lại sự kiện này' },
+        ],
+      });
+      if (!values) return;
+      message.hidden = true;
+      try {
+        // gửi cả người bị chặn: máy chủ kiểm tra lại và trả về danh sách bỏ qua kèm lý do
+        const data = await postJson(`/api/admin/events/${EVENT_ID}/registrations/cancel`, {
+          codes: list.map((p) => p.code), reason: values.reason, block: values.block,
+        });
+        (data.cancelled || []).forEach((item) => {
+          const p = people.find((person) => person.code === item.code);
+          if (!p) return;
+          Object.assign(p, {
+            cancelled: true, cancelledAt: item.huy_luc, cancelledBy: item.huy_boi, cancelReason: item.ly_do_huy,
+            blockedRereg: item.chan_dang_ky_lai, cancelledCheckin: item.cancelled_checkin_time,
+            checkedIn: false, status: '', recordId: null, error: '', scans: 0,
+          });
+          selected.delete(p.code);
+        });
+        (data.skipped || []).forEach((item) => {
+          const p = people.find((person) => person.code === item.code);
+          if (p && !p.cancelled) p.cancelBlocked = item.reason;
+        });
+        renderAll();
+        showMessage(data.success ? 'success' : 'error', data.message || (data.success ? 'Đã xóa.' : 'Không thể xóa.'));
+        if (data.skipped && data.skipped.length && (data.success || data.skipped.length > 1)) await showSkipped(data.skipped);
+      } catch (error) {
+        showMessage('error', 'Không thể kết nối máy chủ.');
+      }
+    }
+
+    async function restorePeople(list) {
+      if (!list.length) return;
+      const text = list.length === 1
+        ? `Khôi phục đăng ký của ${list[0].name || '(chưa có tên)'} – mã CB/SV ${list[0].code}?\nNgười này quay lại danh sách như cũ (kể cả lượt check-in trước đó) và được gỡ chặn đăng ký lại.`
+        : `Khôi phục đăng ký của ${list.length} người?\nHọ quay lại danh sách như cũ và được gỡ chặn đăng ký lại.`;
+      if (!await confirmAsync(text)) return;
+      message.hidden = true;
+      try {
+        const data = await postJson(`/api/admin/events/${EVENT_ID}/registrations/restore`, { codes: list.map((p) => p.code) });
+        if (!data.success) { showMessage('error', data.message || 'Không thể khôi phục.'); return; }
+        (data.restored || []).forEach((code) => {
+          const p = people.find((person) => person.code === code);
+          if (!p) return;
+          Object.assign(p, { cancelled: false, cancelledAt: '', cancelledBy: '', cancelReason: '', blockedRereg: false, cancelledCheckin: '' });
+          selected.delete(code);
+        });
+        await loadRecords();            // lấy lại check-in của người vừa khôi phục
+        renderAll();
+        showMessage(data.warning ? 'error' : 'success', [data.message, data.warning].filter(Boolean).join(' '));
+      } catch (error) {
+        showMessage('error', 'Không thể kết nối máy chủ.');
+      }
+    }
+
+    if (CAN_DELETE) {
+      selectAll.addEventListener('change', () => {
+        visiblePeople().forEach((p) => { if (selectAll.checked) selected.add(p.code); else selected.delete(p.code); });
+        updateBulkBar();
+      });
+      document.getElementById('bulkCancel').addEventListener('click', () => cancelPeople(selectedPeople()));
+      document.getElementById('bulkRestore').addEventListener('click', () => restorePeople(selectedPeople()));
+      document.getElementById('bulkClear').addEventListener('click', () => { selected.clear(); updateBulkBar(); });
+    }
+
     renderAll();
     syncAll();
   });
@@ -549,22 +772,22 @@
     if (!code) return;
     certificatePreviewModal.hidden = false;
     certificatePreviewContent.innerHTML = 'Đang tải...';
-    certificateDownload.href = `/api/certificates/${encodeURIComponent(code)}`;
+    certificateDownload.href = `/api/admin/certificates/${encodeURIComponent(code)}`;
 
     try {
-      const head = await fetch(`/api/certificates/${encodeURIComponent(code)}/view`, { method: 'HEAD' });
+      const head = await fetch(`/api/admin/certificates/${encodeURIComponent(code)}/view`, { method: 'HEAD' });
       const contentType = head.headers.get('Content-Type') || '';
       certificatePreviewContent.innerHTML = '';
         if (contentType.includes('pdf')) {
           const iframe = document.createElement('iframe');
-          iframe.src = `/api/certificates/${encodeURIComponent(code)}/view`;
+          iframe.src = `/api/admin/certificates/${encodeURIComponent(code)}/view`;
           iframe.style.width = '100%';
           iframe.style.height = 'calc(100vh - 230px)';
           iframe.style.border = '0';
           certificatePreviewContent.appendChild(iframe);
         } else {
           const img = document.createElement('img');
-          img.src = `/api/certificates/${encodeURIComponent(code)}/view`;
+          img.src = `/api/admin/certificates/${encodeURIComponent(code)}/view`;
           img.style.maxWidth = '100%';
           img.style.maxHeight = 'calc(100vh - 230px)';
           img.style.width = 'auto';

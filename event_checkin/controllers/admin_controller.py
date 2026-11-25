@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from flask import Blueprint, Response, current_app, jsonify, make_response, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, current_app, g, jsonify, make_response, redirect, render_template, request, session, url_for
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
@@ -31,8 +31,9 @@ from event_checkin.models.don_vi import DonVi
 from event_checkin.models.email_log import EmailLog
 from event_checkin.models.event import Event
 from event_checkin.models.lucky_draw import LuckyConfig, LuckyWinner
-from event_checkin.models.registration import Registration
+from event_checkin.models.registration import STATUS_ACTIVE, STATUS_CANCELLED, Registration
 from event_checkin.models.user import User
+from event_checkin.utils import event_image as event_images
 from event_checkin.utils.timezone import format_local, format_utc_as_vn, now_vn_naive, vn_today_range
 
 
@@ -116,6 +117,8 @@ def _event_payload(event):
         "ten_su_kien": event.ten_su_kien,
         "hinh": event.hinh,
         "hinh_url": url_for("static", filename=event.hinh) if event.hinh else None,
+        "hinh_width": event_images.event_image(event)["width"] if event.hinh else None,
+        "hinh_height": event_images.event_image(event)["height"] if event.hinh else None,
         "mo_ta": event.mo_ta,
         "dia_diem": event.dia_diem,
         "co_so": event.co_so,
@@ -155,7 +158,7 @@ def _today_checkin_map():
 
 
 def _dashboard_payload():
-    registrations = Registration.query.order_by(Registration.thoi_gian_dang_ky.desc()).all()
+    registrations = Registration.active().order_by(Registration.thoi_gian_dang_ky.desc()).all()
     today_checkin_map = _today_checkin_map()
     certificate_map = {
         (item.ma_cbsv, item.event_id): item
@@ -178,8 +181,8 @@ def _dashboard_payload():
             "trang_thai": "Đã check-in" if checkin_item else "Chưa check-in",
             "checkin_time": format_local(checkin_item.checkin_at) if checkin_item else "",
             "certificate_code": certificate.certificate_code if certificate else "",
-            "certificate_url": f"/api/certificates/{certificate.certificate_code}" if certificate else "",
-            "verify_url": f"/verify/{certificate.certificate_code}" if certificate else "",
+            "certificate_url": url_for("certificates.admin_download", certificate_code=certificate.certificate_code) if certificate else "",
+            "verify_url": url_for("certificates.token_verify", token=certificate.token) if certificate and certificate.token else "",
             "can_generate_certificate": bool(checkin_item and not certificate),
         })
 
@@ -230,26 +233,35 @@ def events_page():
 @access(perm.REGISTRATION_VIEW_FULL)
 def event_detail(event_id):
     event = Event.query.get_or_404(event_id)
+    # Lấy cả đăng ký đã hủy: hiện ở mục "Đã hủy" (lọc riêng) để admin xem lại / khôi phục. Mọi số liệu chỉ tính
+    # đăng ký còn hiệu lực.
     registrations = (
         Registration.query
         .filter_by(event_id=event_id)
         .order_by(Registration.thoi_gian_dang_ky.asc())
         .all()
     )
-    checkin_map = mailer.patron_summary(event_id)
+    checkin_map = mailer.patron_summary(event_id)          # đã bỏ check-in của người bị hủy
     certificate_map = {
         item.ma_cbsv: item
         for item in Certificate.query.filter_by(event_id=event_id).all()
     }
+    cancelled_codes = [item.ma_cbsv for item in registrations if not item.is_active]
+    cancelled_checkins = _first_checkins(event_id, cancelled_codes)
+    blocked = _cancel_block_reasons(event_id, [item.ma_cbsv for item in registrations if item.is_active])
 
     rows = []
-    for position, registration in enumerate(registrations, start=1):
+    position = 0
+    for registration in registrations:
         user = registration.user
-        checkin_item = checkin_map.get(registration.ma_cbsv)
-        certificate = certificate_map.get(registration.ma_cbsv)
+        active = registration.is_active
+        checkin_item = checkin_map.get(registration.ma_cbsv) if active else None
+        certificate = certificate_map.get(registration.ma_cbsv) if active else None
         primary = checkin_item["primary"] if checkin_item else None
+        if active:
+            position += 1
         rows.append({
-            "stt": position,
+            "stt": position if active else None,
             "ma_cbsv": registration.ma_cbsv,
             "event_id": registration.event_id,
             "ho_ten": user.ho_ten if user else "",
@@ -260,30 +272,225 @@ def event_detail(event_id):
             "checkin_time": format_local(checkin_item["first_checkin_at"]) if checkin_item else "",
             "scans": checkin_item["scans"] if checkin_item else 0,
             "certificate_code": certificate.certificate_code if certificate else "",
-            "certificate_url": f"/api/certificates/{certificate.certificate_code}" if certificate else "",
+            "certificate_url": url_for("certificates.admin_download", certificate_code=certificate.certificate_code) if certificate else "",
             "cert_status": primary.cert_status if primary else "",
             "cert_error": (primary.error_msg or "") if primary else "",
             "cert_sent_at": format_local(primary.cert_sent_at) if primary and primary.cert_sent_at else "",
             "send_count": primary.send_count if primary else 0,
             "cau_hoi": (registration.cau_hoi or "").strip(),
+            # ---- hủy đăng ký ----
+            "cancel_blocked": blocked.get(registration.ma_cbsv, ""),   # lý do không được xóa (đã có chứng chỉ/trúng thưởng)
+            **_cancel_info(registration, cancelled_checkins),
         })
 
-    question_count = sum(1 for row in rows if row["cau_hoi"])
+    active_rows = [row for row in rows if not row["cancelled"]]
+    question_count = sum(1 for row in active_rows if row["cau_hoi"])
+    checked = sum(1 for row in active_rows if row["checked_in"])
     return render_template(
         "admin/event_detail.html",
         event=_event_payload(event),
         # Cột/nút câu hỏi hiện khi sự kiện đang bật công tắc HOẶC đã từng nhận câu hỏi (tắt công tắc không làm mất câu hỏi đã lưu)
         show_questions=bool(event.cho_phep_cau_hoi) or question_count > 0,
         lucky_ready=db.session.get(LuckyConfig, event_id) is not None,  # đã thiết lập quay số thì mới hiện nút
+        can_delete=perm.has_permission(get_current_admin().role, perm.REGISTRATION_DELETE),
         rows=rows,
         totals={
-            "registrations": len(rows),
-            "checkins": len(checkin_map),
-            "pending": max(len(rows) - len(checkin_map), 0),
-            "emails_sent": sum(1 for info in checkin_map.values() if info["primary"].cert_status == "sent"),
+            "registrations": len(active_rows),
+            "checkins": checked,
+            "pending": len(active_rows) - checked,
+            "emails_sent": sum(1 for row in active_rows if row["checked_in"] and row["cert_status"] == "sent"),
             "questions": question_count,
+            "cancelled": len(rows) - len(active_rows),
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Xóa (hủy mềm) / khôi phục đăng ký -- chỉ admin, super_admin (perm.REGISTRATION_DELETE). Không gửi email cho ai.
+# Dòng đăng ký giữ nguyên trong DB (trang_thai = 'cancelled'); KHÔNG đụng bảng users (dùng chung nhiều sự kiện) và
+# không xóa dòng check-in (chỉ không tính nữa, xem Registration.checkin_not_cancelled).
+# ---------------------------------------------------------------------------
+CANCEL_REASON_MAX = 500
+CANCEL_MAX_CODES = 2000
+CANCEL_BLOCKED_CERTIFICATE = "Người này đã được cấp chứng chỉ, cần thu hồi chứng chỉ trước."
+
+
+def _first_checkins(event_id, codes):
+    """{mã: giờ check-in sớm nhất (giờ VN)} -- đọc thẳng checkin_records, kể cả của người đã bị hủy."""
+    if not codes:
+        return {}
+    return dict(
+        db.session.query(CheckinRecord.patron_code, db.func.min(CheckinRecord.checkin_at))
+        .filter(CheckinRecord.event_id == event_id, CheckinRecord.patron_code.in_(codes))
+        .group_by(CheckinRecord.patron_code)
+        .all()
+    )
+
+
+def _cancel_block_reasons(event_id, codes):
+    """{mã: lý do KHÔNG được xóa} cho những mã đã được cấp chứng chỉ (chưa thu hồi) hoặc đang trúng thưởng."""
+    if not codes:
+        return {}
+    reasons = {}
+    for certificate in Certificate.query.filter(
+        Certificate.event_id == event_id, Certificate.ma_cbsv.in_(codes), Certificate.status != "revoked"
+    ):
+        reasons[certificate.ma_cbsv] = CANCEL_BLOCKED_CERTIFICATE
+    winners = LuckyWinner.query.filter(
+        LuckyWinner.event_id == event_id, LuckyWinner.patron_code.in_(codes), LuckyWinner.hieu_luc == 1,
+        LuckyWinner.trang_thai.in_(("pending", "confirmed")),
+    ).all()
+    for winner in winners:
+        prize = winner.prize.ten_giai if winner.prize else ""
+        reasons.setdefault(winner.patron_code, (
+            f"Người này đã trúng thưởng bốc thăm{f' ({prize})' if prize else ''}. "
+            "Muốn xóa, hãy hủy kết quả trúng thưởng ở màn hình quay số trước."
+        ))
+    return reasons
+
+
+def _cancel_info(registration, first_checkins):
+    if registration.is_active:
+        return {"cancelled": False, "huy_luc": "", "huy_boi": "", "ly_do_huy": "", "chan_dang_ky_lai": False,
+                "cancelled_checkin_time": ""}
+    admin = registration.cancelled_by
+    checked = first_checkins.get(registration.ma_cbsv)
+    return {
+        "cancelled": True,
+        "huy_luc": format_local(registration.huy_luc) if registration.huy_luc else "",
+        "huy_boi": admin.username if admin else "",
+        "ly_do_huy": registration.ly_do_huy or "",
+        "chan_dang_ky_lai": bool(registration.chan_dang_ky_lai),
+        "cancelled_checkin_time": format_local(checked) if checked else "",
+    }
+
+
+def _codes_from_payload(payload):
+    raw = payload.get("codes")
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return None
+    codes = []
+    for item in raw:
+        code = str(item or "").strip()
+        if code and code not in codes:
+            codes.append(code)
+    return codes
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/registrations/cancel")
+@access(perm.REGISTRATION_DELETE)
+def cancel_registrations(event_id):
+    """Hủy đăng ký của 1 hoặc nhiều mã. Người đã được cấp chứng chỉ / đang trúng thưởng thì BỎ QUA (không chặn cả
+    lô), trả danh sách bỏ qua kèm lý do. Người đã check-in vẫn hủy được (giao diện đã cảnh báo giờ check-in)."""
+    event = Event.query.get_or_404(event_id)
+    payload = request.get_json(silent=True) or {}
+    codes = _codes_from_payload(payload)
+    if not codes:
+        return jsonify({"success": False, "message": "Chưa chọn người cần xóa."}), 400
+    if len(codes) > CANCEL_MAX_CODES:
+        return jsonify({"success": False, "message": f"Mỗi lần xóa tối đa {CANCEL_MAX_CODES} người."}), 400
+    reason = " ".join(str(payload.get("reason") or "").split())
+    if len(reason) > CANCEL_REASON_MAX:
+        return jsonify({"success": False, "message": f"Lý do tối đa {CANCEL_REASON_MAX} ký tự."}), 400
+    block = bool(payload.get("block"))
+    admin = get_current_admin()
+
+    # Khóa dòng sự kiện: không chạy song song với đăng ký/khôi phục của cùng sự kiện (giống register())
+    db.session.query(Event.id).filter(Event.id == event_id).with_for_update().one()
+    registrations = {
+        item.ma_cbsv: item
+        for item in Registration.query.filter(Registration.event_id == event_id, Registration.ma_cbsv.in_(codes))
+        .with_for_update()
+    }
+    blocked = _cancel_block_reasons(event_id, [code for code, item in registrations.items() if item.is_active])
+    checkins = _first_checkins(event_id, codes)
+    now = now_vn_naive().replace(microsecond=0)
+    done, skipped = [], []
+    for code in codes:
+        registration = registrations.get(code)
+        name = registration.user.ho_ten if registration and registration.user else ""
+        if not registration:
+            skipped.append({"code": code, "name": name, "reason": "Mã này chưa đăng ký sự kiện này."})
+        elif not registration.is_active:
+            skipped.append({"code": code, "name": name, "reason": "Đăng ký này đã bị xóa trước đó."})
+        elif code in blocked:
+            skipped.append({"code": code, "name": name, "reason": blocked[code]})
+        else:
+            registration.mark_cancelled(admin.id, reason, block, now)
+            done.append(registration)
+    db.session.commit()
+
+    if done:
+        cancelled_codes = [item.ma_cbsv for item in done]
+        detail = {
+            "ten_su_kien": event.ten_su_kien,
+            "ly_do": reason or None,
+            "chan_dang_ky_lai": block,
+            "da_check_in": [code for code in cancelled_codes if code in checkins] or None,
+        }
+        if len(codes) == 1:
+            log_action("registration.cancel", "event", event_id, {"ma_cbsv": cancelled_codes[0], **detail})
+        else:
+            log_action("registration.cancel_bulk", "event", event_id, {
+                "ma_cbsv": cancelled_codes, "so_nguoi": len(cancelled_codes),
+                "bo_qua": [{"ma_cbsv": item["code"], "ly_do": item["reason"]} for item in skipped] or None, **detail,
+            })
+
+    if done and skipped:
+        message = f"Đã xóa {len(done)} người. Bỏ qua {len(skipped)} người không xóa được."
+    elif done:
+        message = f"Đã xóa đăng ký của {done[0].user.ho_ten if done[0].user else done[0].ma_cbsv} ({done[0].ma_cbsv})." \
+            if len(done) == 1 else f"Đã xóa {len(done)} người."
+    else:
+        message = skipped[0]["reason"] if len(skipped) == 1 else f"Không xóa được ai ({len(skipped)} người bị bỏ qua)."
+    return jsonify({
+        "success": bool(done),
+        "message": message,
+        "cancelled": [{"code": item.ma_cbsv, **_cancel_info(item, checkins)} for item in done],
+        "skipped": skipped,
+        "registration_count": event.registration_count,
+    }), (200 if done else 409)
+
+
+@admin_bp.post("/api/admin/events/<int:event_id>/registrations/restore")
+@access(perm.REGISTRATION_DELETE)
+def restore_registrations(event_id):
+    """Khôi phục đăng ký đã hủy (gỡ luôn chặn đăng ký lại). Sự kiện đã đủ chỗ thì vẫn khôi phục (admin chủ động) nhưng
+    báo cho admin biết đang vượt số lượng tối đa."""
+    event = Event.query.get_or_404(event_id)
+    codes = _codes_from_payload(request.get_json(silent=True) or {})
+    if not codes:
+        return jsonify({"success": False, "message": "Chưa chọn người cần khôi phục."}), 400
+    if len(codes) > CANCEL_MAX_CODES:
+        return jsonify({"success": False, "message": f"Mỗi lần khôi phục tối đa {CANCEL_MAX_CODES} người."}), 400
+
+    db.session.query(Event.id).filter(Event.id == event_id).with_for_update().one()
+    registrations = (
+        Registration.query
+        .filter(Registration.event_id == event_id, Registration.ma_cbsv.in_(codes),
+                Registration.trang_thai == STATUS_CANCELLED)
+        .with_for_update().all()
+    )
+    for registration in registrations:
+        registration.mark_active()
+    db.session.commit()
+    if not registrations:
+        return jsonify({"success": False, "message": "Không có đăng ký đã xóa nào để khôi phục."}), 409
+
+    restored = [item.ma_cbsv for item in registrations]
+    log_action("registration.restore", "event", event_id, {
+        "ma_cbsv": restored[0] if len(restored) == 1 else restored, "ten_su_kien": event.ten_su_kien,
+    })
+    count = event.registration_count
+    message = (f"Đã khôi phục đăng ký của {registrations[0].user.ho_ten if registrations[0].user else restored[0]} "
+               f"({restored[0]}).") if len(restored) == 1 else f"Đã khôi phục {len(restored)} người."
+    warning = ""
+    if event.so_luong_toi_da and count > event.so_luong_toi_da:
+        warning = f"Lưu ý: sự kiện hiện có {count}/{event.so_luong_toi_da} người, vượt số lượng tối đa."
+    return jsonify({"success": True, "message": message, "warning": warning, "restored": restored,
+                    "registration_count": count})
 
 
 @admin_bp.post("/api/admin/events/<int:event_id>/send-certificates")
@@ -340,7 +547,8 @@ CHECKIN_TIME_FORMAT = "%d/%m/%Y %H:%M"
 
 
 def _checkin_rows(event_id, status=None):
-    query = CheckinRecord.query.filter_by(event_id=event_id)
+    # Người đã bị hủy đăng ký không hiện ở danh sách check-in (dòng check-in vẫn giữ, khôi phục thì hiện lại)
+    query = CheckinRecord.query.filter_by(event_id=event_id).filter(Registration.checkin_not_cancelled())
     if status:
         query = query.filter_by(cert_status=status)
     records = query.order_by(CheckinRecord.checkin_at.asc(), CheckinRecord.id.asc()).all()
@@ -376,12 +584,14 @@ def _checkin_counts(event_id):
     counts = dict(
         db.session.query(CheckinRecord.cert_status, db.func.count(CheckinRecord.id))
         .filter_by(event_id=event_id)
+        .filter(Registration.checkin_not_cancelled())
         .group_by(CheckinRecord.cert_status)
         .all()
     )
     checked_in = (
         db.session.query(db.func.count(db.distinct(CheckinRecord.patron_code)))
         .filter_by(event_id=event_id)
+        .filter(Registration.checkin_not_cancelled())
         .scalar()
     )
     return {
@@ -510,7 +720,7 @@ def add_checkin_manually(event_id):
         checkin_at = now_vn_naive()
 
     # Giống check-in thường: vẫn bắt buộc đã đăng ký (chưa có Sierra để lấy họ tên/email)
-    if not Registration.query.filter_by(ma_cbsv=patron_code, event_id=event_id).first():
+    if not Registration.active().filter_by(ma_cbsv=patron_code, event_id=event_id).first():
         return jsonify({"success": False, "message": f"Mã {patron_code} chưa đăng ký sự kiện này."}), 404
 
     db.session.add(CheckinRecord(
@@ -611,7 +821,7 @@ def _parse_checkin_imports(files, event_id):
     """Đọc nhiều file cùng lúc. Trả (rows hợp lệ của mọi file, lỗi, ghi chú).
     Mã lặp lại -- trong 1 file, giữa các file, hoặc đã check-in trước -- vẫn được
     nhập (giống quét trùng), chỉ ghi chú nhắc bấm Lọc trùng."""
-    registered = {row[0] for row in db.session.query(Registration.ma_cbsv).filter_by(event_id=event_id)}
+    registered = {row[0] for row in db.session.query(Registration.ma_cbsv).filter_by(event_id=event_id, trang_thai=STATUS_ACTIVE)}
     already = {
         row[0] for row in db.session.query(CheckinRecord.patron_code).filter_by(event_id=event_id).distinct()
     }
@@ -841,18 +1051,12 @@ def fix_and_resend_checkin(event_id, record_id):
 
 def _certificate_files(event_id):
     """[(Certificate, Path)] của các chứng chỉ sự kiện còn file trên server.
-    Chỉ nhận file nằm trong thư mục static/certificates/generated (an toàn khi xoá)."""
-    root = (Path(current_app.static_folder) / "certificates" / "generated").resolve()
+    get_certificate_file_path chỉ trả file nằm trong thư mục lưu chứng chỉ (an toàn khi xoá)."""
     found = []
     for certificate in Certificate.query.filter_by(event_id=event_id).order_by(Certificate.id).all():
         path = get_certificate_file_path(certificate)
-        if not path or not path.is_file():
-            continue
-        try:
-            path.resolve().relative_to(root)
-        except ValueError:
-            continue
-        found.append((certificate, path))
+        if path and path.is_file():
+            found.append((certificate, path))
     return found
 
 
@@ -977,7 +1181,7 @@ def _ascii_filename_component(text):
 def export_event_registrations(event_id):
     event = Event.query.get_or_404(event_id)
     registrations = (
-        Registration.query
+        Registration.active()
         .filter_by(event_id=event_id)
         .order_by(Registration.thoi_gian_dang_ky.asc())
         .all()
@@ -1047,7 +1251,7 @@ def export_event_questions(event_id):
     event = Event.query.get_or_404(event_id)
     registrations = [
         item for item in (
-            Registration.query
+            Registration.active()
             .filter_by(event_id=event_id)
             .order_by(Registration.thoi_gian_dang_ky.asc())
             .all()
@@ -1457,7 +1661,10 @@ def update_event(event_id):
 
     event.ten_su_kien = ten_su_kien
     if "hinh" in payload:
-        event.hinh = (payload.get("hinh") or "").strip() or None
+        new_hinh = (payload.get("hinh") or "").strip() or None
+        if new_hinh != event.hinh:
+            event.hinh = new_hinh
+            event_images.set_size(event.id, None, None)  # kích thước cũ không còn đúng với ảnh khác
     event.mo_ta = (payload.get("mo_ta") or "").strip() or None
     event.dia_diem = (payload.get("dia_diem") or "").strip() or None
     event.co_so = co_so
@@ -1492,15 +1699,17 @@ def upload_event_image(event_id):
     if extension not in EVENT_IMAGE_EXTENSIONS:
         return jsonify({"success": False, "message": "Chỉ hỗ trợ PNG, JPG, JPEG hoặc WEBP."}), 400
 
-    image_dir = Path(current_app.static_folder) / "events"
-    image_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"event_{event_id}_image{extension}"
-    file_path = image_dir / filename
-    file.save(file_path)
-
-    event.hinh = f"events/{filename}"
+    # Mở thử bằng Pillow (đúng là ảnh, không hỏng), xoay theo EXIF, thu nhỏ/nén nếu quá lớn, lưu kích thước -- xem
+    # event_checkin/utils/event_image.py
+    try:
+        old_image = event_images.save_event_image(event, file.read())
+    except event_images.ImageRejected as error:
+        return jsonify({"success": False, "message": str(error)}), 400
     event.updated_at = datetime.utcnow()
     db.session.commit()
+    if old_image and old_image.is_file():
+        old_image.unlink(missing_ok=True)
+    g.pop("event_image_sizes", None)  # payload bên dưới đọc lại kích thước mới
 
     return jsonify({
         "success": True,
@@ -1793,19 +2002,16 @@ def delete_event(event_id):
     impact = _event_delete_impact(event_id)
     event_name = event.ten_su_kien
 
-    certificate_paths = []
-    for certificate in Certificate.query.filter_by(event_id=event_id).all():
-        if certificate.file_url:
-            static_prefix = url_for("static", filename="", _external=False)
-            relative_path = certificate.file_url
-            if relative_path.startswith(static_prefix):
-                relative_path = relative_path[len(static_prefix):]
-            certificate_paths.append(Path(current_app.static_folder) / relative_path)
+    certificate_paths = [
+        path for path in (get_certificate_file_path(item) for item in Certificate.query.filter_by(event_id=event_id).all())
+        if path
+    ]
 
     # Deleted in FK-dependency order: EmailLog references Certificate, both
     # reference Registration/CheckIn's (ma_cbsv, event_id) pair indirectly.
     from event_checkin.utils.lucky_draw import purge_event_data, remove_files
     lucky_files = purge_event_data(event_id)  # dữ liệu quay số + ảnh nền (có khoá ngoại sang events)
+    image_path = event_images.stored_path(event.hinh)
     EmailLog.query.filter_by(event_id=event_id).delete()
     Certificate.query.filter_by(event_id=event_id).delete()
     CheckinRecord.query.filter_by(event_id=event_id).delete()
@@ -1818,6 +2024,8 @@ def delete_event(event_id):
         if path.exists():
             path.unlink(missing_ok=True)
     remove_files(lucky_files)
+    if image_path and image_path.is_file():
+        image_path.unlink(missing_ok=True)
 
     log_action("event.delete", "event", event_id, {"ten_su_kien": event_name, **impact})
     return jsonify({"success": True, "message": "Đã xóa sự kiện."})
@@ -1835,11 +2043,7 @@ def delete_event_checkin(event_id, ma_cbsv):
     certificate = Certificate.query.filter_by(event_id=event_id, ma_cbsv=ma_cbsv).first()
     certificate_path = None
     if certificate and certificate.file_url:
-        static_prefix = url_for("static", filename="", _external=False)
-        relative_path = certificate.file_url
-        if relative_path.startswith(static_prefix):
-            relative_path = relative_path[len(static_prefix):]
-        certificate_path = Path(current_app.static_folder) / relative_path
+        certificate_path = get_certificate_file_path(certificate)
 
         EmailLog.query.filter_by(
             event_id=event_id,
@@ -1868,7 +2072,7 @@ def delete_event_checkin(event_id, ma_cbsv):
 @access(perm.DATA_EXPORT)
 @audited("export.csv")
 def export_csv():
-    registrations = Registration.query.order_by(Registration.thoi_gian_dang_ky.asc()).all()
+    registrations = Registration.active().order_by(Registration.thoi_gian_dang_ky.asc()).all()
     today_checkin_map = _today_checkin_map()
 
     buffer = StringIO()
@@ -1902,10 +2106,14 @@ def reset_data():
     if not confirmed:
         return jsonify({"success": False, "message": "Chưa xác nhận xóa dữ liệu."}), 400
 
+    # File chứng chỉ (có họ tên) xoá theo dữ liệu, không để sót lại trên đĩa
+    certificate_paths = [path for path in (get_certificate_file_path(item) for item in Certificate.query.all()) if path]
     db.session.query(EmailLog).delete()
     db.session.query(Certificate).delete()
     db.session.query(CheckinRecord).delete()
     db.session.query(CheckIn).delete()
     db.session.query(Registration).delete()
     db.session.commit()
+    for path in certificate_paths:
+        path.unlink(missing_ok=True)
     return jsonify({"success": True, "message": "Đã xóa toàn bộ dữ liệu đăng ký, check-in và chứng nhận."})

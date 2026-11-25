@@ -32,7 +32,7 @@ def event_page(event_id):
     trang cũng không lộ. Dữ liệu dựng sẵn ở server (không có API riêng cho staff để lộ thêm)."""
     event = Event.query.get_or_404(event_id)
     registrations = (
-        Registration.query
+        Registration.active()
         .filter_by(event_id=event_id)
         .order_by(Registration.thoi_gian_dang_ky.asc())
         .all()

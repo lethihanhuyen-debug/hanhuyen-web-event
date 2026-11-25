@@ -38,10 +38,16 @@ Cài thêm (bắt buộc thao tác qua trình cài .msi/.exe, không có gói wi
 - **NSSM** (chạy waitress như Windows Service): https://nssm.cc/download — giải nén, đặt `nssm.exe` vào ví dụ `C:\tools\nssm\nssm.exe`
 - **win-acme** (SSL Let's Encrypt miễn phí): https://www.win-acme.com/ — giải nén, ví dụ `C:\tools\win-acme\wacs.exe`
 
-Sau khi cài ARR, bật tính năng proxy cấp server (một lần duy nhất):
+Sau khi cài ARR, bật tính năng proxy cấp server (một lần duy nhất), đồng thời bảo ARR gửi IP thật của người dùng
+trong header `X-Forwarded-For` và **không gắn kèm cổng** (nếu ARR ghi `IP:cổng` thì mỗi kết nối một cổng khác nhau,
+các giới hạn theo IP mất tác dụng; app có tự bỏ cổng nhưng nên tắt ngay từ ARR):
 ```powershell
-& "$env:windir\system32\inetsrv\appcmd.exe" set config -section:system.webServer/proxy /enabled:"True" /commit:apphost
+& "$env:windir\system32\inetsrv\appcmd.exe" set config -section:system.webServer/proxy /enabled:"True" /xForwardedForHeaderName:"X-Forwarded-For" /includePortInXForwardedFor:"False" /commit:apphost
 ```
+Hoặc trong IIS Manager: chọn tên máy chủ → **Application Request Routing Cache** → **Server Proxy Settings...** → tích
+**Preserve client IP in the following header** = `X-Forwarded-For`, **bỏ tích** **Include TCP port from client IP** → Apply.
+App chỉ tin header này khi `APP_ENV=production` và request đến từ chính máy này (127.0.0.1, tức IIS) — xem
+`TrustedLocalProxyFix` trong `app.py`.
 
 ## 2. Cài MariaDB Server (giống máy dev nhưng lần này đăng ký Service thật vì có quyền admin)
 
@@ -105,6 +111,18 @@ $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfil
 $trigger = New-ScheduledTaskTrigger -Daily -At 2am
 Register-ScheduledTask -TaskName "CheckinEvent-DB-Backup" -Action $action -Trigger $trigger -RunLevel Highest
 ```
+**File chứng chỉ** (từ bản m007) nằm ở `C:\apps\eventcheckin\instance\certificates` (hoặc `CERTIFICATE_STORAGE_DIR`
+trong `.env`), không nằm trong DB nên phải sao lưu riêng. Thêm vào cuối `backup-db.ps1`:
+```powershell
+robocopy "C:\apps\eventcheckin\instance\certificates" "C:\backups\certificates" /MIR /R:1 /W:1 | Out-Null
+```
+**Ảnh sự kiện** (từ bản m008 không còn nằm trong git) và bản gốc ảnh trước khi m008 thu nhỏ cũng phải sao lưu riêng.
+Thêm tiếp vào cuối `backup-db.ps1`:
+```powershell
+robocopy "C:\apps\eventcheckin\event_checkin\static\events" "C:\backups\events" /MIR /R:1 /W:1 | Out-Null
+robocopy "C:\apps\eventcheckin\instance\event_images_goc" "C:\backups\event_images_goc" /E /R:1 /W:1 | Out-Null
+```
+
 Khuyến nghị: định kỳ copy thư mục `C:\backups` ra ngoài server (Google Drive, OneDrive, ổ ngoài...) — backup nằm chung server sẽ mất luôn nếu server hỏng/bị mã hoá.
 
 ## 3. Deploy code lên server
@@ -119,7 +137,7 @@ Copy thủ công (USB / ổ mạng chia sẻ / kéo-thả qua UltraViewer file t
 - `flask_stdout.log`, `flask_stderr.log`, `logs\` — log của máy dev, không cần mang theo
 - `database\` — dữ liệu Excel/dump cũ của máy dev, không phải nguồn dữ liệu production (DB thật sẽ được tạo mới trên server ở Mục 2)
 
-**Cần copy đầy đủ**: `event_checkin\` (toàn bộ, gồm cả `static\certificates\...` — template/font/chứng chỉ đã tạo trước đó), `app.py`, `config.py`, `requirements.txt`, `wsgi.py`, `README.md`.
+**Cần copy đầy đủ**: `event_checkin\` (toàn bộ, gồm cả `static\certificates\templates` và `fonts`), `instance\certificates\` (chứng chỉ đã tạo, nếu chuyển từ máy khác), `app.py`, `config.py`, `requirements.txt`, `wsgi.py`, `README.md`.
 
 **Không copy `.env` của máy dev sang thẳng** — tạo `.env` **mới** riêng cho production ở bước bên dưới (đổi `SECRET_KEY`, mật khẩu DB, mật khẩu admin — không dùng lại giá trị dev).
 
@@ -213,6 +231,11 @@ Tạo `C:\apps\eventcheckin\iis-site\web.config`:
           </conditions>
           <action type="Redirect" url="https://{HTTP_HOST}/{R:1}" redirectType="Permanent" />
         </rule>
+        <!-- Chứng chỉ cũ từng nằm trong static (ai đoán tên file là tải được): chặn hẳn, kể cả khi thư mục còn sót file -->
+        <rule name="BlockLegacyCertificateFiles" stopProcessing="true">
+          <match url="^static/certificates/generated/.*" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
         <rule name="StaticFilesPassThrough" stopProcessing="true">
           <match url="^static/.*" />
           <action type="None" />
@@ -242,7 +265,7 @@ Trong IIS Manager, chuột phải vào site `EventCheckin` → **Add Virtual Dir
 - Alias: `static`
 - Physical path: `C:\apps\eventcheckin\event_checkin\static`
 
-OK. IIS giờ sẽ tự phục vụ mọi request `/static/...` (CSS, JS, ảnh sự kiện, chứng chỉ đã tạo, font) trực tiếp từ ổ đĩa, không đi qua app Python nữa.
+OK. IIS giờ sẽ tự phục vụ mọi request `/static/...` (CSS, JS, ảnh sự kiện, font) trực tiếp từ ổ đĩa, không đi qua app Python nữa. Vì vậy **không được để file có dữ liệu cá nhân trong `static`**: chứng chỉ đã tạo nằm ở `instance\certificates` (ngoài `static`) và chỉ tải được qua route của app; rule `BlockLegacyCertificateFiles` ở mục 5.2 chặn thêm đường dẫn cũ `/static/certificates/generated/`.
 
 ## 6. SSL miễn phí với win-acme (Let's Encrypt)
 
@@ -272,6 +295,14 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 - [ ] Đăng nhập `/admin/login` bằng tài khoản admin đã đổi mật khẩu (không phải `admin123`)
 - [ ] Đăng ký thử 1 sự kiện bằng mã CB/SV test, check-in thử tại `/checkin`
 - [ ] `python -m event_checkin.migrations.m005_cau_hoi_dang_ky --check` báo `OK` (sau khi chạy m005)
+- [ ] `python -m event_checkin.migrations.m006_phan_quyen --check` và `python -m event_checkin.migrations.m007_certificate_token --check` đều báo `OK`
+- [ ] `python -m event_checkin.migrations.m008_event_image_size --check` báo `OK`
+- [ ] `python -m event_checkin.migrations.m009_huy_dang_ky --check` báo `OK`
+- [ ] Giới hạn đăng ký: **Nhật ký hoạt động** ghi IP thật của máy khác (không phải `127.0.0.1`) -- nếu không, giới hạn `REGISTER_RATE_LIMIT` sẽ tính cả trường là 1 IP
+- [ ] Xóa người đăng ký: đăng nhập admin, mở chi tiết 1 sự kiện thử, xóa 1 người → biến khỏi danh sách, số "Đã đăng ký" giảm 1, có trong mục "Đã hủy"; bấm Khôi phục → quay lại như cũ. Đăng nhập staff: không thấy nút Xóa
+- [ ] **Ảnh sau khi `git pull`**: trước pull đã sao lưu `event_checkin\static\events` và `instance\` (mục 9 → Cập nhật code); sau pull số file ảnh bằng số trước pull; thiếu thì chép lại từ bản sao lưu. Mở trang chủ: sự kiện nào có ảnh đều hiện đúng ảnh (không hiện ảnh mặc định ngoài ý muốn)
+- [ ] Tải thử ảnh sự kiện > 15MB: báo "File quá lớn..." (không phải trang lỗi 413 trống)
+- [ ] **Kiểm tra migration lúc khởi động**: sau `Restart-Service EventCheckinApp`, `C:\apps\eventcheckin\logs\app.log` **không** có dòng `Chưa chạy migration m00X, xem DEPLOYMENT.md`, và trang Quản trị **không** có banner đỏ "Lỗi hệ thống". Nếu có: app vẫn chạy nhưng phần liên quan tạm ngưng (thiếu m007 → mọi link chứng chỉ báo "Hệ thống chứng chỉ đang bảo trì"; thiếu m006 → đăng nhập/quản trị/check-in báo bảo trì, chỉ trang đăng ký còn mở; thiếu m008 → ảnh vẫn hiện, riêng nút tải ảnh sự kiện báo bảo trì; thiếu m009 → **mọi trang** báo bảo trì). Chạy migration còn thiếu theo mục 9 rồi **khởi động lại app** (app chỉ kiểm tra lúc khởi động)
 - [ ] Menu **Quay số may mắn** (`/admin/lucky-draw`) mở được; thiết lập thử 1 sự kiện (giải + ảnh nền), quay thử, Lưu, rồi xóa thiết lập thử (sau khi chạy m004)
 - [ ] Chứng chỉ PDF/PNG tạo và tải được sau check-in (nếu event bật cấp chứng chỉ)
 - [ ] Email xác nhận gửi được (kiểm tra hộp thư, và `C:\apps\eventcheckin\logs\app.log` không có lỗi SMTP)
@@ -282,7 +313,17 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 ## 9. Vận hành lâu dài
 
 - **Log ứng dụng**: `C:\apps\eventcheckin\logs\app.log` (tự xoay vòng, tối đa 5 file x 5MB, cấu hình trong `app.py`). Log service (stdout/stderr) tại `C:\apps\eventcheckin\logs\service-*.log`.
-- **Cập nhật code**: `git pull` trong `C:\apps\eventcheckin`, `pip install -r requirements.txt` nếu có thư viện mới, rồi `Restart-Service EventCheckinApp`. App tự chạy `ensure_schema_upgrades()`/`db.create_all()` mỗi lần khởi động nên các thay đổi schema nhỏ (thêm cột/index) tự áp dụng, không cần chạy migration thủ công.
+- **Cập nhật code** — LUÔN sao lưu file do admin tải lên **trước** `git pull` (ảnh sự kiện, chứng chỉ, bản gốc ảnh không
+  nằm trong git; một bản cập nhật gỡ thư mục khỏi git có thể làm `git pull` xóa file thật):
+  ```powershell
+  $ngay = Get-Date -Format yyyyMMdd-HHmm
+  robocopy "C:\apps\eventcheckin\event_checkin\static\events" "C:\backups\truoc_pull_$ngay\events" /E /R:1 /W:1
+  robocopy "C:\apps\eventcheckin\instance" "C:\backups\truoc_pull_$ngay\instance" /E /R:1 /W:1
+  (Get-ChildItem "C:\apps\eventcheckin\event_checkin\static\events" -File).Count   # ghi lại số này
+  ```
+  Sau `git pull`: đếm lại số file ảnh, phải **bằng** số đã ghi. Thiếu thì chép lại từ bản sao lưu (không ghi đè file
+  đang có): `robocopy "C:\backups\truoc_pull_$ngay\events" "C:\apps\eventcheckin\event_checkin\static\events" /E /XC /XN /XO`
+  (tương tự cho `instance`). Các bước còn lại: `git pull` trong `C:\apps\eventcheckin`, `pip install -r requirements.txt` nếu có thư viện mới, rồi `Restart-Service EventCheckinApp`. App tự chạy `ensure_schema_upgrades()`/`db.create_all()` mỗi lần khởi động nên các thay đổi schema nhỏ (thêm cột/index) tự áp dụng, không cần chạy migration thủ công.
 - **Ngoại lệ — bản cập nhật check-in/gửi chứng chỉ (10/2026)**: thêm bảng/cột mà `db.create_all()` không tự thêm vào bảng đã có. Sao lưu database, chép code mới, `Restart-Service EventCheckinApp`, rồi chạy **ngay** theo thứ tự (chạy lại nhiều lần vẫn an toàn):
   ```powershell
   .venv\Scripts\python -m event_checkin.migrations.m001_checkin_records --dry-run   # xem trước
@@ -339,6 +380,55 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
   - Từ bước (c): `/checkin`, `/checkin/<id>`, `/api/checkin` **bắt buộc đăng nhập** (staff trở lên); người tham dự không tự check-in. Trang đăng ký sự kiện vẫn công khai.
   - **Thời gian check-in sau khi sự kiện kết thúc**: biến `CHECKIN_GRACE_HOURS` trong `.env` (mặc định `5` giờ; muốn khác thì đặt ví dụ `CHECKIN_GRACE_HOURS=2`). Trong khoảng này staff vẫn thấy nút Check-in và check-in được; quá mốc thì staff chỉ xem danh sách, admin thêm check-in tay. Đổi giá trị xong cần `Restart-Service EventCheckinApp`.
   - Chạy test (trên máy dev, DB thử): `$env:MYSQL_DATABASE = "checkin_event_test"` rồi `.venv\Scripts\python -m unittest discover -s . -t . -p "test_*.py" -v`.
+- **Bản cập nhật bảo mật chứng chỉ (11/2026, migration m007)**: file chứng chỉ chuyển từ `event_checkin\static\certificates\generated` (IIS phục vụ thẳng, ai đoán tên file là tải được) sang `instance\certificates`; mỗi chứng chỉ có token ngẫu nhiên, link mới `/c/<token>`, `/c/<token>/view`, `/verify/t/<token>`. Link cũ trong email đã gửi (`/verify/<mã>`, `/api/certificates/<mã>`) vẫn mở được nhưng muốn tải file phải nhập đúng mã CB/SV. Làm **đúng thứ tự** (không khởi động lại app trước bước 4):
+  1. Sao lưu DB (`Start-ScheduledTask -TaskName "CheckinEvent-DB-Backup"`) **và sao lưu thư mục chứng chỉ cũ**: bản cập nhật gỡ thư mục này khỏi git nên `git pull` có thể xóa các file trong đó.
+     ```powershell
+     robocopy "C:\apps\eventcheckin\event_checkin\static\certificates\generated" "C:\backups\certificates_truoc_m007" /E
+     (Get-ChildItem "C:\backups\certificates_truoc_m007" -Recurse -File).Count   # ghi lại con số này
+     ```
+  2. `git pull`. Nếu git báo lỗi vì file trong `static\certificates\generated` khác bản trên repo: chạy `git checkout -- event_checkin/static/certificates/generated` rồi `git pull` lại (đã có bản sao ở bước 1).
+  3. Chép lại các file có thể đã bị `git pull` xóa, không ghi đè file đang có: `robocopy "C:\backups\certificates_truoc_m007" "C:\apps\eventcheckin\event_checkin\static\certificates\generated" /E /XC /XN /XO`
+  4. Chạy m007 rồi khởi động lại:
+     ```powershell
+     .venv\Scripts\python -m event_checkin.migrations.m007_certificate_token --dry-run   # xem trước
+     .venv\Scripts\python -m event_checkin.migrations.m007_certificate_token             # thực hiện (chạy lại nhiều lần vẫn an toàn)
+     .venv\Scripts\python -m event_checkin.migrations.m007_certificate_token --check     # mã thoát 0 + dòng "OK" là đạt
+     Restart-Service EventCheckinApp
+     ```
+     So số file: `(Get-ChildItem C:\apps\eventcheckin\instance\certificates -Recurse -File).Count` phải bằng số chứng chỉ có file (trên DB: `SELECT COUNT(*) FROM certificates WHERE file_url IS NOT NULL AND file_url <> '';`, trừ các dòng m007 cảnh báo "không còn file"). m007 cũng liệt kê các file "không thuộc chứng chỉ nào" (ảnh xem trước, chứng chỉ đã xóa): những file này không được chép.
+  5. Cập nhật `C:\apps\eventcheckin\iis-site\web.config` theo mục 5.2 (thêm rule `BlockLegacyCertificateFiles`), bật `X-Forwarded-For` không kèm cổng theo mục 1, rồi `iisreset`. Kiểm tra từ máy khác: mở `https://<domain>/static/certificates/generated/2026/<tên một file có thật>` phải ra **404**.
+  6. Sau khi kiểm tra web chạy đúng (tải chứng chỉ bằng link mới, admin xem/tải ZIP được), xóa file cũ: `.venv\Scripts\python -m event_checkin.migrations.m007_certificate_token --remove-old` (chỉ xóa khi `--check` đạt). Giữ `C:\backups\certificates_truoc_m007` thêm một thời gian rồi xóa.
+  7. Thêm `instance\certificates` vào backup hằng ngày (mục 2.3).
+  - `.env` có thể đặt `CERTIFICATE_STORAGE_DIR` (thư mục khác, ví dụ trên ổ D:) và `CERT_PUBLIC_RATE_LIMIT` (số request mỗi phút cho mỗi IP vào các trang chứng chỉ công khai, mặc định `120` vì cả trường dùng chung IP Wi-Fi; đếm trong bộ nhớ, khởi động lại app thì về 0). Nhập sai mã CB/SV ở link cũ: tối đa 5 lần / 15 phút cho mỗi mã chứng chỉ và mỗi IP.
+  - Mã chứng chỉ: số thứ tự lấy từ bộ đếm `events.certificate_seq` (chỉ tăng; app tự thêm cột này khi khởi động, không cần migration), nên xóa check-in/chứng chỉ không làm mã cũ bị cấp lại cho người khác. Mã đã bị cấp lại trước bản cập nhật này (nếu có) không sửa được tự động; link cũ của những mã đó vẫn an toàn vì phải nhập đúng mã CB/SV.
+  - Kiểm tra IP thật: sau khi bật `X-Forwarded-For`, đăng nhập từ một máy khác rồi xem **Quản trị → Nhật ký hoạt động**: cột IP phải là IP của máy đó (không phải `127.0.0.1`). Nếu vẫn là `127.0.0.1`: kiểm tra `APP_ENV=production` trong `.env` và cấu hình ARR ở mục 1. IP này dùng cho nhật ký, giới hạn quên mật khẩu và các giới hạn chứng chỉ.
+- **Bản cập nhật ảnh sự kiện (11/2026, migration m008)**: banner hiện đủ ảnh theo tỉ lệ gốc (không cắt/méo), ảnh tải lên được kiểm tra đúng là ảnh, ảnh > 2000px hoặc > 2MB tự thu nhỏ + nén, lưu kích thước vào `events.hinh_width/hinh_height`; giới hạn mỗi lần tải lên 15MB (`MAX_UPLOAD_MB` trong `.env`). Thư mục `event_checkin\static\events` **được gỡ khỏi git** (như chứng chỉ ở m007). Làm **đúng thứ tự**:
+  1. Sao lưu DB **và thư mục ảnh**: `robocopy "C:\apps\eventcheckin\event_checkin\static\events" "C:\backups\events_truoc_m008" /E`, ghi lại số file: `(Get-ChildItem "C:\backups\events_truoc_m008" -File).Count`.
+  2. `git pull`. Nếu git báo lỗi vì file trong `static\events` khác bản trên repo: `git checkout -- event_checkin/static/events` rồi `git pull` lại (đã có bản sao ở bước 1).
+  3. Chép lại ảnh có thể đã bị `git pull` xóa, không ghi đè file đang có: `robocopy "C:\backups\events_truoc_m008" "C:\apps\eventcheckin\event_checkin\static\events" /E /XC /XN /XO`. Đếm lại: phải bằng số ở bước 1.
+  4. Chạy m008 rồi khởi động lại:
+     ```powershell
+     .venv\Scripts\python -m event_checkin.migrations.m008_event_image_size --dry-run   # ảnh nào sẽ thu nhỏ (dung lượng trước/sau), ảnh thừa nào sẽ xóa
+     .venv\Scripts\python -m event_checkin.migrations.m008_event_image_size             # thực hiện (chạy lại nhiều lần vẫn an toàn)
+     .venv\Scripts\python -m event_checkin.migrations.m008_event_image_size --check     # mã thoát 0 + dòng "OK" là đạt
+     Restart-Service EventCheckinApp
+     ```
+     m008 chép **bản gốc** của mọi ảnh sắp thu nhỏ hoặc xóa sang `instance\event_images_goc\events\` (giữ nguyên tên) **trước** khi đụng tới file. Ảnh thừa = file trong `static\events` mà không sự kiện nào trỏ tới (ảnh cũ khi đổi đuôi .png/.jpg, ảnh của sự kiện đã xóa). Chưa chạy m008 thì web vẫn chạy (ảnh vẫn hiện), chỉ nút tải ảnh sự kiện báo bảo trì và trang Quản trị có banner đỏ.
+  5. Kiểm tra trang chủ, trang đăng ký và trang Quản trị: ảnh hiện đủ, không cắt. Giữ `instance\event_images_goc` và `C:\backups\events_truoc_m008` thêm một thời gian.
+  6. Thêm 2 dòng robocopy ảnh vào `backup-db.ps1` (mục 2.3).
+- **Bản cập nhật xóa người đăng ký (11/2026, migration m009)**: admin/super_admin xóa được người đăng ký (từng người hoặc hàng loạt) ở trang chi tiết sự kiện. Xóa là **xóa mềm**: dòng đăng ký giữ trong DB với `trang_thai = 'cancelled'` + giờ/người/lý do hủy; người bị xóa không còn trong danh sách, xuất Excel, check-in, gửi chứng chỉ, quay số và được nhả lại chỗ; có mục **"Đã hủy"** để xem lại và **Khôi phục**. Ô "Chặn mã này đăng ký lại sự kiện này" dùng cho đăng ký ảo. Không xóa thông tin trong bảng `users`, không gửi email. Người đã được cấp chứng chỉ hoặc đang trúng thưởng thì không xóa được. Làm **đúng thứ tự** (không khởi động lại app trước bước 3 -- thiếu m009 thì **mọi trang** báo bảo trì):
+  1. Sao lưu DB (mục 2.3).
+  2. `git pull`.
+  3. Chạy m009 rồi khởi động lại:
+     ```powershell
+     .venv\Scripts\python -m event_checkin.migrations.m009_huy_dang_ky --dry-run   # xem sẽ thêm cột/chỉ mục nào
+     .venv\Scripts\python -m event_checkin.migrations.m009_huy_dang_ky             # thực hiện (chạy lại nhiều lần vẫn an toàn)
+     .venv\Scripts\python -m event_checkin.migrations.m009_huy_dang_ky --check     # mã thoát 0 + dòng "OK" là đạt
+     Restart-Service EventCheckinApp
+     ```
+     m009 chỉ **thêm** cột vào `registrations` (đăng ký cũ = đang hiệu lực), không sửa/xóa dữ liệu.
+  4. Kiểm tra: trang chủ và trang Quản trị mở được; số "Đã đăng ký" của các sự kiện không đổi so với trước khi cập nhật.
+  - **Chống đăng ký ảo** (cùng đợt, không cần migration): mỗi IP gửi form đăng ký tối đa `REGISTER_RATE_LIMIT` lần/phút (mặc định `30`, đặt trong `.env`; để cao vì sinh viên dùng chung Wi-Fi trường), quá thì báo "Bạn thao tác quá nhanh, vui lòng thử lại sau 1 phút". IP lấy theo IP thật sau ProxyFix (xem mục kiểm tra IP thật ở trên): nếu IP luôn là `127.0.0.1` thì **cả trường bị tính chung 1 IP** và giới hạn này chặn nhầm -- phải sửa cấu hình IP thật trước. Form có thêm 1 ô bẫy ẩn: bot điền vào thì web giả vờ báo thành công nhưng không lưu, ghi nhật ký "Chặn đăng ký tự động (ô bẫy)".
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.
 
@@ -346,6 +436,6 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
   - Sau khi chạy m006, tài khoản cũ tự thành `super_admin`. Có thể tạo thêm tài khoản ngay trong web: đăng nhập super_admin → **Quản trị → Quản lý tài khoản**.
   - Tạo tài khoản bằng dòng lệnh khi cần: `.venv\Scripts\python scripts\tao_tai_khoan.py <tên> <staff|admin|super_admin>` (tự in tên DB đang dùng; không có `--password` thì sinh mật khẩu ngẫu nhiên in một lần).
   - **Super_admin quên mật khẩu hoặc bị khóa**: chạy trên máy chủ `.venv\Scripts\python scripts\reset-superadmin.py <tên_đăng_nhập>` — đặt mật khẩu tạm (in một lần), bật buộc đổi mật khẩu, mở khóa, đăng xuất mọi phiên cũ và ghi nhật ký.
-  - **Quên mật khẩu qua email** dùng đúng cấu hình gửi thư sẵn có (`MAIL_USERNAME`, `MAIL_PASSWORD` trong `.env`). Chưa cấu hình thì người dùng vẫn thấy câu "Nếu email tồn tại…" nhưng không có thư nào được gửi; khi đó dùng chức năng "Đặt lại mật khẩu" của super_admin. Ở môi trường dev (không phải production) liên kết đặt lại được in vào cửa sổ log để thử.
+  - **Quên mật khẩu qua email** dùng đúng cấu hình gửi thư sẵn có (`MAIL_USERNAME`, `MAIL_PASSWORD` trong `.env`). Chưa cấu hình thì người dùng vẫn thấy câu "Đã gửi liên kết đặt lại mật khẩu…" nhưng không có thư nào được gửi; khi đó dùng chức năng "Đặt lại mật khẩu" của super_admin. Ở môi trường dev (không phải production) liên kết đặt lại được in vào cửa sổ log để thử.
   - Đường dẫn trong thư là địa chỉ tuyệt đối dựng từ domain mà người dùng đang truy cập; sau IIS/ARR cần giữ cấu hình `X-Forwarded-Proto/Host` hiện có thì liên kết mới đúng `https://…`.
-  - Chỉ mục `audit_logs (action, created_at)` dùng cho giới hạn quên mật khẩu **đã có sẵn trong m006**, không cần migration m007.
+  - Chỉ mục `audit_logs (action, created_at)` dùng cho giới hạn quên mật khẩu **đã có sẵn trong m006**.

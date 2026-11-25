@@ -57,6 +57,24 @@ class Config:
     # Số giờ SAU giờ kết thúc sự kiện mà staff vẫn check-in được (quá mốc này chỉ admin thêm tay). Server kiểm tra
     # theo đúng mốc này và giao diện (nút Check-in, dòng nhắc) cũng dùng cùng mốc -- xem Event.checkin_state.
     CHECKIN_GRACE_HOURS = float(os.getenv("CHECKIN_GRACE_HOURS", "5"))
+    # Nơi lưu file chứng chỉ đã tạo: NGOÀI thư mục static (không ai mở thẳng qua URL được), chỉ phục vụ qua route
+    # có kiểm tra token/quyền. Mặc định instance/certificates (đã có trong .gitignore). Nhớ đưa thư mục này vào backup.
+    CERTIFICATE_STORAGE_DIR = Path(os.getenv("CERTIFICATE_STORAGE_DIR") or (BASE_DIR / "instance" / "certificates"))
+    # Số request tối đa mỗi phút cho MỖI IP vào các route chứng chỉ công khai (tải/xem/xác minh). Để cao vì cả
+    # trường thường dùng chung 1 IP công cộng (Wi-Fi trường). Quá mức -> 429.
+    CERT_PUBLIC_RATE_LIMIT = int(os.getenv("CERT_PUBLIC_RATE_LIMIT", "120"))
+    # Số lần gửi form đăng ký tối đa mỗi phút cho MỖI IP (/register và /api/register, tính cả lần bị từ chối). Để 30
+    # vì sinh viên dùng chung Wi-Fi trường (chung 1 IP công cộng). Quá mức -> 429 "Bạn thao tác quá nhanh...".
+    REGISTER_RATE_LIMIT = int(os.getenv("REGISTER_RATE_LIMIT", "30"))
+    # Ảnh (banner) sự kiện: IIS/Flask phục vụ qua /static/events/... nên trên server PHẢI để mặc định. Biến môi trường
+    # chỉ dùng khi chạy thử m008 trên một bản sao thư mục ảnh.
+    EVENT_IMAGE_DIR = Path(os.getenv("EVENT_IMAGE_DIR") or (BASE_DIR / "event_checkin" / "static" / "events"))
+    # Bản gốc của ảnh trước khi m008 thu nhỏ/xóa (giữ nguyên tên và đường dẫn, vd. events/event_1_image.png)
+    EVENT_IMAGE_BACKUP_DIR = Path(os.getenv("EVENT_IMAGE_BACKUP_DIR") or (BASE_DIR / "instance" / "event_images_goc"))
+    # Dung lượng tối đa của MỘT request (mọi chỗ tải file lên: ảnh sự kiện, mẫu chứng chỉ, font, Excel, ảnh nền quay
+    # số). Quá mức -> 413 kèm thông báo tiếng Việt (app.py). IIS mặc định cho tới 30MB nên không cần chỉnh IIS.
+    MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "15"))
+    MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
     PERMANENT_SESSION_LIFETIME = timedelta(days=REMEMBER_LOGIN_DAYS)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"

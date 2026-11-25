@@ -1,0 +1,14 @@
+{# Ảnh sự kiện dùng chung cho mọi trang (CSS: .event-media trong style.css).
+   - Ảnh luôn hiện ĐỦ (object-fit: contain), không cắt, không méo. Phần trống lấp bằng chính ảnh đó phóng to + làm mờ.
+   - variant: 'card' (thẻ danh sách, khung 16:9) | 'hero' (slider trang chủ, khung 16:9) | 'detail' (trang đăng ký /
+     chi tiết: theo tỉ lệ gốc, cao tối đa 70vh).
+   - width/height lấy từ DB (m008) để trang không nhảy bố cục khi ảnh tải xong.
+   - Sự kiện không có ảnh -> ảnh mặc định (images/event-default.svg).
+   event: Event hoặc dict có 'id' và 'hinh' (xem utils/event_image.event_image). #}
+{% macro event_media(event, variant='card', alt='', lazy=true, extra_class='') %}
+{% set img = event_image(event) %}
+<div class="event-media event-media--{{ variant }}{% if img.is_default %} event-media--default{% endif %}{% if extra_class %} {{ extra_class }}{% endif %}">
+  {% if not img.is_default %}<img class="event-media__backdrop" src="{{ img.url }}" alt="" aria-hidden="true"{% if lazy %} loading="lazy"{% endif %} decoding="async">{% endif %}
+  <img class="event-media__img" src="{{ img.url }}" alt="{{ alt }}"{% if img.width and img.height %} width="{{ img.width }}" height="{{ img.height }}"{% endif %}{% if lazy %} loading="lazy"{% endif %} decoding="async">
+</div>
+{% endmacro %}

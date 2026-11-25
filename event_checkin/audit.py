@@ -43,6 +43,14 @@ ACTION_LABELS = {
     "certificate.layout": "Lưu bố cục chứng chỉ",
     "certificate.font": "Đổi font chứng chỉ",
     "certificate.purge": "Xóa file chứng chỉ",
+    "certificate.legacy_success": "Tải chứng chỉ qua link cũ (đúng mã CB/SV)",
+    "certificate.legacy_failed": "Link chứng chỉ cũ: nhập sai mã CB/SV",
+    "certificate.legacy_throttled": "Link chứng chỉ cũ bị chặn (quá số lần nhập sai)",
+    "registration.cancel": "Xóa (hủy) đăng ký",
+    "registration.cancel_bulk": "Xóa (hủy) đăng ký hàng loạt",
+    "registration.restore": "Khôi phục đăng ký",
+    "registration.reregister": "Người đã bị hủy tự đăng ký lại",
+    "registration.honeypot": "Chặn đăng ký tự động (ô bẫy)",
     "checkin.add_manual": "Thêm check-in thủ công",
     "checkin.import": "Import check-in",
     "checkin.delete": "Xóa check-in",
@@ -71,9 +79,21 @@ def action_label(action):
     return ACTION_LABELS.get(action, action)
 
 
+def normalize_ip(value):
+    """Bỏ cổng mà IIS/ARR có thể gắn kèm vào X-Forwarded-For ("1.2.3.4:51234", "[2001:db8::1]:51234").
+    Không bỏ thì mỗi kết nối có cổng khác nhau -> các giới hạn theo IP coi như mỗi lần là một IP mới."""
+    value = (value or "").strip()
+    if value.startswith("["):                       # IPv6 có cổng: [addr]:port
+        value = value[1:].split("]", 1)[0]
+    elif value.count(":") == 1:                     # IPv4 có cổng: addr:port (IPv6 thường có >= 2 dấu ":")
+        value = value.split(":", 1)[0]
+    return value[:64] or None
+
+
 def client_ip():
-    # Sau ProxyFix (production) remote_addr đã là IP thật của người dùng.
-    return ((request.remote_addr or "") if has_request_context() else "")[:64] or None
+    # Sau ProxyFix (production, chỉ khi request đến từ IIS cùng máy) remote_addr đã là IP thật của người dùng.
+    # Mọi chỗ dùng IP (nhật ký, giới hạn quên mật khẩu, giới hạn chứng chỉ) đều đi qua hàm này.
+    return normalize_ip(request.remote_addr) if has_request_context() else None
 
 
 def log_action(action, target_type=None, target_id=None, detail=None, admin=None, username=None):
