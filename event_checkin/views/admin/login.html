@@ -10,6 +10,12 @@
     <p class="auth-subtitle">Nhập thông tin tài khoản để truy cập hệ thống</p>
     <div id="loginMessage" class="message" style="display:none"></div>
     <div class="auth-form">
+      {# Ô bẫy cho bot: người thật không thấy, không Tab tới được (giống form đăng ký). Có giá trị -> server coi
+         như sai tài khoản/mật khẩu, không lộ cho bot biết đã bị phát hiện. #}
+      <div class="hp-field" aria-hidden="true">
+        <label for="loginGhiChuNoiBo">Để trống ô này</label>
+        <input type="text" name="ghi_chu_noi_bo" id="loginGhiChuNoiBo" tabindex="-1" autocomplete="off" value="">
+      </div>
       <label class="auth-field">
         <span>Tài khoản</span>
         <input name="username" type="text" autocomplete="username" placeholder="Nhập tài khoản" required>
@@ -31,6 +37,9 @@
         </label>
         <a class="auth-back" href="{{ url_for('register.index') }}">← Về trang chủ</a>
       </div>
+      {% if recaptcha_site_key %}
+      <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+      {% endif %}
       <p class="auth-forgot"><a href="{{ url_for('password.forgot_page') }}">Quên mật khẩu?</a></p>
       <button class="btn btn--primary btn--full auth-submit" type="submit">Đăng nhập</button>
     </div>
@@ -39,8 +48,12 @@
 {% endblock %}
 
 {% block scripts %}
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
 <script>
 const nextUrl = {{ next_url|tojson }};
+const recaptchaEnabled = {{ (true if recaptcha_site_key else false)|tojson }};
 const passwordInput = document.getElementById('adminPassword');
 const passwordToggle = document.querySelector('.auth-password__toggle');
 
@@ -60,6 +73,8 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (even
     password: form.password.value,
     remember: form.remember.checked,
   };
+  if (form.ghi_chu_noi_bo && form.ghi_chu_noi_bo.value) payload.ghi_chu_noi_bo = form.ghi_chu_noi_bo.value;   // ô bẫy: người thật để trống
+  if (recaptchaEnabled && window.grecaptcha) payload.recaptcha_token = grecaptcha.getResponse();
   const submit = form.querySelector('.auth-submit');
   submit.classList.add('is-loading');
   submit.disabled = true;
@@ -85,6 +100,7 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (even
   submit.disabled = false;
   form.username.setAttribute('aria-invalid', 'true');
   form.password.setAttribute('aria-invalid', 'true');
+  if (recaptchaEnabled && window.grecaptcha) grecaptcha.reset();
   message.className = 'message message--error';
   message.textContent = data.message || 'Đăng nhập thất bại.';
 });

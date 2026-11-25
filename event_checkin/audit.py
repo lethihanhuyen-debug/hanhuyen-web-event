@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 ACTION_LABELS = {
     "auth.login": "Đăng nhập",
     "auth.login_failed": "Đăng nhập thất bại",
+    "auth.login_throttled": "Đăng nhập bị chặn (quá số lần sai)",
+    "auth.login_honeypot": "Chặn đăng nhập tự động (ô bẫy)",
     "auth.logout": "Đăng xuất",
     "password.change": "Đổi mật khẩu",
     "password.forgot_request": "Yêu cầu quên mật khẩu",
