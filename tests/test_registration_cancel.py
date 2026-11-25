@@ -79,7 +79,7 @@ class RegistrationCancelTest(AppTestCase):
     def register(self, key, client=None):
         client = client or self.client_for(None)
         return client.post("/api/register", json={
-            "ma_cbsv": self.codes[key], "ho_ten": f"Người {key}", "email": f"{self.codes[key].lower()}@example.com",
+            "ma_cbsv": self.codes[key], "ho_ten": f"Người {key}", "email": f"{self.codes[key].lower()}@example.com", "chuc_vu": "Cán bộ",
             "event_id": self.event_id,
         })
 

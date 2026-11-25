@@ -95,7 +95,7 @@ class AnonymousTest(AppTestCase):
                 self.skipTest("DB thử không có sự kiện đang mở đăng ký")
             event_id = event.id
             code = "T006" + self.suffix.upper()
-            payload = {"ma_cbsv": code, "ho_ten": "Nguoi Test", "email": f"{code.lower()}@example.com", "event_id": event_id}
+            payload = {"ma_cbsv": code, "ho_ten": "Nguoi Test", "email": f"{code.lower()}@example.com", "chuc_vu": "Sinh viên", "event_id": event_id}
             existed = User.query.filter_by(ma_cbsv=code).first() is not None
         try:
             response = self.client.post("/api/register", json=payload)
