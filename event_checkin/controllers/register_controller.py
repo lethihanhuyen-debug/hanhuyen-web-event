@@ -36,7 +36,9 @@ def _hero_events():
     """Banner trang đăng ký lấy nội dung từ 3 sự kiện mới tạo gần đây nhất --
     thay cho banner tĩnh admin phải tự nhập tay. Chỉ hiện ảnh; bấm vào ảnh mở trang
     đăng ký của đúng sự kiện đó (register.event_register)."""
-    events = Event.query.order_by(Event.created_at.desc()).limit(3).all()
+    # Thêm id giảm dần: 2 sự kiện tạo CÙNG giây (created_at chỉ lưu tới giây) thì thứ tự vẫn cố định, banner không
+    # đảo vị trí giữa các lần tải trang -- sự kiện tạo sau (id lớn hơn) đứng trước.
+    events = Event.query.order_by(Event.created_at.desc(), Event.id.desc()).limit(3).all()
     result = []
     for event in events:
         result.append({
