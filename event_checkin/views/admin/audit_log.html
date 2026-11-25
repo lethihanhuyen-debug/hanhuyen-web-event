@@ -46,8 +46,8 @@
   <div class="table-card">
     <div class="table-scroll">
       <table class="list-table list-table--people">
-        <thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Thao tác</th><th>Đối tượng</th><th>Chi tiết</th><th>IP</th></tr></thead>
-        <tbody id="auditRows"><tr><td colspan="6" class="table-empty">Đang tải…</td></tr></tbody>
+        <thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Thao tác</th><th>Đối tượng</th><th class="col-actions"><span class="sr-only">Chi tiết</span></th></tr></thead>
+        <tbody id="auditRows"><tr><td colspan="5" class="table-empty">Đang tải…</td></tr></tbody>
       </table>
     </div>
     <div class="audit-pager">
@@ -75,6 +75,33 @@
     return node;
   }
 
+  // Chi tiết lưu dạng JSON: hiện thành từng dòng "khóa: giá trị" cho dễ đọc
+  function formatDetail(raw) {
+    if (!raw) return '(không có)';
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (error) { return raw; }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return JSON.stringify(parsed, null, 2);
+    return Object.entries(parsed).map(([key, value]) => {
+      if (value === null || value === undefined || value === '') return `${key}: —`;
+      if (typeof value === 'object') return `${key}: ${JSON.stringify(value, null, 2)}`;
+      return `${key}: ${value}`;
+    }).join(String.fromCharCode(10));
+  }
+
+  function showDetail(row) {
+    const text = [
+      `Thời gian: ${row.time}`,
+      `Người thực hiện: ${row.username || '—'}`,
+      `Thao tác: ${row.action_label}`,
+      `Đối tượng: ${row.target || '—'}`,
+      `IP: ${row.ip || '—'}`,
+      '',
+      'Chi tiết:',
+      formatDetail(row.detail),
+    ].join(String.fromCharCode(10));
+    window.infoDialog('Chi tiết nhật ký', text);
+  }
+
   async function load() {
     const params = new URLSearchParams({ page });
     ['user', 'action', 'from', 'to'].forEach((name) => { if (form[name].value) params.set(name, form[name].value); });
@@ -86,12 +113,18 @@
     pages = Math.max(Math.ceil(data.total / data.page_size), 1);
     body.replaceChildren();
     if (!data.data.length) {
-      const tr = el('tr'); const td = el('td', 'table-empty', 'Không có dòng nhật ký nào khớp bộ lọc.'); td.colSpan = 6; tr.append(td); body.append(tr);
+      const tr = el('tr'); const td = el('td', 'table-empty', 'Không có dòng nhật ký nào khớp bộ lọc.'); td.colSpan = 5; tr.append(td); body.append(tr);
     }
     data.data.forEach((row) => {
       const tr = el('tr');
-      const detail = el('td', 'audit-detail', row.detail);
-      tr.append(el('td', '', row.time), el('td', '', row.username), el('td', '', row.action_label), el('td', '', row.target), detail, el('td', '', row.ip));
+      // Chi tiết + IP không chiếm cột: bấm nút "Chi tiết" để xem trong hộp thoại
+      const more = el('td', 'col-actions');
+      const button = el('button', 'btn btn--row btn--ghost', 'Chi tiết');
+      button.type = 'button';
+      button.setAttribute('aria-label', `Xem chi tiết: ${row.action_label} lúc ${row.time}`);
+      button.addEventListener('click', () => showDetail(row));
+      more.append(button);
+      tr.append(el('td', '', row.time), el('td', '', row.username || '—'), el('td', '', row.action_label), el('td', '', row.target || '—'), more);
       body.append(tr);
     });
     $('pagerInfo').textContent = 'Trang ' + page + '/' + pages + ' · ' + data.total + ' dòng';
