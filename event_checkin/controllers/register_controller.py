@@ -381,6 +381,9 @@ def register():
         user.email = email
         if don_vi:
             user.don_vi_id = don_vi.id
+        if not user.chuc_vu:
+            # mã đăng ký từ trước khi có ô "Bạn là": chỉ điền khi còn trống, không ghi đè giá trị đã có
+            user.chuc_vu = chuc_vu
         user.updated_at = now
 
     if event.so_luong_toi_da:
