@@ -48,6 +48,10 @@ atexit.register(shutil.rmtree, TEST_IMAGE_DIR, True)
 atexit.register(shutil.rmtree, TEST_IMAGE_BACKUP_DIR, True)
 # Mọi request test đến từ cùng 1 IP: nới giới hạn đăng ký theo IP (test riêng của giới hạn tự đặt lại số nhỏ)
 app.config["REGISTER_RATE_LIMIT"] = 100000
+# Tương tự cho đăng nhập (PR #11: LOGIN_RATE_LIMIT/phút mỗi IP, LOGIN_FAIL_LIMIT lần sai): test đăng nhập rất nhiều lần
+# từ cùng 1 IP. Test riêng của các giới hạn này phải tự đặt lại số nhỏ.
+app.config["LOGIN_RATE_LIMIT"] = 100000
+app.config["LOGIN_FAIL_LIMIT"] = 100000
 
 
 class AppTestCase(unittest.TestCase):
