@@ -1230,7 +1230,7 @@ def export_event_registrations(event_id):
         if include_questions:
             _set_text_cell(sheet.cell(row=position + 1, column=len(headers)), (registration.cau_hoi or "").strip())
 
-    column_widths = [6, 16, 26, 28, 16, 24, 12, 20, 16]
+    column_widths = [6, 16, 26, 28, 16, 24, 22, 20, 16]
     if include_questions:
         column_widths.append(60)
     for index, width in enumerate(column_widths, start=1):

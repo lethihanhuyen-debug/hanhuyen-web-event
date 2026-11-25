@@ -106,14 +106,18 @@ class RegisterProtectionTest(AppTestCase):
                 data["chuc_vu"] = value
             response = client.post("/api/register", json=data)
             self.assertEqual(response.status_code, 400, value)
-            self.assertIn("cán bộ hay sinh viên", response.get_json()["message"])
+            self.assertIn("học viên sau đại học", response.get_json()["message"])
         self.assertEqual(self.registered(20), 0)
         self.assertEqual(client.post("/api/register", json=self.payload(21, chuc_vu="Cán bộ")).status_code, 200)
         with app.app_context():
             self.assertEqual(db.session.get(User, f"{self.prefix}021").chuc_vu, "Cán bộ")
+        self.assertEqual(client.post("/api/register", json=self.payload(22, chuc_vu="Học viên sau đại học")).status_code, 200)
+        with app.app_context():
+            self.assertEqual(db.session.get(User, f"{self.prefix}022").chuc_vu, "Học viên sau đại học")
         page = client.get(f"/events/{self.event_id}/register").get_data(as_text=True)
         self.assertIn("<span>Bạn là</span>", page)
         self.assertIn('<option value="Sinh viên">Sinh viên</option>', page)
+        self.assertIn('<option value="Học viên sau đại học">Học viên sau đại học</option>', page)
         self.assertNotIn("Chức vụ", page)
 
 
