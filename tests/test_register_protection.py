@@ -8,7 +8,7 @@ from event_checkin.models.event import Event
 from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
 from event_checkin.utils.timezone import now_vn_naive
-from tests.base import AppTestCase, app, db
+from tests.base import AppTestCase, app, db, test_don_vi_id
 
 
 class RegisterProtectionTest(AppTestCase):
@@ -47,7 +47,7 @@ class RegisterProtectionTest(AppTestCase):
 
     def payload(self, n, **extra):
         return {"ma_cbsv": f"{self.prefix}{n:03d}", "ho_ten": "Người Thử", "email": f"rp{n}@example.com", "chuc_vu": "Sinh viên",
-                "event_id": self.event_id, **extra}
+                "don_vi_id": test_don_vi_id(), "event_id": self.event_id, **extra}
 
     def registered(self, n):
         with app.app_context():
@@ -106,15 +106,41 @@ class RegisterProtectionTest(AppTestCase):
                 data["chuc_vu"] = value
             response = client.post("/api/register", json=data)
             self.assertEqual(response.status_code, 400, value)
-            self.assertIn("cán bộ hay sinh viên", response.get_json()["message"])
+            self.assertIn("học viên sau đại học", response.get_json()["message"])
         self.assertEqual(self.registered(20), 0)
         self.assertEqual(client.post("/api/register", json=self.payload(21, chuc_vu="Cán bộ")).status_code, 200)
         with app.app_context():
             self.assertEqual(db.session.get(User, f"{self.prefix}021").chuc_vu, "Cán bộ")
+        self.assertEqual(client.post("/api/register", json=self.payload(22, chuc_vu="Học viên sau đại học")).status_code, 200)
+        with app.app_context():
+            self.assertEqual(db.session.get(User, f"{self.prefix}022").chuc_vu, "Học viên sau đại học")
         page = client.get(f"/events/{self.event_id}/register").get_data(as_text=True)
-        self.assertIn("<span>Bạn là</span>", page)
+        self.assertIn("<span>Đối tượng</span>", page)
         self.assertIn('<option value="Sinh viên">Sinh viên</option>', page)
+        self.assertIn('<option value="Học viên sau đại học">Học viên sau đại học</option>', page)
         self.assertNotIn("Chức vụ", page)
+        self.assertIn('<option value="" disabled selected hidden>— Chọn đối tượng —</option>', page)
+        self.assertIn('<option value="" disabled selected hidden>— Chọn đơn vị —</option>', page)
+
+    def test_same_name_allowed_same_email_blocked(self):
+        client = self.client_for()
+        first = client.post("/api/register", json=self.payload(40, email="trung40@example.com"))
+        self.assertEqual(first.status_code, 200, first.get_json())
+        same_name = client.post("/api/register", json=self.payload(41, email="khac41@example.com"))   # cùng họ tên "Người Thử"
+        self.assertEqual(same_name.status_code, 200, same_name.get_json())
+        same_email = client.post("/api/register", json=self.payload(42, email="TRUNG40@example.com"))
+        self.assertEqual(same_email.status_code, 409)
+        self.assertIn("Email này đã được dùng", same_email.get_json()["message"])
+        self.assertEqual(self.registered(42), 0)
+
+    def test_don_vi_required_when_list_exists(self):
+        client = self.client_for()
+        data = self.payload(30)
+        data.pop("don_vi_id")
+        response = client.post("/api/register", json=data)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("chọn đơn vị", response.get_json()["message"])
+        self.assertEqual(self.registered(30), 0)
 
 
 class HeroOrderTest(AppTestCase):

@@ -1,6 +1,6 @@
 ﻿{% extends 'base.html' %}
 {% from '_event_media.html' import event_media %}
-{% block title %}Đăng ký | Event Check-in{% endblock %}
+{% block title %}{{ 'Đăng ký' if selected_event else 'Trang chủ' }} | Event Check-in{% endblock %}
 
 {% block content %}
 {% if not selected_event %}
@@ -130,28 +130,31 @@
       <form id="registerForm" class="form-grid">
         <input type="hidden" name="event_id" id="event_id" value="{{ selected_event.id }}">
         <label>
-          <span>Mã CB/SV</span>
-          <input type="text" name="ma_cbsv" id="ma_cbsv" placeholder="Nhập mã CB/SV" required>
+          <span>Mã số (cán bộ/sinh viên)</span>
+          <input type="text" name="ma_cbsv" id="ma_cbsv" placeholder="Nhập mã số cán bộ/sinh viên" required>
         </label>
         <label>
           <span>Họ tên</span>
           <input type="text" name="ho_ten" id="ho_ten" placeholder="Họ và tên" pattern="[^0-9]*" title="Họ tên không được chứa chữ số" required>
         </label>
         <label>
-          <span>Đơn vị</span>
-          <select name="don_vi" id="don_vi">
-            <option value="">Chọn đơn vị</option>
+          <span>Đơn vị (phòng/ban/viện/trung tâm/khoa)</span>
+          {# Dòng gợi ý không chọn được (disabled): người dùng PHẢI tự chọn, không lưu nhầm đơn vị đầu danh sách #}
+          <select name="don_vi" id="don_vi"{% if don_vi_items %} required{% endif %}>
+            <option value="" disabled selected hidden>— Chọn đơn vị —</option>
             {% for item in don_vi_items %}
               <option value="{{ item.id }}">{{ item.ten_don_vi }}</option>
             {% endfor %}
           </select>
         </label>
         <label>
-          <span>Bạn là</span>
-          {# Lưu vào cột users.chuc_vu; server chỉ nhận đúng 2 giá trị này (register_controller.DOI_TUONG_CHOICES) #}
+          <span>Đối tượng</span>
+          {# Lưu vào cột users.chuc_vu; server chỉ nhận đúng 3 giá trị này (register_controller.DOI_TUONG_CHOICES) #}
           <select name="chuc_vu" id="chuc_vu" required>
+            <option value="" disabled selected hidden>— Chọn đối tượng —</option>
             <option value="Cán bộ">Cán bộ</option>
             <option value="Sinh viên">Sinh viên</option>
+            <option value="Học viên sau đại học">Học viên sau đại học</option>
           </select>
         </label>
         <label>
@@ -275,6 +278,9 @@
   function restoreDefaultView() {
     if (!eventGroups) return;
     eventGroups.innerHTML = defaultGroupsHtml;
+    // HTML khôi phục là bản chụp lúc tải trang (thẻ chưa có .is-revealed -> đang trong suốt): phải bật lại hiệu
+    // ứng hiện thẻ, nếu không chọn lại "Tất cả tháng" sẽ thấy danh sách trống trơn.
+    window.appUtils.observeReveal(eventGroups);
     if (loadMoreWrap) {
       loadMoreWrap.dataset.nextOffset = defaultLoadMoreOffset;
       loadMoreWrap.hidden = defaultLoadMoreHidden;
@@ -426,7 +432,7 @@
       ma_cbsv: maInput.value.trim(),
       ho_ten: hoTenInput.value.trim(),
       don_vi_id: Number(donViInput.value || 0) || null,
-      chuc_vu: chucVuInput.value.trim(),
+      chuc_vu: (chucVuInput.value || '').trim(),
       so_dien_thoai: sdtInput.value.trim(),
       email: emailInput.value.trim(),
     };

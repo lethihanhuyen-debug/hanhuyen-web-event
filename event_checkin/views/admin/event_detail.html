@@ -103,6 +103,7 @@
             {% if can_delete %}<th class="col-select"><input type="checkbox" id="selectAll" aria-label="Chọn tất cả người đang hiện trong danh sách"></th>{% endif %}
             <th>Người tham dự</th>
             <th>Đơn vị</th>
+            <th>Đối tượng</th>
             {% if show_questions %}<th>Câu hỏi</th>{% endif %}
             <th>Check-in</th>
             <th>Chứng nhận</th>
@@ -110,7 +111,7 @@
           </tr>
         </thead>
         <tbody id="regRows">
-          <tr><td colspan="{{ 5 + (1 if show_questions else 0) + (1 if can_delete else 0) }}" class="table-empty">Đang tải…</td></tr>
+          <tr><td colspan="{{ 6 + (1 if show_questions else 0) + (1 if can_delete else 0) }}" class="table-empty">Đang tải…</td></tr>
         </tbody>
       </table>
     </div>
@@ -218,7 +219,7 @@
     const EVENT_ID = {{ event.id }};
     const SHOW_QUESTIONS = {{ show_questions|tojson }};
     const CAN_DELETE = {{ can_delete|tojson }};
-    const COLS = 5 + (SHOW_QUESTIONS ? 1 : 0) + (CAN_DELETE ? 1 : 0);
+    const COLS = 6 +(SHOW_QUESTIONS ? 1 : 0) + (CAN_DELETE ? 1 : 0);
     const selected = new Set();   // mã CB/SV đang được tích (chỉ các dòng cùng loại: đang hiệu lực / đã hủy)
     const tbody = document.getElementById('regRows');
     const searchInput = document.getElementById('regSearch');
@@ -240,7 +241,7 @@
     // ---- Dữ liệu: dựng từ danh sách đăng ký đã render sẵn (chuỗi giờ ở đây đã là GIỜ VIỆT NAM, chỉ cắt chuỗi, không đổi múi giờ) ----
     function toPerson(r) {
       const person = {
-        code: r.ma_cbsv, name: r.ho_ten || '', unit: r.don_vi || '', email: r.email || '',
+        code: r.ma_cbsv, name: r.ho_ten || '', unit: r.don_vi || '', role: r.chuc_vu || '', email: r.email || '',
         checkedIn: !!r.checked_in, checkinFull: r.checkin_time || '', scans: r.scans || 0,
         certCode: r.certificate_code || '', status: r.checked_in ? (r.cert_status || 'pending') : '',
         error: r.cert_error || '', sentAt: r.cert_sent_at || '', sendCount: r.send_count || 0,
@@ -251,7 +252,7 @@
         cancelled: !!r.cancelled, cancelledAt: r.huy_luc || '', cancelledBy: r.huy_boi || '',
         cancelReason: r.ly_do_huy || '', blockedRereg: !!r.chan_dang_ky_lai, cancelledCheckin: r.cancelled_checkin_time || '',
       };
-      person.searchKey = normalize([person.name, person.code, person.email, person.question, person.regTime].join(' '));
+      person.searchKey = normalize([person.name, person.code, person.email, person.role, person.question, person.regTime].join(' '));
       return person;
     }
     const people = JSON.parse(document.getElementById('regData').textContent).map(toPerson);
@@ -364,6 +365,10 @@
       unitText.title = p.unit || '';
       unit.appendChild(unitText);
       tr.appendChild(unit);
+
+      const role = el('td');
+      role.appendChild(p.role ? el('span', '', p.role) : el('span', 'cell-muted', '—'));
+      tr.appendChild(role);
 
       if (SHOW_QUESTIONS) {
         const questionTd = el('td', 'cell-question');

@@ -274,6 +274,7 @@ def event_detail(event_id):
             "event_id": registration.event_id,
             "ho_ten": user.ho_ten if user else "",
             "don_vi": user.ten_don_vi if user else "",
+            "chuc_vu": (user.chuc_vu or "") if user else "",      # ô "Đối tượng" (Cán bộ / Sinh viên)
             "email": user.email if user else "",
             "thoi_gian_dang_ky": format_utc_as_vn(registration.thoi_gian_dang_ky),
             "checked_in": bool(checkin_item),
@@ -1206,7 +1207,7 @@ def export_event_registrations(event_id):
     sheet.title = "Danh sach dang ky"
 
     include_questions = bool(event.cho_phep_cau_hoi) or any((item.cau_hoi or "").strip() for item in registrations)
-    headers = ["STT", "Mã CB/SV", "Họ tên", "Email", "Số điện thoại", "Đơn vị", "Thời gian đăng ký", "Trạng thái"]
+    headers = ["STT", "Mã CB/SV", "Họ tên", "Email", "Số điện thoại", "Đơn vị", "Đối tượng", "Thời gian đăng ký", "Trạng thái"]
     if include_questions:
         headers.append("Câu hỏi")
     sheet.append(headers)
@@ -1222,13 +1223,14 @@ def export_event_registrations(event_id):
             user.email if user else "",
             user.so_dien_thoai if user else "",
             user.ten_don_vi if user else "",
+            (user.chuc_vu or "") if user else "",
             format_utc_as_vn(registration.thoi_gian_dang_ky),
             "Đã check-in" if registration.ma_cbsv in checked_in_codes else "Chưa check-in",
         ])
         if include_questions:
             _set_text_cell(sheet.cell(row=position + 1, column=len(headers)), (registration.cau_hoi or "").strip())
 
-    column_widths = [6, 16, 26, 28, 16, 24, 20, 16]
+    column_widths = [6, 16, 26, 28, 16, 24, 22, 20, 16]
     if include_questions:
         column_widths.append(60)
     for index, width in enumerate(column_widths, start=1):

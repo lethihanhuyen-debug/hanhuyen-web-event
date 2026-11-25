@@ -24,7 +24,7 @@ CRLF, CR, LF = chr(13) + chr(10), chr(13), chr(10)  # chuẩn hoá xuống dòng
 MONTH_GROUPS_PER_PAGE = 3
 CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
 BLOCKED_MESSAGE = "Mã này không thể đăng ký sự kiện này. Vui lòng liên hệ ban tổ chức."
-DOI_TUONG_CHOICES = ("Cán bộ", "Sinh viên")   # ô "Bạn là" ở form đăng ký (lưu vào users.chuc_vu)
+DOI_TUONG_CHOICES = ("Cán bộ", "Sinh viên", "Học viên sau đại học")   # ô "Đối tượng" ở form đăng ký (lưu vào users.chuc_vu)
 RATE_LIMITED_MESSAGE = "Bạn thao tác quá nhanh, vui lòng thử lại sau 1 phút"
 # Ô bẫy (honeypot) trong form đăng ký: người dùng thật không thấy (ẩn bằng CSS .hp-field), bot tự điền mọi ô thì điền
 # cả ô này. Tên ô cố ý không giống "website"/"url" để trình duyệt không tự điền.
@@ -315,7 +315,7 @@ def register():
 
     chuc_vu = (payload.get("chuc_vu") or "").strip()
     if chuc_vu not in DOI_TUONG_CHOICES:
-        return jsonify({"success": False, "message": "Vui lòng chọn bạn là cán bộ hay sinh viên."}), 400
+        return jsonify({"success": False, "message": "Vui lòng chọn đối tượng: cán bộ, sinh viên hay học viên sau đại học."}), 400
 
     if any(ch.isdigit() for ch in ho_ten):
         return jsonify({"success": False, "message": "Họ tên không được chứa chữ số."}), 400
@@ -351,6 +351,16 @@ def register():
     if existed and existed.chan_dang_ky_lai:
         # admin đã hủy đăng ký này và chặn đăng ký lại (đăng ký ảo) -- xem admin_controller.cancel_registrations
         return jsonify({"success": False, "message": BLOCKED_MESSAGE}), 403
+    # Mỗi email chỉ dùng cho 1 mã trong cùng sự kiện (họ tên được trùng: người khác nhau có thể cùng tên).
+    # Đăng ký đã bị admin hủy không tính.
+    email_taken = (
+        Registration.active()
+        .join(User, User.ma_cbsv == Registration.ma_cbsv)
+        .filter(Registration.event_id == event_id, Registration.ma_cbsv != ma_cbsv, func.lower(User.email) == email)
+        .first()
+    )
+    if email_taken:
+        return jsonify({"success": False, "message": "Email này đã được dùng để đăng ký sự kiện này với mã số khác."}), 409
 
     don_vi = None
     if don_vi_id:
@@ -362,6 +372,9 @@ def register():
             return jsonify({"success": False, "message": "Đơn vị không hợp lệ."}), 400
     elif don_vi_text:
         don_vi = _get_or_create_don_vi(don_vi_text)
+    elif DonVi.query.filter_by(is_active=True).first() is not None:
+        # form có danh sách đơn vị thì bắt buộc chọn (không để trống / không tự lấy đơn vị mặc định)
+        return jsonify({"success": False, "message": "Vui lòng chọn đơn vị."}), 400
     user = User.query.filter_by(ma_cbsv=ma_cbsv).first()
     now = datetime.utcnow()
 
@@ -381,6 +394,9 @@ def register():
         user.email = email
         if don_vi:
             user.don_vi_id = don_vi.id
+        if not user.chuc_vu:
+            # mã đăng ký từ trước khi có ô "Đối tượng": chỉ điền khi còn trống, không ghi đè giá trị đã có
+            user.chuc_vu = chuc_vu
         user.updated_at = now
 
     if event.so_luong_toi_da:

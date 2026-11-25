@@ -16,7 +16,7 @@ from event_checkin.models.lucky_draw import LuckyConfig, LuckyPrize, LuckyWinner
 from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
 from event_checkin.utils.timezone import now_vn_naive
-from tests.base import AppTestCase, app, db
+from tests.base import AppTestCase, app, db, test_don_vi_id
 
 
 class RegistrationCancelTest(AppTestCase):
@@ -80,7 +80,7 @@ class RegistrationCancelTest(AppTestCase):
         client = client or self.client_for(None)
         return client.post("/api/register", json={
             "ma_cbsv": self.codes[key], "ho_ten": f"Người {key}", "email": f"{self.codes[key].lower()}@example.com", "chuc_vu": "Cán bộ",
-            "event_id": self.event_id,
+            "don_vi_id": test_don_vi_id(), "event_id": self.event_id,
         })
 
     def registration(self, key):

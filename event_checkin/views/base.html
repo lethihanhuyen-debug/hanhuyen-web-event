@@ -33,7 +33,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
         </button>
         <ul class="primary-nav__list">
-          <li><a class="{% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Đăng ký</a></li>
+          <li><a class="{% if request.path == '/' %}is-active{% endif %}" href="{{ url_for('register.index') }}">Trang chủ</a></li>
           {% if current_admin %}
           <li><a class="{% if request.path.startswith(('/admin', '/staff')) and request.path != '/admin/login' %}is-active{% endif %}" href="{{ admin_home_path }}">{{ 'Sự kiện' if admin_home_path == '/staff/events' else 'Quản trị' }}</a></li>
           {% endif %}
