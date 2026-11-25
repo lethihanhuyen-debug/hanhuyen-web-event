@@ -1,6 +1,6 @@
 ﻿{% extends 'base.html' %}
 {% from '_event_media.html' import event_media %}
-{% block title %}Đăng ký | Event Check-in{% endblock %}
+{% block title %}{{ 'Đăng ký' if selected_event else 'Trang chủ' }} | Event Check-in{% endblock %}
 
 {% block content %}
 {% if not selected_event %}
