@@ -46,7 +46,7 @@ class RegisterProtectionTest(AppTestCase):
         register_controller.register_limiter.reset()
 
     def payload(self, n, **extra):
-        return {"ma_cbsv": f"{self.prefix}{n:03d}", "ho_ten": "Người Thử", "email": f"rp{n}@example.com",
+        return {"ma_cbsv": f"{self.prefix}{n:03d}", "ho_ten": "Người Thử", "email": f"rp{n}@example.com", "chuc_vu": "Sinh viên",
                 "event_id": self.event_id, **extra}
 
     def registered(self, n):
@@ -95,3 +95,23 @@ class RegisterProtectionTest(AppTestCase):
         self.assertIn('tabindex="-1"', field)
         self.assertNotIn("display:none", field.replace(" ", ""))
         self.assertNotIn(" hidden", field)
+
+    def test_ban_la_must_be_can_bo_or_sinh_vien(self):
+        client = self.client_for()
+        for value in (None, "", "Giảng viên"):
+            data = self.payload(20)
+            if value is None:
+                data.pop("chuc_vu")
+            else:
+                data["chuc_vu"] = value
+            response = client.post("/api/register", json=data)
+            self.assertEqual(response.status_code, 400, value)
+            self.assertIn("cán bộ hay sinh viên", response.get_json()["message"])
+        self.assertEqual(self.registered(20), 0)
+        self.assertEqual(client.post("/api/register", json=self.payload(21, chuc_vu="Cán bộ")).status_code, 200)
+        with app.app_context():
+            self.assertEqual(db.session.get(User, f"{self.prefix}021").chuc_vu, "Cán bộ")
+        page = client.get(f"/events/{self.event_id}/register").get_data(as_text=True)
+        self.assertIn("<span>Bạn là</span>", page)
+        self.assertIn('<option value="Sinh viên">Sinh viên</option>', page)
+        self.assertNotIn("Chức vụ", page)

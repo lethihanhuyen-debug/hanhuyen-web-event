@@ -1550,7 +1550,7 @@ def create_event():
         return jsonify({"success": False, "message": str(error)}), 400
 
     if ngay_ket_thuc < ngay_bat_dau:
-        return jsonify({"success": False, "message": "Ngày kết thúc phải sau ngày bắt đầu."}), 400
+        return jsonify({"success": False, "message": "Ngày kết thúc sự kiện phải sau ngày bắt đầu sự kiện."}), 400
     if thoi_gian_dong_dang_ky < thoi_gian_mo_dang_ky:
         return jsonify({"success": False, "message": "Thời gian đóng đăng ký phải sau thời gian mở đăng ký."}), 400
     # Registration must open no later than the event itself starts -- otherwise
@@ -1564,7 +1564,7 @@ def create_event():
 
     now = now_vn_naive()
     if ngay_bat_dau < now:
-        return jsonify({"success": False, "message": "Ngày bắt đầu không được ở trong quá khứ."}), 400
+        return jsonify({"success": False, "message": "Ngày bắt đầu sự kiện không được ở trong quá khứ."}), 400
     if thoi_gian_mo_dang_ky < now:
         return jsonify({"success": False, "message": "Thời gian mở đăng ký không được ở trong quá khứ."}), 400
     if thoi_gian_dong_dang_ky < now:
@@ -1633,7 +1633,7 @@ def update_event(event_id):
         return jsonify({"success": False, "message": str(error)}), 400
 
     if ngay_ket_thuc < ngay_bat_dau:
-        return jsonify({"success": False, "message": "Ngày kết thúc phải sau ngày bắt đầu."}), 400
+        return jsonify({"success": False, "message": "Ngày kết thúc sự kiện phải sau ngày bắt đầu sự kiện."}), 400
     if thoi_gian_dong_dang_ky < thoi_gian_mo_dang_ky:
         return jsonify({"success": False, "message": "Thời gian đóng đăng ký phải sau thời gian mở đăng ký."}), 400
     # Registration must open no later than the event itself starts -- otherwise

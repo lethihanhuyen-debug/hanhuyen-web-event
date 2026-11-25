@@ -24,6 +24,7 @@ CRLF, CR, LF = chr(13) + chr(10), chr(13), chr(10)  # chuẩn hoá xuống dòng
 MONTH_GROUPS_PER_PAGE = 3
 CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
 BLOCKED_MESSAGE = "Mã này không thể đăng ký sự kiện này. Vui lòng liên hệ ban tổ chức."
+DOI_TUONG_CHOICES = ("Cán bộ", "Sinh viên")   # ô "Bạn là" ở form đăng ký (lưu vào users.chuc_vu)
 RATE_LIMITED_MESSAGE = "Bạn thao tác quá nhanh, vui lòng thử lại sau 1 phút"
 # Ô bẫy (honeypot) trong form đăng ký: người dùng thật không thấy (ẩn bằng CSS .hp-field), bot tự điền mọi ô thì điền
 # cả ô này. Tên ô cố ý không giống "website"/"url" để trình duyệt không tự điền.
@@ -310,6 +311,10 @@ def register():
     if not EMAIL_PATTERN.match(email):
         return jsonify({"success": False, "message": "Email không hợp lệ."}), 400
 
+    chuc_vu = (payload.get("chuc_vu") or "").strip()
+    if chuc_vu not in DOI_TUONG_CHOICES:
+        return jsonify({"success": False, "message": "Vui lòng chọn bạn là cán bộ hay sinh viên."}), 400
+
     if any(ch.isdigit() for ch in ho_ten):
         return jsonify({"success": False, "message": "Họ tên không được chứa chữ số."}), 400
 
@@ -363,7 +368,7 @@ def register():
             ma_cbsv=ma_cbsv,
             ho_ten=ho_ten,
             don_vi_id=don_vi.id if don_vi else None,
-            chuc_vu=(payload.get("chuc_vu") or None),
+            chuc_vu=chuc_vu,
             so_dien_thoai=so_dien_thoai or None,
             email=email,
             created_at=now,
