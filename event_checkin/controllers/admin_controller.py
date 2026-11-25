@@ -1564,7 +1564,7 @@ def create_event():
 
     now = now_vn_naive()
     if ngay_bat_dau < now:
-        return jsonify({"success": False, "message": "Ngày bắt đầu không được ở trong quá khứ."}), 400
+        return jsonify({"success": False, "message": "Ngày bắt đầu sự kiện không được ở trong quá khứ."}), 400
     if thoi_gian_mo_dang_ky < now:
         return jsonify({"success": False, "message": "Thời gian mở đăng ký không được ở trong quá khứ."}), 400
     if thoi_gian_dong_dang_ky < now:
