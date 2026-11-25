@@ -275,6 +275,9 @@
   function restoreDefaultView() {
     if (!eventGroups) return;
     eventGroups.innerHTML = defaultGroupsHtml;
+    // HTML khôi phục là bản chụp lúc tải trang (thẻ chưa có .is-revealed -> đang trong suốt): phải bật lại hiệu
+    // ứng hiện thẻ, nếu không chọn lại "Tất cả tháng" sẽ thấy danh sách trống trơn.
+    window.appUtils.observeReveal(eventGroups);
     if (loadMoreWrap) {
       loadMoreWrap.dataset.nextOffset = defaultLoadMoreOffset;
       loadMoreWrap.hidden = defaultLoadMoreHidden;
