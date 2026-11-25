@@ -24,7 +24,7 @@ CRLF, CR, LF = chr(13) + chr(10), chr(13), chr(10)  # chuẩn hoá xuống dòng
 MONTH_GROUPS_PER_PAGE = 3
 CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
 BLOCKED_MESSAGE = "Mã này không thể đăng ký sự kiện này. Vui lòng liên hệ ban tổ chức."
-DOI_TUONG_CHOICES = ("Cán bộ", "Sinh viên", "Học viên sau đại học")   # ô "Bạn là" ở form đăng ký (lưu vào users.chuc_vu)
+DOI_TUONG_CHOICES = ("Cán bộ", "Sinh viên", "Học viên sau đại học")   # ô "Đối tượng" ở form đăng ký (lưu vào users.chuc_vu)
 RATE_LIMITED_MESSAGE = "Bạn thao tác quá nhanh, vui lòng thử lại sau 1 phút"
 # Ô bẫy (honeypot) trong form đăng ký: người dùng thật không thấy (ẩn bằng CSS .hp-field), bot tự điền mọi ô thì điền
 # cả ô này. Tên ô cố ý không giống "website"/"url" để trình duyệt không tự điền.
@@ -315,7 +315,7 @@ def register():
 
     chuc_vu = (payload.get("chuc_vu") or "").strip()
     if chuc_vu not in DOI_TUONG_CHOICES:
-        return jsonify({"success": False, "message": "Vui lòng chọn bạn là cán bộ, sinh viên hay học viên sau đại học."}), 400
+        return jsonify({"success": False, "message": "Vui lòng chọn đối tượng: cán bộ, sinh viên hay học viên sau đại học."}), 400
 
     if any(ch.isdigit() for ch in ho_ten):
         return jsonify({"success": False, "message": "Họ tên không được chứa chữ số."}), 400
@@ -382,7 +382,7 @@ def register():
         if don_vi:
             user.don_vi_id = don_vi.id
         if not user.chuc_vu:
-            # mã đăng ký từ trước khi có ô "Bạn là": chỉ điền khi còn trống, không ghi đè giá trị đã có
+            # mã đăng ký từ trước khi có ô "Đối tượng": chỉ điền khi còn trống, không ghi đè giá trị đã có
             user.chuc_vu = chuc_vu
         user.updated_at = now
 

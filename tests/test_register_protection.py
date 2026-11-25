@@ -115,7 +115,7 @@ class RegisterProtectionTest(AppTestCase):
         with app.app_context():
             self.assertEqual(db.session.get(User, f"{self.prefix}022").chuc_vu, "Học viên sau đại học")
         page = client.get(f"/events/{self.event_id}/register").get_data(as_text=True)
-        self.assertIn("<span>Bạn là</span>", page)
+        self.assertIn("<span>Đối tượng</span>", page)
         self.assertIn('<option value="Sinh viên">Sinh viên</option>', page)
         self.assertIn('<option value="Học viên sau đại học">Học viên sau đại học</option>', page)
         self.assertNotIn("Chức vụ", page)

@@ -274,7 +274,7 @@ def event_detail(event_id):
             "event_id": registration.event_id,
             "ho_ten": user.ho_ten if user else "",
             "don_vi": user.ten_don_vi if user else "",
-            "chuc_vu": (user.chuc_vu or "") if user else "",      # ô "Bạn là" (Cán bộ / Sinh viên)
+            "chuc_vu": (user.chuc_vu or "") if user else "",      # ô "Đối tượng" (Cán bộ / Sinh viên)
             "email": user.email if user else "",
             "thoi_gian_dang_ky": format_utc_as_vn(registration.thoi_gian_dang_ky),
             "checked_in": bool(checkin_item),
@@ -1207,7 +1207,7 @@ def export_event_registrations(event_id):
     sheet.title = "Danh sach dang ky"
 
     include_questions = bool(event.cho_phep_cau_hoi) or any((item.cau_hoi or "").strip() for item in registrations)
-    headers = ["STT", "Mã CB/SV", "Họ tên", "Email", "Số điện thoại", "Đơn vị", "Bạn là", "Thời gian đăng ký", "Trạng thái"]
+    headers = ["STT", "Mã CB/SV", "Họ tên", "Email", "Số điện thoại", "Đơn vị", "Đối tượng", "Thời gian đăng ký", "Trạng thái"]
     if include_questions:
         headers.append("Câu hỏi")
     sheet.append(headers)
