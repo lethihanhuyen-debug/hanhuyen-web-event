@@ -140,7 +140,6 @@
         <label>
           <span>Đơn vị (phòng/ban/viện/trung tâm/khoa)</span>
           <select name="don_vi" id="don_vi">
-            <option value="">Chọn đơn vị</option>
             {% for item in don_vi_items %}
               <option value="{{ item.id }}">{{ item.ten_don_vi }}</option>
             {% endfor %}
