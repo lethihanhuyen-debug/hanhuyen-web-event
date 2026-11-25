@@ -10,9 +10,6 @@ Token/mã sai, chứng chỉ đã thu hồi, thiếu file đều trả 404 giố
 
 Admin (quyền certificate.manage; staff không có): /api/admin/certificates/<mã>[/view].
 """
-import threading
-import time
-from collections import deque
 from datetime import datetime, timedelta
 
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, send_file, url_for
@@ -20,6 +17,7 @@ from flask import Blueprint, abort, current_app, jsonify, redirect, render_templ
 from event_checkin import permissions as perm
 from event_checkin.access import access
 from event_checkin.audit import audited, client_ip, log_action
+from event_checkin.utils.rate_limit import PerIpRateLimiter
 from event_checkin.certificates.service import (
     CertificateError,
     DEFAULT_EVENT_ID,
@@ -44,41 +42,9 @@ RATE_LIMITED_MESSAGE = "Quá nhiều yêu cầu. Vui lòng thử lại sau ít p
 PRIVATE_HEADERS = {"Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow"}
 
 
-# ---- Giới hạn tần suất theo IP (đếm trong bộ nhớ) --------------------------------------------------------------
+# ---- Giới hạn tần suất theo IP (event_checkin/utils/rate_limit.py) -------------------------------------------
 
-class _PerIpRateLimiter:
-    """Cửa sổ trượt 60 giây cho mỗi IP. Đếm trong bộ nhớ tiến trình: app chạy 1 tiến trình waitress nhiều luồng nên
-    đủ dùng; khởi động lại app thì bộ đếm về 0."""
-
-    WINDOW_SECONDS = 60
-
-    def __init__(self):
-        self._hits = {}
-        self._lock = threading.Lock()
-        self._last_sweep = 0.0
-
-    def allow(self, key, limit):
-        now = time.monotonic()
-        cutoff = now - self.WINDOW_SECONDS
-        with self._lock:
-            if now - self._last_sweep > self.WINDOW_SECONDS:          # dọn IP không còn hoạt động (không phình bộ nhớ)
-                for stale in [k for k, q in self._hits.items() if not q or q[-1] < cutoff]:
-                    del self._hits[stale]
-                self._last_sweep = now
-            hits = self._hits.setdefault(key, deque())
-            while hits and hits[0] < cutoff:
-                hits.popleft()
-            if len(hits) >= limit:
-                return False
-            hits.append(now)
-            return True
-
-    def reset(self):
-        with self._lock:
-            self._hits.clear()
-
-
-public_limiter = _PerIpRateLimiter()
+public_limiter = PerIpRateLimiter()
 
 
 @certificate_bp.before_request

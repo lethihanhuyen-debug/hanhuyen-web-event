@@ -158,6 +158,12 @@
           <span>Email</span>
           <input type="email" name="email" id="email" placeholder="Email" required>
         </label>
+        {# Ô bẫy chống đăng ký tự động: ẩn bằng CSS (.hp-field), KHÔNG dùng display:none/hidden trong HTML; người dùng
+           thật không thấy, không Tab tới được. Có giá trị -> server giả vờ thành công nhưng không lưu. #}
+        <div class="hp-field" aria-hidden="true">
+          <label for="ghi_chu_noi_bo">Để trống ô này</label>
+          <input type="text" name="ghi_chu_noi_bo" id="ghi_chu_noi_bo" tabindex="-1" autocomplete="off" value="">
+        </div>
         {% if selected_event.cho_phep_cau_hoi %}
         <label class="field-wide question-field">
           <span>{{ selected_event.question_title }} <em class="question-field__optional">(không bắt buộc)</em></span>
@@ -421,6 +427,8 @@
       email: emailInput.value.trim(),
     };
     if (cauHoiInput) payload.cau_hoi = cauHoiInput.value.trim();
+    const trap = document.getElementById('ghi_chu_noi_bo');
+    if (trap && trap.value) payload.ghi_chu_noi_bo = trap.value;   // ô bẫy: người thật để trống
 
     try {
       const response = await fetch('/register', {

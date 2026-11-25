@@ -1,18 +1,19 @@
 import re
 from datetime import datetime
 
-from flask import Blueprint, jsonify, render_template, request, url_for
+from flask import Blueprint, current_app, jsonify, render_template, request, url_for
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 
 from event_checkin import permissions as perm
 from event_checkin.access import access
-from event_checkin.audit import log_action
+from event_checkin.audit import client_ip, log_action
 from event_checkin.models import db
 from event_checkin.models.don_vi import DonVi
 from event_checkin.models.event import Event
 from event_checkin.models.registration import STATUS_ACTIVE, Registration
 from event_checkin.models.user import User
+from event_checkin.utils.rate_limit import PerIpRateLimiter
 
 
 register_bp = Blueprint("register", __name__)
@@ -23,6 +24,11 @@ CRLF, CR, LF = chr(13) + chr(10), chr(13), chr(10)  # chuẩn hoá xuống dòng
 MONTH_GROUPS_PER_PAGE = 3
 CO_SO_CHOICES = ("Linh Xuân", "Sài Gòn", "Khác")
 BLOCKED_MESSAGE = "Mã này không thể đăng ký sự kiện này. Vui lòng liên hệ ban tổ chức."
+RATE_LIMITED_MESSAGE = "Bạn thao tác quá nhanh, vui lòng thử lại sau 1 phút"
+# Ô bẫy (honeypot) trong form đăng ký: người dùng thật không thấy (ẩn bằng CSS .hp-field), bot tự điền mọi ô thì điền
+# cả ô này. Tên ô cố ý không giống "website"/"url" để trình duyệt không tự điền.
+HONEYPOT_FIELD = "ghi_chu_noi_bo"
+register_limiter = PerIpRateLimiter()
 
 
 def _hero_events():
@@ -275,7 +281,22 @@ def public_don_vi():
 @register_bp.post("/api/register")
 @access(perm.PUBLIC)
 def register():
+    # Giới hạn theo IP thật (client_ip, sau ProxyFix) cho cả /register và /api/register -- đếm MỌI lần gửi
+    if not register_limiter.allow(client_ip() or "?", current_app.config["REGISTER_RATE_LIMIT"]):
+        response = jsonify({"success": False, "message": RATE_LIMITED_MESSAGE})
+        response.status_code = 429
+        response.headers["Retry-After"] = "60"
+        return response
+
     payload = request.get_json(silent=True) or request.form
+    if str(payload.get(HONEYPOT_FIELD) or "").strip():
+        # Bot: giả vờ thành công (để bot không đổi cách), KHÔNG lưu gì, chỉ ghi nhật ký
+        ho_ten_bot = str(payload.get("ho_ten") or "").strip()[:255]
+        log_action("registration.honeypot", "event", str(payload.get("event_id") or "")[:20] or None, {
+            "ma_cbsv": str(payload.get("ma_cbsv") or "")[:50], "ho_ten": ho_ten_bot,
+            "email": str(payload.get("email") or "")[:255], "o_bay": str(payload.get(HONEYPOT_FIELD))[:200],
+        }, username="(bot)")
+        return jsonify({"success": True, "message": f"Đăng ký thành công cho {ho_ten_bot}."})
     ma_cbsv = (payload.get("ma_cbsv") or "").strip()
     ho_ten = (payload.get("ho_ten") or "").strip()
     don_vi_id = payload.get("don_vi_id")

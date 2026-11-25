@@ -50,6 +50,7 @@ ACTION_LABELS = {
     "registration.cancel_bulk": "Xóa (hủy) đăng ký hàng loạt",
     "registration.restore": "Khôi phục đăng ký",
     "registration.reregister": "Người đã bị hủy tự đăng ký lại",
+    "registration.honeypot": "Chặn đăng ký tự động (ô bẫy)",
     "checkin.add_manual": "Thêm check-in thủ công",
     "checkin.import": "Import check-in",
     "checkin.delete": "Xóa check-in",

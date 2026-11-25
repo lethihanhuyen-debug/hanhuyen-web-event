@@ -4242,3 +4242,15 @@ td.col-num {
   font-size: var(--text-xs);
   vertical-align: middle;
 }
+
+/* Ô bẫy chống đăng ký tự động (form đăng ký): đưa ra ngoài màn hình thay vì display:none để bot vẫn "thấy" và điền */
+.hp-field {
+  position: absolute !important;
+  left: -10000px !important;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

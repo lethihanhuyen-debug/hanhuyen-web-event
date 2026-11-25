@@ -46,6 +46,8 @@ app.config["EVENT_IMAGE_DIR"] = TEST_IMAGE_DIR
 app.config["EVENT_IMAGE_BACKUP_DIR"] = TEST_IMAGE_BACKUP_DIR
 atexit.register(shutil.rmtree, TEST_IMAGE_DIR, True)
 atexit.register(shutil.rmtree, TEST_IMAGE_BACKUP_DIR, True)
+# Mọi request test đến từ cùng 1 IP: nới giới hạn đăng ký theo IP (test riêng của giới hạn tự đặt lại số nhỏ)
+app.config["REGISTER_RATE_LIMIT"] = 100000
 
 
 class AppTestCase(unittest.TestCase):

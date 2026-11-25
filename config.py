@@ -63,6 +63,9 @@ class Config:
     # Số request tối đa mỗi phút cho MỖI IP vào các route chứng chỉ công khai (tải/xem/xác minh). Để cao vì cả
     # trường thường dùng chung 1 IP công cộng (Wi-Fi trường). Quá mức -> 429.
     CERT_PUBLIC_RATE_LIMIT = int(os.getenv("CERT_PUBLIC_RATE_LIMIT", "120"))
+    # Số lần gửi form đăng ký tối đa mỗi phút cho MỖI IP (/register và /api/register, tính cả lần bị từ chối). Để 30
+    # vì sinh viên dùng chung Wi-Fi trường (chung 1 IP công cộng). Quá mức -> 429 "Bạn thao tác quá nhanh...".
+    REGISTER_RATE_LIMIT = int(os.getenv("REGISTER_RATE_LIMIT", "30"))
     # Ảnh (banner) sự kiện: IIS/Flask phục vụ qua /static/events/... nên trên server PHẢI để mặc định. Biến môi trường
     # chỉ dùng khi chạy thử m008 trên một bản sao thư mục ảnh.
     EVENT_IMAGE_DIR = Path(os.getenv("EVENT_IMAGE_DIR") or (BASE_DIR / "event_checkin" / "static" / "events"))

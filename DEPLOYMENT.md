@@ -298,6 +298,7 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
 - [ ] `python -m event_checkin.migrations.m006_phan_quyen --check` và `python -m event_checkin.migrations.m007_certificate_token --check` đều báo `OK`
 - [ ] `python -m event_checkin.migrations.m008_event_image_size --check` báo `OK`
 - [ ] `python -m event_checkin.migrations.m009_huy_dang_ky --check` báo `OK`
+- [ ] Giới hạn đăng ký: **Nhật ký hoạt động** ghi IP thật của máy khác (không phải `127.0.0.1`) -- nếu không, giới hạn `REGISTER_RATE_LIMIT` sẽ tính cả trường là 1 IP
 - [ ] Xóa người đăng ký: đăng nhập admin, mở chi tiết 1 sự kiện thử, xóa 1 người → biến khỏi danh sách, số "Đã đăng ký" giảm 1, có trong mục "Đã hủy"; bấm Khôi phục → quay lại như cũ. Đăng nhập staff: không thấy nút Xóa
 - [ ] **Ảnh sau khi `git pull`**: trước pull đã sao lưu `event_checkin\static\events` và `instance\` (mục 9 → Cập nhật code); sau pull số file ảnh bằng số trước pull; thiếu thì chép lại từ bản sao lưu. Mở trang chủ: sự kiện nào có ảnh đều hiện đúng ảnh (không hiện ảnh mặc định ngoài ý muốn)
 - [ ] Tải thử ảnh sự kiện > 15MB: báo "File quá lớn..." (không phải trang lỗi 413 trống)
@@ -427,6 +428,7 @@ New-NetFirewallRule -DisplayName "HTTPS" -Direction Inbound -Protocol TCP -Local
      ```
      m009 chỉ **thêm** cột vào `registrations` (đăng ký cũ = đang hiệu lực), không sửa/xóa dữ liệu.
   4. Kiểm tra: trang chủ và trang Quản trị mở được; số "Đã đăng ký" của các sự kiện không đổi so với trước khi cập nhật.
+  - **Chống đăng ký ảo** (cùng đợt, không cần migration): mỗi IP gửi form đăng ký tối đa `REGISTER_RATE_LIMIT` lần/phút (mặc định `30`, đặt trong `.env`; để cao vì sinh viên dùng chung Wi-Fi trường), quá thì báo "Bạn thao tác quá nhanh, vui lòng thử lại sau 1 phút". IP lấy theo IP thật sau ProxyFix (xem mục kiểm tra IP thật ở trên): nếu IP luôn là `127.0.0.1` thì **cả trường bị tính chung 1 IP** và giới hạn này chặn nhầm -- phải sửa cấu hình IP thật trước. Form có thêm 1 ô bẫy ẩn: bot điền vào thì web giả vờ báo thành công nhưng không lưu, ghi nhật ký "Chặn đăng ký tự động (ô bẫy)".
 - **Gia hạn SSL**: tự động qua Scheduled Task của win-acme, không cần làm gì thêm trừ khi domain đổi hoặc chứng chỉ gặp lỗi (kiểm tra bằng `wacs.exe` → renew manually nếu nghi ngờ).
 - **Giám sát**: định kỳ xem `Get-Service EventCheckinApp, MariaDB, W3SVC` để chắc cả 3 đang `Running`.
 
