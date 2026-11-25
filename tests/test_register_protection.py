@@ -115,3 +115,32 @@ class RegisterProtectionTest(AppTestCase):
         self.assertIn("<span>Bạn là</span>", page)
         self.assertIn('<option value="Sinh viên">Sinh viên</option>', page)
         self.assertNotIn("Chức vụ", page)
+
+
+class HeroOrderTest(AppTestCase):
+    """Banner trang chủ: 3 sự kiện mới tạo nhất, tạo cùng giây thì sự kiện tạo sau (id lớn hơn) đứng trước, cố định."""
+
+    def test_same_created_at_keeps_stable_order(self):
+        from datetime import datetime
+
+        from event_checkin.controllers.register_controller import _hero_events
+
+        now = now_vn_naive()
+        future = datetime(2099, 1, 1, 0, 0, 0)
+        with app.app_context():
+            ids = []
+            for i in range(3):
+                event = Event(ten_su_kien=f"Banner cùng giây {i} {self.suffix}", ngay_bat_dau=now, ngay_ket_thuc=now,
+                              thang=now.month, nam=now.year, thoi_gian_mo_dang_ky=now, thoi_gian_dong_dang_ky=now,
+                              created_by=self.accounts["super_admin"][0], created_at=future)
+                db.session.add(event)
+                db.session.flush()
+                ids.append(event.id)
+            db.session.commit()
+            try:
+                with app.test_request_context():
+                    for _ in range(5):
+                        self.assertEqual([item["id"] for item in _hero_events()], sorted(ids, reverse=True))
+            finally:
+                Event.query.filter(Event.id.in_(ids)).delete(synchronize_session=False)
+                db.session.commit()
