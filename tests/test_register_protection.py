@@ -8,7 +8,7 @@ from event_checkin.models.event import Event
 from event_checkin.models.registration import Registration
 from event_checkin.models.user import User
 from event_checkin.utils.timezone import now_vn_naive
-from tests.base import AppTestCase, app, db
+from tests.base import AppTestCase, app, db, test_don_vi_id
 
 
 class RegisterProtectionTest(AppTestCase):
@@ -47,7 +47,7 @@ class RegisterProtectionTest(AppTestCase):
 
     def payload(self, n, **extra):
         return {"ma_cbsv": f"{self.prefix}{n:03d}", "ho_ten": "Người Thử", "email": f"rp{n}@example.com", "chuc_vu": "Sinh viên",
-                "event_id": self.event_id, **extra}
+                "don_vi_id": test_don_vi_id(), "event_id": self.event_id, **extra}
 
     def registered(self, n):
         with app.app_context():
@@ -119,6 +119,17 @@ class RegisterProtectionTest(AppTestCase):
         self.assertIn('<option value="Sinh viên">Sinh viên</option>', page)
         self.assertIn('<option value="Học viên sau đại học">Học viên sau đại học</option>', page)
         self.assertNotIn("Chức vụ", page)
+        self.assertIn('<option value="" disabled selected hidden>— Chọn đối tượng —</option>', page)
+        self.assertIn('<option value="" disabled selected hidden>— Chọn đơn vị —</option>', page)
+
+    def test_don_vi_required_when_list_exists(self):
+        client = self.client_for()
+        data = self.payload(30)
+        data.pop("don_vi_id")
+        response = client.post("/api/register", json=data)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("chọn đơn vị", response.get_json()["message"])
+        self.assertEqual(self.registered(30), 0)
 
 
 class HeroOrderTest(AppTestCase):

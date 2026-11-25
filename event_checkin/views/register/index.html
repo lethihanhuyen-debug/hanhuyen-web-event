@@ -139,7 +139,9 @@
         </label>
         <label>
           <span>Đơn vị (phòng/ban/viện/trung tâm/khoa)</span>
-          <select name="don_vi" id="don_vi">
+          {# Dòng gợi ý không chọn được (disabled): người dùng PHẢI tự chọn, không lưu nhầm đơn vị đầu danh sách #}
+          <select name="don_vi" id="don_vi"{% if don_vi_items %} required{% endif %}>
+            <option value="" disabled selected hidden>— Chọn đơn vị —</option>
             {% for item in don_vi_items %}
               <option value="{{ item.id }}">{{ item.ten_don_vi }}</option>
             {% endfor %}
@@ -149,6 +151,7 @@
           <span>Đối tượng</span>
           {# Lưu vào cột users.chuc_vu; server chỉ nhận đúng 3 giá trị này (register_controller.DOI_TUONG_CHOICES) #}
           <select name="chuc_vu" id="chuc_vu" required>
+            <option value="" disabled selected hidden>— Chọn đối tượng —</option>
             <option value="Cán bộ">Cán bộ</option>
             <option value="Sinh viên">Sinh viên</option>
             <option value="Học viên sau đại học">Học viên sau đại học</option>
@@ -429,7 +432,7 @@
       ma_cbsv: maInput.value.trim(),
       ho_ten: hoTenInput.value.trim(),
       don_vi_id: Number(donViInput.value || 0) || null,
-      chuc_vu: chucVuInput.value.trim(),
+      chuc_vu: (chucVuInput.value || '').trim(),
       so_dien_thoai: sdtInput.value.trim(),
       email: emailInput.value.trim(),
     };

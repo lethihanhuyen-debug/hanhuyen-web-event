@@ -4,7 +4,7 @@ from collections import Counter
 
 from flask import Flask
 
-from tests.base import AppTestCase, app, db  # import này cũng kiểm tra tên DB trước tiên
+from tests.base import AppTestCase, app, db, test_don_vi_id  # import này cũng kiểm tra tên DB trước tiên
 
 from config import Config
 from event_checkin import permissions as perm
@@ -95,7 +95,7 @@ class AnonymousTest(AppTestCase):
                 self.skipTest("DB thử không có sự kiện đang mở đăng ký")
             event_id = event.id
             code = "T006" + self.suffix.upper()
-            payload = {"ma_cbsv": code, "ho_ten": "Nguoi Test", "email": f"{code.lower()}@example.com", "chuc_vu": "Sinh viên", "event_id": event_id}
+            payload = {"ma_cbsv": code, "ho_ten": "Nguoi Test", "email": f"{code.lower()}@example.com", "chuc_vu": "Sinh viên", "don_vi_id": test_don_vi_id(), "event_id": event_id}
             existed = User.query.filter_by(ma_cbsv=code).first() is not None
         try:
             response = self.client.post("/api/register", json=payload)

@@ -54,6 +54,21 @@ app.config["LOGIN_RATE_LIMIT"] = 100000
 app.config["LOGIN_FAIL_LIMIT"] = 100000
 
 
+def test_don_vi_id():
+    """Id 1 đơn vị đang hoạt động cho payload đăng ký (form bắt buộc chọn đơn vị khi có danh sách)."""
+    from event_checkin.models.don_vi import DonVi
+    with app.app_context():
+        item = DonVi.query.filter_by(is_active=True).first()
+        if item is None:
+            item = DonVi(ten_don_vi="Đơn vị thử (test)", is_active=True)
+            db.session.add(item)
+            db.session.commit()
+        return item.id
+
+
+test_don_vi_id.__test__ = False   # không phải test case
+
+
 class AppTestCase(unittest.TestCase):
     """Tạo 3 tài khoản thử (super_admin / admin / staff) cho cả lớp test, xóa khi xong."""
 

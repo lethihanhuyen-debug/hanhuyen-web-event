@@ -362,6 +362,9 @@ def register():
             return jsonify({"success": False, "message": "Đơn vị không hợp lệ."}), 400
     elif don_vi_text:
         don_vi = _get_or_create_don_vi(don_vi_text)
+    elif DonVi.query.filter_by(is_active=True).first() is not None:
+        # form có danh sách đơn vị thì bắt buộc chọn (không để trống / không tự lấy đơn vị mặc định)
+        return jsonify({"success": False, "message": "Vui lòng chọn đơn vị."}), 400
     user = User.query.filter_by(ma_cbsv=ma_cbsv).first()
     now = datetime.utcnow()
 
