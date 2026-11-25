@@ -130,15 +130,15 @@
       <form id="registerForm" class="form-grid">
         <input type="hidden" name="event_id" id="event_id" value="{{ selected_event.id }}">
         <label>
-          <span>Mã CB/SV</span>
-          <input type="text" name="ma_cbsv" id="ma_cbsv" placeholder="Nhập mã CB/SV" required>
+          <span>Mã số (cán bộ/sinh viên)</span>
+          <input type="text" name="ma_cbsv" id="ma_cbsv" placeholder="Nhập mã số cán bộ/sinh viên" required>
         </label>
         <label>
           <span>Họ tên</span>
           <input type="text" name="ho_ten" id="ho_ten" placeholder="Họ và tên" pattern="[^0-9]*" title="Họ tên không được chứa chữ số" required>
         </label>
         <label>
-          <span>Đơn vị</span>
+          <span>Đơn vị (phòng/ban/viện/trung tâm/khoa)</span>
           <select name="don_vi" id="don_vi">
             <option value="">Chọn đơn vị</option>
             {% for item in don_vi_items %}

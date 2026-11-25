@@ -38,7 +38,7 @@ class Event(db.Model):
     # Ai sửa gần nhất (m006); NULL với sự kiện chưa từng sửa sau khi có phân quyền.
     updated_by = db.Column(db.Integer, db.ForeignKey("admins.id"))
 
-    DEFAULT_QUESTION_TITLE = "Câu hỏi bạn muốn gửi đến diễn giả"
+    DEFAULT_QUESTION_TITLE = "Thầy/Cô/Các bạn có câu hỏi nào gửi đến diễn giả của buổi tập huấn/sự kiện không?"
 
     @property
     def question_title(self):
